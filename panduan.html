@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panduan Guru — SimKimia</title>
+<meta name="description" content="Panduan memakai SimKimia di kelas: pemetaan capaian pembelajaran Fase A sampai F, saran kegiatan, dan cara memasang situs sendiri.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f766e'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>K</text></svg>">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/sim.css">
+<style>
+  .doc { max-width: 820px; margin-inline: auto; padding: 32px 16px 64px; }
+  .doc h1 {
+    font-family: var(--font-display); font-size: clamp(30px, 5vw, 42px);
+    letter-spacing: -0.03em; margin-bottom: 12px;
+  }
+  .doc .lede { font-size: 18px; color: var(--ink-soft); margin-bottom: 36px; max-width: 62ch; }
+  .doc h2 {
+    font-family: var(--font-display); font-size: 24px; margin-top: 44px; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--line);
+  }
+  .doc h3 { font-size: 17px; margin-top: 26px; margin-bottom: 7px; }
+  .doc p, .doc li { color: var(--ink-soft); font-size: 15.5px; line-height: 1.65; }
+  .doc p { margin: 0 0 13px; }
+  .doc ul, .doc ol { padding-left: 22px; margin: 0 0 16px; }
+  .doc li { margin-bottom: 6px; }
+  .doc li::marker { color: var(--accent); }
+  .doc strong { color: var(--ink); font-weight: 620; }
+  .doc code {
+    font-family: var(--font-mono); font-size: .88em; background: var(--bg-sunken);
+    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line);
+  }
+  .doc pre {
+    background: var(--bg-sunken); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: var(--r-md); padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+  }
+  .doc pre code { background: none; border: none; padding: 0; font-size: 13.5px; line-height: 1.6; }
+  .doc table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 14px 0 20px; }
+  .doc th, .doc td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .doc th {
+    font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 700;
+  }
+  .doc td { color: var(--ink-soft); }
+  .fase-tag {
+    display: inline-block; width: 22px; height: 22px; border-radius: 6px;
+    color: #fff; font-size: 12px; font-weight: 800; text-align: center; line-height: 22px;
+    margin-right: 8px; flex-shrink: 0;
+  }
+  .toc {
+    background: var(--bg-raised); border: 1px solid var(--line);
+    border-radius: var(--r-lg); padding: 18px 22px; margin-bottom: 36px;
+  }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc a { font-size: 14.5px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark" aria-hidden="true">K</span>
+      <span>SimKimia</span>
+    </a>
+    <div class="topbar-spacer"></div>
+    <a class="btn btn-ghost btn-sm" href="index.html">Semua simulasi</a>
+    <button class="btn btn-ghost theme-toggle" type="button" id="tema"
+            title="Ganti mode terang/gelap" aria-label="Ganti mode terang atau gelap">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2.6v2M12 19.4v2M2.6 12h2M19.4 12h2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M18.6 5.4l-1.4 1.4M6.8 17.2l-1.4 1.4"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="doc">
+
+  <h1>Panduan Guru</h1>
+  <p class="lede">
+    SimKimia dirancang untuk disisipkan ke dalam alur pembelajaran yang sudah Anda susun,
+    bukan menggantikannya. Halaman ini menjelaskan cara memakainya di kelas, pemetaannya
+    terhadap capaian pembelajaran, dan cara memasang salinan Anda sendiri.
+  </p>
+
+  <nav class="toc" aria-label="Daftar isi">
+    <ol>
+      <li><a href="#cara">Cara memakai di kelas</a></li>
+      <li><a href="#struktur">Struktur setiap halaman simulasi</a></li>
+      <li><a href="#pemetaan">Pemetaan capaian pembelajaran</a></li>
+      <li><a href="#kegiatan">Tiga pola kegiatan yang bisa langsung dipakai</a></li>
+      <li><a href="#luring">Memakai tanpa internet</a></li>
+      <li><a href="#pasang">Memasang salinan sendiri di GitHub Pages</a></li>
+      <li><a href="#ubah">Menambah atau mengubah simulasi</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="cara">Cara memakai di kelas</h2>
+
+  <p>
+    Setiap simulasi berdiri sendiri dalam satu halaman. Tidak ada akun, tidak ada
+    pemasangan, dan tidak ada data yang dikirim ke mana pun. Cukup bagikan tautannya,
+    atau tampilkan di proyektor.
+  </p>
+
+  <h3>Tiga kemungkinan pemakaian</h3>
+  <ul>
+    <li><strong>Demonstrasi di depan kelas</strong> — tampilkan di proyektor, ubah satu
+      pengaturan, dan minta peserta didik meramalkan apa yang akan terjadi sebelum Anda
+      menekan tombolnya. Pertanyaan "menurut kalian apa yang terjadi kalau…" jauh lebih
+      berharga daripada menunjukkan hasilnya langsung.</li>
+    <li><strong>Kerja berpasangan</strong> — satu perangkat untuk dua peserta didik.
+      Pakai daftar <em>Ajakan bereksperimen</em> di setiap halaman sebagai lembar kerja
+      yang sudah jadi.</li>
+    <li><strong>Penugasan mandiri</strong> — bagikan tautan simulasi beserta beberapa
+      pertanyaan. Bagian <em>Latihan cepat</em> di tiap halaman sudah berpembahasan,
+      sehingga peserta didik dapat memeriksa pemahamannya sendiri.</li>
+  </ul>
+
+  <div class="callout" data-tone="tip">
+    <strong>Pola yang paling berhasil</strong>
+    Ramalkan → coba → jelaskan. Minta peserta didik menuliskan ramalannya lebih dulu,
+    baru menjalankan simulasinya. Ketidakcocokan antara ramalan dan hasil adalah momen
+    belajar yang paling kuat.
+  </div>
+
+  <h2 id="struktur">Struktur setiap halaman simulasi</h2>
+
+  <p>Seluruh halaman simulasi memiliki susunan yang sama, sehingga peserta didik tidak
+  perlu belajar ulang cara memakainya:</p>
+
+  <table>
+    <thead><tr><th>Bagian</th><th>Isi</th></tr></thead>
+    <tbody>
+      <tr><td>Panggung</td><td>Tampilan interaktif beserta tombol jalan, langkah, dan atur ulang</td></tr>
+      <tr><td>Panel kontrol</td><td>Penggeser, sakelar, dan pilihan untuk mengubah keadaan</td></tr>
+      <tr><td>Pembacaan</td><td>Angka hasil pengukuran yang diperbarui seketika</td></tr>
+      <tr><td>Konsep kunci</td><td>Penjelasan lengkap beserta rumus dan tabel</td></tr>
+      <tr><td>Ajakan bereksperimen</td><td>Empat kegiatan terarah, siap dipakai sebagai lembar kerja</td></tr>
+      <tr><td>Latihan cepat</td><td>Tiga sampai empat soal pilihan ganda berpembahasan</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="pemetaan">Pemetaan capaian pembelajaran</h2>
+
+  <p>
+    Simulasi dikelompokkan menurut fase Kurikulum Merdeka. Setiap kartu di halaman utama
+    memuat label fase, jenjang kelas, dan topik, sehingga mudah dicocokkan dengan alur
+    tujuan pembelajaran Anda. Gunakan kotak pencarian untuk mencari berdasarkan kata kunci
+    capaian pembelajaran.
+  </p>
+
+  <div id="peta"></div>
+
+  <h2 id="kegiatan">Tiga pola kegiatan yang bisa langsung dipakai</h2>
+
+  <h3>1. Lembar ramalan (15 menit)</h3>
+  <p>
+    Sebelum membuka simulasi, bagikan tiga pertanyaan ramalan. Contoh untuk
+    <em>Laju Reaksi</em>: "Mana yang lebih berpengaruh terhadap laju — menaikkan suhu
+    10 °C atau menggandakan konsentrasi?" Peserta didik menulis ramalan dan alasannya,
+    baru kemudian mengujinya.
+  </p>
+
+  <h3>2. Perburuan pola (25 menit)</h3>
+  <p>
+    Berikan satu simulasi dan satu tabel kosong. Tugasnya: mengisi tabel dengan mengubah
+    satu variabel pada satu waktu, lalu merumuskan pola yang ditemukan dengan kalimat
+    sendiri. Cocok untuk <em>Hukum-Hukum Dasar Kimia</em>, <em>Tabel Periodik</em>, dan
+    <em>Sifat Koligatif</em>.
+  </p>
+
+  <h3>3. Mencari yang salah (20 menit)</h3>
+  <p>
+    Berikan pernyataan yang keliru dan minta peserta didik membuktikannya salah memakai
+    simulasi. Contoh: "Katalis menggeser kesetimbangan ke kanan sehingga hasilnya lebih
+    banyak." Peserta didik membuktikan sendiri bahwa posisi kesetimbangan tidak berubah.
+  </p>
+
+  <h2 id="luring">Memakai tanpa internet</h2>
+
+  <p>
+    Seluruh situs berjalan sepenuhnya di peramban. Setelah berkasnya ada di komputer,
+    tidak diperlukan sambungan internet sama sekali — cocok untuk laboratorium sekolah
+    dengan jaringan terbatas.
+  </p>
+
+  <p>Dua cara memakainya secara luring:</p>
+  <ol>
+    <li><strong>Buka berkas langsung.</strong> Unduh seluruh folder, lalu buka
+      <code>index.html</code> dengan klik ganda. Katalog sengaja disimpan sebagai berkas
+      JavaScript, bukan JSON, agar cara ini tetap berfungsi.</li>
+    <li><strong>Jalankan server lokal</strong> (disarankan bila ingin membuka dari
+      perangkat lain di jaringan yang sama):
+      <pre><code>cd simkimia
+python3 -m http.server 8000</code></pre>
+      Lalu buka <code>http://localhost:8000</code>, atau alamat IP komputer tersebut
+      dari perangkat lain.
+    </li>
+  </ol>
+
+  <h2 id="pasang">Memasang salinan sendiri di GitHub Pages</h2>
+
+  <p>Anda dapat memasang salinan Anda sendiri secara gratis:</p>
+
+  <ol>
+    <li>Buat repositori baru di GitHub, misalnya bernama <code>simkimia</code>.</li>
+    <li>Unggah seluruh berkas proyek ini ke repositori tersebut.</li>
+    <li>Buka <strong>Settings → Pages</strong>.</li>
+    <li>Pada bagian <em>Source</em>, pilih <strong>Deploy from a branch</strong>,
+      lalu pilih cabang <code>main</code> dan folder <code>/ (root)</code>.</li>
+    <li>Tekan <strong>Save</strong>. Setelah satu sampai dua menit, situs Anda tersedia di
+      <code>https://&lt;nama-pengguna&gt;.github.io/simkimia/</code>.</li>
+  </ol>
+
+  <div class="callout" data-tone="warn">
+    <strong>Jangan hapus berkas .nojekyll</strong>
+    Berkas kosong bernama <code>.nojekyll</code> di akar proyek memberi tahu GitHub Pages
+    agar menyajikan berkas apa adanya. Tanpa berkas itu, sebagian folder bisa diabaikan.
+  </div>
+
+  <h2 id="ubah">Menambah atau mengubah simulasi</h2>
+
+  <p>
+    Proyek ini ditulis dengan HTML, CSS, dan JavaScript murni — tanpa kerangka kerja dan
+    tanpa proses <em>build</em>. Semua yang Anda lihat dapat diubah dengan penyunting teks
+    biasa.
+  </p>
+
+  <h3>Mengubah teks penjelasan</h3>
+  <p>
+    Buka <code>sims/&lt;nama-simulasi&gt;/sim.js</code> dan cari bagian <code>notes</code>,
+    <code>explore</code>, atau <code>quiz</code>. Ketiganya berisi teks biasa yang bisa
+    langsung disunting sesuai kebutuhan kelas Anda.
+  </p>
+
+  <h3>Menambah simulasi baru</h3>
+  <ol>
+    <li>Tambahkan satu entri ke <code>assets/js/katalog.js</code>.</li>
+    <li>Jalankan <code>node tools/buat-shell.js</code> untuk membuat kerangka HTML-nya.</li>
+    <li>Tulis logikanya di <code>sims/&lt;slug&gt;/sim.js</code>, mengikuti pola simulasi
+      yang sudah ada.</li>
+    <li>Jalankan <code>node tools/uji.js</code> untuk memastikan semuanya tetap berjalan.</li>
+  </ol>
+
+  <h3>Alat uji bawaan</h3>
+  <p>
+    Perintah <code>node tools/uji.js</code> menjalankan setiap simulasi tanpa peramban:
+    membangun panel kontrol, menjalankan empat puluh bingkai animasi, menggeser setiap
+    kontrol ke nilai ekstremnya, menekan setiap tombol, dan mengklik seluruh bagian
+    panggung. Jalankan perintah ini setiap kali Anda mengubah sesuatu.
+  </p>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>SimKimia</strong> — simulasi kimia interaktif untuk Fase A sampai F, Kurikulum Merdeka.</p>
+    <p style="margin-bottom:0">
+      Terinspirasi pendekatan <a href="https://phet.colorado.edu" target="_blank" rel="noopener">PhET Interactive Simulations</a>.
+      SimKimia adalah karya mandiri dan tidak berafiliasi dengan PhET.
+    </p>
+  </div>
+</footer>
+
+<script src="assets/js/core.js"></script>
+<script src="assets/js/katalog.js"></script>
+<script>
+(function () {
+  document.getElementById('tema').addEventListener('click', Sim.Theme.toggle);
+
+  // Bangun tabel pemetaan capaian pembelajaran dari katalog.
+  const el = Sim.el;
+  const wadah = document.getElementById('peta');
+  ['A', 'B', 'C', 'D', 'E', 'F'].forEach(function (f) {
+    const info = window.FASE_INFO[f];
+    const isi = window.KATALOG.filter(function (s) { return s.fase === f; });
+    if (!isi.length) return;
+
+    const judul = el('h3', { style: { display: 'flex', alignItems: 'center', marginTop: '28px' } }, [
+      el('span', { class: 'fase-tag', style: { background: info.warna }, text: f }),
+      el('span', { text: info.label + ' — ' + info.jenjang + '  (' + isi.length + ' simulasi)' })
+    ]);
+    wadah.appendChild(judul);
+
+    const tbody = el('tbody', {}, isi.map(function (s) {
+      return el('tr', {}, [
+        el('td', {}, [el('a', { href: 'sims/' + s.slug + '/index.html', text: s.judul })]),
+        el('td', { text: s.cp || '—' })
+      ]);
+    }));
+    wadah.appendChild(el('table', {}, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', { text: 'Simulasi', style: { width: '36%' } }),
+        el('th', { text: 'Capaian pembelajaran yang didukung' })
+      ])]),
+      tbody
+    ]));
+  });
+})();
+</script>
+</body>
+</html>

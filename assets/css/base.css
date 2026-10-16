@@ -1,0 +1,301 @@
+/* ==========================================================================
+   SimKimia — sistem desain dasar
+   Token warna, tipografi, dan komponen yang dipakai seluruh situs.
+   ========================================================================== */
+
+:root {
+  /* Warna dasar */
+  --bg:            #f6f7f4;
+  --bg-raised:     #ffffff;
+  --bg-sunken:     #eceee8;
+  --bg-stage:      #11161c;
+  --ink:           #16191c;
+  --ink-soft:      #4e565e;
+  --ink-faint:     #858f99;
+  --line:          #dcdfd8;
+  --line-strong:   #c2c7bd;
+
+  /* Aksen */
+  --accent:        #0f766e;
+  --accent-soft:   #d6ece9;
+  --accent-ink:    #0a524c;
+  --amber:         #b45309;
+  --amber-soft:    #fcebd4;
+  --rose:          #b91c4a;
+  --rose-soft:     #fbe0e8;
+  --violet:        #6d28d9;
+  --violet-soft:   #eadff9;
+  --blue:          #1d4ed8;
+  --blue-soft:     #dbe4fd;
+
+  /* Warna fase (A paling muda → F paling tua) */
+  --fase-a: #e8713c;
+  --fase-b: #d9951f;
+  --fase-c: #68922b;
+  --fase-d: #0f8a7e;
+  --fase-e: #2563c9;
+  --fase-f: #7b3fc4;
+
+  /* Warna kimia yang dipakai di kanvas */
+  --c-proton:   #e0533d;
+  --c-neutron:  #7a8694;
+  --c-electron: #3b82f6;
+  --c-asam:     #e0533d;
+  --c-basa:     #3b6fe0;
+  --c-netral:   #3f9b52;
+  --c-air:      #5aa9e6;
+  --c-panas:    #e8763c;
+  --c-dingin:   #4a90d9;
+
+  /* Bentuk & bayangan */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --shadow-sm: 0 1px 2px rgba(20, 28, 24, .07), 0 1px 3px rgba(20, 28, 24, .05);
+  --shadow-md: 0 2px 6px rgba(20, 28, 24, .07), 0 8px 24px rgba(20, 28, 24, .07);
+  --shadow-lg: 0 4px 12px rgba(20, 28, 24, .08), 0 18px 48px rgba(20, 28, 24, .11);
+
+  /* Tipografi */
+  --font-ui: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code", monospace;
+
+  --maxw: 1200px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:          #14171a;
+    --bg-raised:   #1c2125;
+    --bg-sunken:   #0f1215;
+    --bg-stage:    #0b0e12;
+    --ink:         #e8eae7;
+    --ink-soft:    #a4aeb5;
+    --ink-faint:   #6e7980;
+    --line:        #2a3036;
+    --line-strong: #3c444b;
+
+    --accent:      #4fd1c0;
+    --accent-soft: #10342f;
+    --accent-ink:  #9af0e2;
+    --amber:       #f0a94a;
+    --amber-soft:  #3a2a12;
+    --rose:        #f48ca9;
+    --rose-soft:   #3c1623;
+    --violet:      #b795f0;
+    --violet-soft: #271643;
+    --blue:        #7ea5f5;
+    --blue-soft:   #16203d;
+
+    --fase-a: #f08a57;
+    --fase-b: #e8b33f;
+    --fase-c: #9ac356;
+    --fase-d: #3fc0b0;
+    --fase-e: #6a9df0;
+    --fase-f: #a97ae8;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, .45), 0 18px 48px rgba(0, 0, 0, .4);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:          #14171a;
+  --bg-raised:   #1c2125;
+  --bg-sunken:   #0f1215;
+  --bg-stage:    #0b0e12;
+  --ink:         #e8eae7;
+  --ink-soft:    #a4aeb5;
+  --ink-faint:   #6e7980;
+  --line:        #2a3036;
+  --line-strong: #3c444b;
+  --accent:      #4fd1c0;
+  --accent-soft: #10342f;
+  --accent-ink:  #9af0e2;
+  --amber:       #f0a94a;
+  --amber-soft:  #3a2a12;
+  --rose:        #f48ca9;
+  --rose-soft:   #3c1623;
+  --violet:      #b795f0;
+  --violet-soft: #271643;
+  --blue:        #7ea5f5;
+  --blue-soft:   #16203d;
+  --fase-a: #f08a57;
+  --fase-b: #e8b33f;
+  --fase-c: #9ac356;
+  --fase-d: #3fc0b0;
+  --fase-e: #6a9df0;
+  --fase-f: #a97ae8;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, .45), 0 18px 48px rgba(0, 0, 0, .4);
+}
+
+/* -------------------------------------------------------------- reset --- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { line-height: 1.2; margin: 0; font-weight: 600; letter-spacing: -0.015em; }
+
+a { color: var(--accent-ink); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--accent); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+img, svg, canvas { display: block; max-width: 100%; }
+
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------- utilitas -- */
+
+.wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: 16px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.stack > * + * { margin-top: var(--gap, 12px); }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- lencana */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  background: var(--bg-sunken); color: var(--ink-soft);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.badge-fase { color: #fff; border-color: transparent; }
+.badge-fase[data-fase="A"] { background: var(--fase-a); }
+.badge-fase[data-fase="B"] { background: var(--fase-b); }
+.badge-fase[data-fase="C"] { background: var(--fase-c); }
+.badge-fase[data-fase="D"] { background: var(--fase-d); }
+.badge-fase[data-fase="E"] { background: var(--fase-e); }
+.badge-fase[data-fase="F"] { background: var(--fase-f); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .badge-fase { color: #0d1114; }
+}
+:root[data-theme="dark"] .badge-fase { color: #0d1114; }
+
+/* ---------------------------------------------------------------- tombol */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--ink);
+  font-size: 14px; font-weight: 550;
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease, transform .08s ease;
+}
+.btn:hover { background: var(--bg-sunken); border-color: var(--ink-faint); }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.btn-primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-primary { color: #06201d; }
+}
+:root[data-theme="dark"] .btn-primary { color: #06201d; }
+
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--bg-sunken); border-color: var(--line); }
+
+.btn-sm { padding: 5px 11px; font-size: 13px; border-radius: var(--r-sm); }
+
+/* ----------------------------------------------------------------- kartu */
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ------------------------------------------------------------ situs: nav */
+
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.6) blur(12px);
+  -webkit-backdrop-filter: saturate(1.6) blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-inner {
+  display: flex; align-items: center; gap: 16px;
+  min-height: 60px;
+}
+
+.brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 17px; letter-spacing: -0.02em;
+  color: var(--ink); text-decoration: none;
+}
+.brand:hover { color: var(--ink); }
+
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: linear-gradient(140deg, var(--accent), var(--blue));
+  display: grid; place-items: center;
+  color: #fff; font-size: 15px; font-weight: 800;
+  flex-shrink: 0;
+}
+
+.topbar-spacer { flex: 1 1 auto; }
+
+.theme-toggle {
+  width: 36px; height: 36px; padding: 0;
+  border-radius: 999px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.site-footer {
+  margin-top: 64px;
+  border-top: 1px solid var(--line);
+  padding: 32px 0 48px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.site-footer strong { color: var(--ink); }
+
+/* -------------------------------------------------------------- cetakan  */
+
+@media print {
+  .topbar, .site-footer, .sim-controls { display: none !important; }
+}
