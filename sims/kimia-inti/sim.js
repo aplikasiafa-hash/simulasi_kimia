@@ -1,399 +1,447 @@
-/* Kimia Inti dan Peluruhan Radioaktif — Fase F
-   Amati peluruhan alfa, beta, dan gama; ukur waktu paruh; dan gunakan
-   peluruhan karbon-14 untuk penanggalan fosil. */
+/* Kimia Inti: Peluruhan Radioaktif — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('kimia-inti', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 600;
-
+  /* t½ dalam detik; satuan tampil disesuaikan */
   const ISOTOP = [
-    { n: 'Karbon-14', Z: 6, A: 14, t: 5730, satuan: 'tahun', jenis: 'beta',
-      anak: 'Nitrogen-14', guna: 'Penanggalan fosil dan benda arkeologi' },
-    { n: 'Uranium-238', Z: 92, A: 238, t: 4.5e9, satuan: 'tahun', jenis: 'alfa',
-      anak: 'Torium-234', guna: 'Penanggalan batuan dan umur bumi' },
-    { n: 'Iodin-131', Z: 53, A: 131, t: 8.02, satuan: 'hari', jenis: 'beta',
-      anak: 'Xenon-131', guna: 'Diagnosis dan terapi kelenjar tiroid' },
-    { n: 'Kobalt-60', Z: 27, A: 60, t: 5.27, satuan: 'tahun', jenis: 'gama',
-      anak: 'Nikel-60', guna: 'Terapi kanker dan sterilisasi alat medis' },
-    { n: 'Teknesium-99m', Z: 43, A: 99, t: 6.01, satuan: 'jam', jenis: 'gama',
-      anak: 'Teknesium-99', guna: 'Pemindaian organ dalam kedokteran nuklir' },
-    { n: 'Radium-226', Z: 88, A: 226, t: 1600, satuan: 'tahun', jenis: 'alfa',
-      anak: 'Radon-222', guna: 'Sejarah penelitian radioaktivitas' },
-    { n: 'Fosforus-32', Z: 15, A: 32, t: 14.3, satuan: 'hari', jenis: 'beta',
-      anak: 'Belerang-32', guna: 'Pelacak serapan pupuk pada tanaman' }
+    { n: 'C-14 (penanggalan)', Z: 6, A: 14, jenis: 'beta', t: 1.8084e11, sat: 'tahun', bagi: 3.156e7,
+      anak: 'N-14', guna: 'penanggalan fosil & artefak' },
+    { n: 'U-238', Z: 92, A: 238, jenis: 'alfa', t: 1.41e17, sat: 'tahun', bagi: 3.156e7,
+      anak: 'Th-234', guna: 'penanggalan batuan, bahan bakar nuklir' },
+    { n: 'U-235', Z: 92, A: 235, jenis: 'alfa', t: 2.22e16, sat: 'tahun', bagi: 3.156e7,
+      anak: 'Th-231', guna: 'bahan bakar reaktor nuklir' },
+    { n: 'Ra-226', Z: 88, A: 226, jenis: 'alfa', t: 5.05e10, sat: 'tahun', bagi: 3.156e7,
+      anak: 'Rn-222', guna: 'sejarah penelitian radioaktivitas' },
+    { n: 'I-131 (tiroid)', Z: 53, A: 131, jenis: 'beta', t: 6.93e5, sat: 'hari', bagi: 86400,
+      anak: 'Xe-131', guna: 'diagnosis & terapi kelenjar tiroid' },
+    { n: 'Co-60 (radioterapi)', Z: 27, A: 60, jenis: 'gama', t: 1.66e8, sat: 'tahun', bagi: 3.156e7,
+      anak: 'Ni-60', guna: 'radioterapi kanker, sterilisasi alat' },
+    { n: 'Tc-99m (pencitraan)', Z: 43, A: 99, jenis: 'gama', t: 21600, sat: 'jam', bagi: 3600,
+      anak: 'Tc-99', guna: 'pencitraan organ (kedokteran nuklir)' },
+    { n: 'P-32 (pupuk tertanda)', Z: 15, A: 32, jenis: 'beta', t: 1.23e6, sat: 'hari', bagi: 86400,
+      anak: 'S-32', guna: 'menelusuri serapan pupuk oleh tanaman' },
+    { n: 'Na-24', Z: 11, A: 24, jenis: 'beta', t: 53856, sat: 'jam', bagi: 3600,
+      anak: 'Mg-24', guna: 'mendeteksi kebocoran pipa' },
+    { n: 'Po-210', Z: 84, A: 210, jenis: 'alfa', t: 1.2e7, sat: 'hari', bagi: 86400,
+      anak: 'Pb-206', guna: 'sumber partikel alfa' }
   ];
 
-  const SINAR = {
-    alfa: { n: 'Alfa (α)', partikel: 'inti helium ⁴₂He', muatan: '+2', massa: '4 sma',
-      daya: 'terhalang selembar kertas', dZ: -2, dA: -4, w: '#ef6a52', tembus: 0.15 },
-    beta: { n: 'Beta (β)', partikel: 'elektron ⁰₋₁e', muatan: '−1', massa: '≈ 0',
-      daya: 'terhalang lempeng aluminium', dZ: 1, dA: 0, w: '#5b9bf5', tembus: 0.5 },
-    gama: { n: 'Gama (γ)', partikel: 'gelombang elektromagnetik', muatan: '0', massa: '0',
-      daya: 'perlu beton atau timbal tebal', dZ: 0, dA: 0, w: '#b795f0', tembus: 1 }
+  const JENIS = {
+    alfa: { n: 'Peluruhan alfa (α)', dZ: -2, dA: -4, warna: 0xef6a52,
+      partikel: '⁴₂He (inti helium)', tembus: 'tertahan kertas, jangkauan beberapa cm di udara' },
+    beta: { n: 'Peluruhan beta (β⁻)', dZ: 1, dA: 0, warna: 0x6fb6ff,
+      partikel: '⁰₋₁e (elektron)', tembus: 'tertahan lempeng aluminium beberapa mm' },
+    gama: { n: 'Pancaran gama (γ)', dZ: 0, dA: 0, warna: 0x9fe8ad,
+      partikel: 'foton berenergi tinggi', tembus: 'perlu timbal atau beton tebal' }
   };
 
-  function isotopAktif(sim) {
-    return ISOTOP.find(function (i) { return i.n === sim.get('isotop'); }) || ISOTOP[0];
+  const N0 = 160;
+
+  function isotop(s) { return ISOTOP[parseInt(s.get('i'), 10) || 0]; }
+
+  function sisa(s) {
+    const z = isotop(s);
+    const n = s.get('paruh');            // berapa kali waktu paruh berlalu
+    return Math.pow(0.5, n);
   }
 
-  function siapkan(sim) {
-    const I = isotopAktif(sim);
-    sim.data.inti = [];
-    for (let i = 0; i < 160; i++) {
-      sim.data.inti.push({
-        x: Sim.rnd(0.06, 0.94), y: Sim.rnd(0.08, 0.92),
-        utuh: true, pancar: 0
-      });
-    }
-    sim.data.waktuSim = 0;
-  }
+  return {
+    latar: 0x05090e,
+    kamera: { jarak: 12, phi: 1.06, theta: 0.6, targetY: 0.6, lajuPutar: 0.14 },
 
-  /** Fraksi inti tersisa setelah t waktu paruh. */
-  function sisa(nParuh) { return Math.pow(0.5, nParuh); }
-
-  Sim.create({
-    title: 'Kimia Inti dan Peluruhan Radioaktif',
-    subtitle: 'Inti yang tidak stabil meluruh dengan laju tetap yang tidak dapat diubah apa pun. Keteraturan itulah yang membuatnya berguna sebagai jam alam.',
-    fase: 'F', jenjang: 'SMA Kelas 12',
-    topik: ['Radioaktivitas', 'Waktu Paruh'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Isotop radioaktif',
-        items: [
-          { type: 'select', id: 'isotop', value: 'Karbon-14', label: 'Pilih isotop',
-            options: ISOTOP.map(function (i) { return { value: i.n, label: i.n }; }) },
-          { type: 'slider', id: 'paruh', value: 0, min: 0, max: 8, step: 0.05,
-            label: 'Waktu berlalu', unit: '× waktu paruh', dec: 2 },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Jalankan waktu', primary: true, onClick: function (sim) {
-              sim.data.jalan = true;
-            } },
-            { label: '■ Hentikan', onClick: function (sim) { sim.data.jalan = false; } },
-            { label: '↺ Ulangi', onClick: function (sim) {
-              sim.set('paruh', 0); sim.data.jalan = false; siapkan(sim);
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Jenis sinar',
-        items: [
-          { type: 'segment', id: 'sinar', value: 'alfa', label: 'Bandingkan daya tembus',
-            options: Object.keys(SINAR).map(function (k) {
-              return { value: k, label: SINAR[k].n.split(' ')[0] }; }) }
-        ]
-      },
-      {
-        title: 'Penanggalan karbon',
-        items: [
-          { type: 'slider', id: 'kadar', value: 100, min: 1, max: 100, step: 1,
-            label: 'Kadar C-14 tersisa', unit: '%', dec: 0,
-            hint: 'Masukkan hasil pengukuran sampel untuk menghitung umurnya.' },
-          { type: 'toggle', id: 'grafik', value: true, label: 'Grafik peluruhan' }
-        ]
-      }
+    kendali: [
+      { judul: 'Isotop', isi: [
+        { type: 'select', id: 'i', value: 0, label: 'Inti radioaktif',
+          options: ISOTOP.map(function (z, i) { return { value: i, label: z.n }; }) },
+        { type: 'slider', id: 'paruh', value: 0, min: 0, max: 8, step: 0.02,
+          label: 'Waktu yang berlalu', unit: ' × t½', dec: 2 },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Jalankan waktu', utama: true, klik: function (s) { s.data.jalan = true; } },
+          { label: '⏸ Jeda', klik: function (s) { s.data.jalan = false; } },
+          { label: '↺ Kembali ke awal', klik: function (s) {
+            s.set('paruh', 0); s.data.jalan = false;
+          }}
+        ]},
+        { type: 'slider', id: 'laju', value: 1, min: 0.2, max: 4, step: 0.1,
+          label: 'Kecepatan waktu', unit: '×', dec: 1 }
+      ]},
+      { judul: 'Pancaran', isi: [
+        { type: 'toggle', id: 'pancar', value: true, label: 'Tampilkan partikel yang dipancarkan' },
+        { type: 'select', id: 'penghalang', value: 0, label: 'Penghalang yang dipasang',
+          options: [
+            { value: 0, label: 'Tanpa penghalang' },
+            { value: 1, label: 'Kertas' },
+            { value: 2, label: 'Aluminium 3 mm' },
+            { value: 3, label: 'Timbal 5 cm' }
+          ]},
+        { type: 'toggle', id: 'detektor', value: true, label: 'Tampilkan detektor Geiger' }
+      ]},
+      { judul: 'Panel', isi: [
+        { type: 'segment', id: 'panel', value: 'paruh', label: 'Grafik', options: [
+          { value: 'paruh', label: 'Kurva peluruhan' },
+          { value: 'umur', label: 'Penanggalan' }
+        ]},
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan panel' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'sisa', label: 'Inti tersisa', tone: 'accent' },
-      { id: 'paruhke', label: 'Waktu paruh ke-' },
-      { id: 'waktu', label: 'Waktu berlalu' },
-      { id: 'umur', label: 'Umur sampel' }
+    baca: [
+      { id: 'sisa', label: 'Inti yang belum meluruh', tone: 'aksen' },
+      { id: 'paruh', label: 'Waktu paruh' },
+      { id: 'waktu', label: 'Waktu yang berlalu' },
+      { id: 'jenis', label: 'Jenis peluruhan' },
+      { id: 'reaksi', label: 'Persamaan inti' },
+      { id: 'tembus', label: 'Daya tembus / kegunaan' }
     ],
 
-    setup: function (sim) { sim.data.jalan = false; siapkan(sim); },
-    reset: function (sim) { sim.data.jalan = false; siapkan(sim); },
-    onChange: function (sim, id) { if (id === 'isotop') siapkan(sim); },
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 10, warna: 0x080d12, y: -2.8 }));
 
-    update: function (sim, dt) {
-      if (sim.data.jalan) {
-        const baru = Math.min(8, sim.get('paruh') + dt * 0.35);
-        sim.set('paruh', Math.round(baru * 20) / 20);
-        if (baru >= 8) sim.data.jalan = false;
-      }
-      const f = sisa(sim.get('paruh'));
-      const hidupTarget = Math.round(160 * f);
-      sim.data.inti.forEach(function (n, i) {
-        const seharusnya = i < hidupTarget;
-        if (n.utuh && !seharusnya) { n.utuh = false; n.pancar = 1; }
-        if (!n.utuh && seharusnya) { n.utuh = true; n.pancar = 0; }
-        if (n.pancar > 0) n.pancar = Math.max(0, n.pancar - dt * 1.4);
+      /* ---------- awan inti: induk (belum meluruh) & anak ---------- */
+      const induk = S.partikel(N0, { r: 0.13, warna: 0xf0a94a, kotak: { x: 1.9, y: 1.4, z: 1.9 } });
+      const anak = S.partikel(N0, { r: 0.12, warna: 0x6fb6ff, kotak: { x: 1.9, y: 1.4, z: 1.9 } });
+      [induk, anak].forEach(function (p) {
+        p.position.set(-2.6, 0.4, 0);
+        p.material.transparent = true;
+        p.material.opacity = 0.95;
+        s.tambah(p);
       });
+      s.data.induk = induk; s.data.anak = anak;
+
+      const kotak = new T.Mesh(new T.BoxGeometry(4.0, 3.0, 4.0),
+        new T.MeshBasicMaterial({ color: 0x3a4a5a, wireframe: true, transparent: true,
+          opacity: 0.16 }));
+      kotak.position.set(-2.6, 0.4, 0);
+      s.tambah(kotak);
+
+      const lblSampel = S.teks('', { skala: 0.28, lebar: 22, warna: '#f0a94a' });
+      lblSampel.position.set(-2.6, 2.3, 0);
+      s.data.lblSampel = lblSampel;
+      s.tambah(lblSampel);
+
+      /* ---------- satu inti besar yang meluruh (model) ---------- */
+      const gInti = new T.Group();
+      gInti.position.set(2.6, 0.6, 0);
+      s.data.gInti = gInti;
+      s.tambah(gInti);
+
+      s.data.nukleon = [];
+      for (let i = 0; i < 64; i++) {
+        const proton = i % 2 === 0;
+        const m = new T.Mesh(S.geoBola(14), new T.MeshStandardMaterial({
+          color: proton ? 0xef6a52 : 0xcfd6dc,
+          emissive: proton ? 0xef6a52 : 0x8d97a1, emissiveIntensity: 0.22,
+          roughness: 0.4
+        }));
+        m.scale.setScalar(0.13);
+        // susunan bola padat acak
+        const u = Math.random(), v = Math.random();
+        const th = Math.acos(1 - 2 * u), ph = 2 * Math.PI * v;
+        const rr = 0.52 * Math.cbrt(Math.random());
+        m.position.set(rr * Math.sin(th) * Math.cos(ph), rr * Math.cos(th),
+          rr * Math.sin(th) * Math.sin(ph));
+        m.userData.asal = m.position.clone();
+        m.userData.proton = proton;
+        gInti.add(m);
+        s.data.nukleon.push(m);
+      }
+
+      // halo inti
+      const halo = new T.Mesh(S.geoBola(28), new T.MeshBasicMaterial({
+        color: 0xf0a94a, transparent: true, opacity: 0.07, depthWrite: false
+      }));
+      halo.scale.setScalar(0.95);
+      s.data.halo = halo;
+      gInti.add(halo);
+
+      const lblInti = S.teks('', { skala: 0.3, lebar: 16, warna: '#f0d040' });
+      lblInti.position.set(2.6, 2.0, 0);
+      s.data.lblInti = lblInti;
+      s.tambah(lblInti);
+
+      /* ---------- partikel yang dipancarkan ---------- */
+      const pancar = [];
+      for (let i = 0; i < 24; i++) {
+        const m = new T.Mesh(S.geoBola(12), new T.MeshStandardMaterial({
+          color: 0xef6a52, emissive: 0xef6a52, emissiveIntensity: 1.4, roughness: 0.3
+        }));
+        m.scale.setScalar(0.1);
+        m.visible = false;
+        s.tambah(m);
+        pancar.push({ m: m, t: 9, arah: new T.Vector3(), mati: false });
+      }
+      s.data.pancar = pancar;
+
+      /* ---------- penghalang ---------- */
+      const hal = new T.Mesh(new T.BoxGeometry(0.2, 2.6, 2.6),
+        new T.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.8 }));
+      hal.position.set(4.6, 0.6, 0);
+      hal.visible = false;
+      s.data.hal = hal;
+      s.tambah(hal);
+      const lblHal = S.teks('', { skala: 0.24, lebar: 18, warna: '#aebbc6' });
+      lblHal.position.set(4.6, 2.2, 0);
+      s.data.lblHal = lblHal;
+      s.tambah(lblHal);
+
+      /* ---------- detektor Geiger ---------- */
+      const det = new T.Group();
+      const tabung = new T.Mesh(new T.CylinderGeometry(0.25, 0.25, 1.4, 24),
+        S.matLogam(0xb0b8c0, { roughness: 0.4 }));
+      tabung.rotation.z = Math.PI / 2;
+      det.add(tabung);
+      const jendela = new T.Mesh(new T.CylinderGeometry(0.26, 0.26, 0.08, 24),
+        new T.MeshStandardMaterial({ color: 0xf0e0a0, roughness: 0.4,
+          emissive: 0xf0e0a0, emissiveIntensity: 0.2 }));
+      jendela.rotation.z = Math.PI / 2;
+      jendela.position.x = -0.72;
+      det.add(jendela);
+      const kotakD = new T.Mesh(new T.BoxGeometry(1.3, 0.9, 0.7),
+        new T.MeshStandardMaterial({ color: 0x232d36, roughness: 0.5, metalness: 0.3 }));
+      kotakD.position.set(1.3, -0.1, 0);
+      det.add(kotakD);
+      const layar = new T.Mesh(new T.BoxGeometry(1.0, 0.44, 0.05),
+        new T.MeshStandardMaterial({ color: 0x08181a, emissive: 0x0a2a2c, emissiveIntensity: 0.6 }));
+      layar.position.set(1.3, 0.04, 0.37);
+      det.add(layar);
+      const angka = S.teks('0 cpm', { skala: 0.26, lebar: 15, latar: false, warna: '#4fd1c0' });
+      angka.position.set(1.3, 0.04, 0.42);
+      det.add(angka);
+      s.data.angkaDet = angka;
+      det.position.set(6.4, 0.6, 0);
+      s.data.det = det;
+      s.tambah(det);
+
+      /* ---------- panel grafik ---------- */
+      const g1 = S.panelGrafik({ w: 5.2, px: 740, py: 460 });
+      g1.position.set(0, 4.3, -2.2);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      const lbl = S.teks('', { skala: 0.38, lebar: 40, warna: '#d8e4ec' });
+      lbl.position.set(0, 2.9, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.jalan = false;
+      s.data.cpm = 0;
+      pasang(s);
     },
 
-    draw: function (c, sim) {
-      const I = isotopAktif(sim);
-      const S = SINAR[sim.get('sinar')];
-      const nParuh = sim.get('paruh');
-      const f = sisa(nParuh);
-      const SJ = SINAR[I.jenis];
+    ubah: function (s, id) {
+      if (id === 'i') pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'detektor') s.data.det.visible = s.get('detektor');
+      if (id === 'penghalang') aturHalangan(s);
+      if (id === 'pancar' && !s.get('pancar')) {
+        s.data.pancar.forEach(function (q) { q.m.visible = false; q.t = 9; });
+      }
+      perbaruiJumlah(s);
+      gambar(s);
+    },
 
-      /* ---------- kotak inti ---------- */
-      const BX = 50, BY = 110, BW = 300, BH = 220;
-      D.text(c, 'CUPLIKAN ' + I.n.toUpperCase(), BX, 92,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.roundRect(c, BX, BY, BW, BH, 10, 'rgba(255,255,255,.03)', 'rgba(255,255,255,.2)', 1.6);
+    langkah: function (s, dt) {
+      const z = isotop(s);
+      const j = JENIS[z.jenis];
+      const dtl = dt * s.get('laju');
 
-      sim.data.inti.forEach(function (n) {
-        const px = BX + n.x * BW, py = BY + n.y * BH;
-        if (n.utuh) {
-          D.circle(c, px, py, 5, '#4fd1c0', 'rgba(0,0,0,.2)', 0.6);
-        } else {
-          D.circle(c, px, py, 4.4, D.alpha('#6b7580', 0.6));
-          if (n.pancar > 0) {
-            c.globalAlpha = n.pancar;
-            D.circle(c, px, py, 5 + (1 - n.pancar) * 14, null, SJ.w, 1.6);
-            c.globalAlpha = 1;
+      if (s.data.jalan) {
+        const v = Math.min(8, s.get('paruh') + dtl * 0.26);
+        s.setDiam('paruh', v);
+        perbaruiJumlah(s);
+        gambar(s);
+        if (v >= 8) s.data.jalan = false;
+      }
+
+      s.data.induk.userData.gerak(dtl, 0.45);
+      s.data.anak.userData.gerak(dtl, 0.4);
+
+      // inti besar bergetar; makin dekat meluruh makin kuat
+      const f = sisa(s);
+      const getar = 0.012 + (1 - f) * 0.03;
+      s.data.nukleon.forEach(function (m, i) {
+        m.position.copy(m.userData.asal);
+        m.position.x += Math.sin(s.waktu * 5 + i) * getar;
+        m.position.y += Math.cos(s.waktu * 4.3 + i * 1.7) * getar;
+        m.position.z += Math.sin(s.waktu * 6.1 + i * 0.9) * getar;
+      });
+      s.data.gInti.rotation.y += dtl * 0.3;
+      s.data.halo.material.opacity = 0.05 + (1 - f) * 0.07;
+      s.data.halo.material.color.setHex(j.warna);
+
+      // pancaran partikel: laju sebanding jumlah inti yang masih ada
+      const laju = s.get('pancar') ? f * 2.6 + 0.05 : 0;
+      let tercatat = 0;
+      s.data.pancar.forEach(function (q, i) {
+        q.t += dtl;
+        if (q.t > 9 && laju > 0.02 && Math.random() < dtl * laju * 1.6) {
+          q.t = 0;
+          q.mati = false;
+          const u = Math.random(), v = Math.random();
+          const th = Math.acos(1 - 2 * u), ph = 2 * Math.PI * v;
+          q.arah.set(Math.sin(th) * Math.cos(ph), Math.cos(th) * 0.5, Math.sin(th) * Math.sin(ph));
+          // separuh diarahkan ke penghalang & detektor agar terlihat
+          if (i % 2 === 0) q.arah.set(1, S.acak(-0.22, 0.22), S.acak(-0.22, 0.22)).normalize();
+        }
+        if (q.t < 9) {
+          const jarak = q.t * 2.6;
+          q.m.visible = !q.mati;
+          q.m.position.copy(s.data.gInti.position).addScaledVector(q.arah, jarak);
+          q.m.material.color.setHex(j.warna);
+          q.m.material.emissive.setHex(j.warna);
+          q.m.scale.setScalar(z.jenis === 'alfa' ? 0.12 : z.jenis === 'beta' ? 0.07 : 0.05);
+
+          // tertahan penghalang?
+          const hal = parseInt(s.get('penghalang'), 10) || 0;
+          if (hal > 0 && q.m.position.x > 4.5 && !q.mati) {
+            const lolos = z.jenis === 'alfa' ? hal < 1
+              : z.jenis === 'beta' ? hal < 2 : hal < 3;
+            if (!lolos) { q.mati = true; q.m.visible = false; }
           }
-        }
+          if (!q.mati && q.m.position.x > 6.1 && q.m.position.x < 6.5) tercatat++;
+          if (jarak > 11) { q.t = 9; q.m.visible = false; }
+        } else q.m.visible = false;
       });
 
-      Plot.legenda(c, BX, BY + BH + 20, [
-        { label: 'inti ' + I.n + ' (belum meluruh)', warna: '#4fd1c0' },
-        { label: I.anak + ' (hasil peluruhan)', warna: '#6b7580' }
-      ]);
+      // bacaan detektor (dihaluskan)
+      const target = tercatat * 240 * (1 + f * 2);
+      s.data.cpm = S.lerp(s.data.cpm, target, dt * 2.2);
+      s.data.angkaDet.userData.ganti(Math.round(s.data.cpm) + ' cpm',
+        s.data.cpm > 400 ? '#ef6a52' : s.data.cpm > 60 ? '#f0a94a' : '#4fd1c0');
+    },
 
-      // bilah sisa
-      D.roundRect(c, BX, BY + BH + 36, BW, 18, 9, 'rgba(255,255,255,.07)');
-      D.roundRect(c, BX, BY + BH + 36, BW * f, 18, 9, P.accent);
-      D.text(c, Sim.fmt(f * 100, 1) + '% tersisa', BX + 10, BY + BH + 45,
-        { size: 11.5, weight: 700, color: f > 0.3 ? '#06201d' : P.accent2, base: 'middle' });
+    bacaUbah: function (s) {
+      const z = isotop(s);
+      const j = JENIS[z.jenis];
+      const f = sisa(s);
+      const n = s.get('paruh');
+      const anakZ = z.Z + j.dZ, anakA = z.A + j.dA;
 
-      /* ---------- persamaan peluruhan ---------- */
-      const PX = 374, PW = W - PX - 40;
-      D.roundRect(c, PX, 110, PW, 106, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PERSAMAAN PELURUHAN', PX + 16, 130,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
+      s.baca('sisa', Math.round(f * 100) + ' %   (' + Math.round(f * N0) + ' dari ' + N0 + ' inti)',
+        f > 0.5 ? 'aksen' : f > 0.1 ? 'warn' : 'danger');
+      s.baca('paruh', S.fmtRapi(z.t / z.bagi) + ' ' + z.sat);
+      s.baca('waktu', S.fmt(n, 2) + ' × t½  =  ' + S.fmtRapi(n * z.t / z.bagi) + ' ' + z.sat);
+      s.baca('jenis', j.n + '  —  memancarkan ' + j.partikel);
+      s.baca('reaksi', z.n.split(' ')[0] + '  →  ' + z.anak + '  +  '
+        + (z.jenis === 'alfa' ? 'α' : z.jenis === 'beta' ? 'β⁻' : 'γ')
+        + '      (Z: ' + z.Z + ' → ' + anakZ + ',  A: ' + z.A + ' → ' + anakA + ')');
+      const hal = parseInt(s.get('penghalang'), 10) || 0;
+      const lolos = z.jenis === 'alfa' ? hal < 1 : z.jenis === 'beta' ? hal < 2 : hal < 3;
+      s.baca('tembus', hal === 0 ? j.tembus
+        : (lolos ? 'Masih tembus penghalang ini' : 'Tertahan penghalang ini') + ' — ' + j.tembus,
+        hal === 0 ? undefined : lolos ? 'warn' : 'aksen');
+      gambar(s);
+    }
+  };
 
-      const Zanak = I.Z + SJ.dZ, Aanak = I.A + SJ.dA;
-      const simAnak = C.byZ[Zanak] ? C.byZ[Zanak].sym : '?';
-      const simInduk = C.byZ[I.Z] ? C.byZ[I.Z].sym : '?';
-      const partikel = I.jenis === 'alfa' ? '⁴₂He' : I.jenis === 'beta' ? '⁰₋₁e' : 'γ';
+  function perbaruiJumlah(s) {
+    const f = sisa(s);
+    const nInduk = Math.round(f * N0);
+    atur(s.data.induk, nInduk, true);
+    atur(s.data.anak, N0 - nInduk, false);
+  }
 
-      D.text(c, Sim.sup(String(I.A)) + Sim.sub(String(I.Z)) + simInduk + '  →  ' +
-        Sim.sup(String(Aanak)) + Sim.sub(String(Zanak)) + simAnak + '  +  ' + partikel,
-        PX + 16, 158, { size: 19, weight: 700, color: P.accent2, base: 'middle' });
-
-      D.text(c, 'Jenis peluruhan: ' + SJ.n, PX + 16, 184,
-        { size: 12, weight: 650, color: SJ.w, base: 'middle' });
-      D.text(c, I.jenis === 'alfa' ? 'Nomor massa berkurang 4, nomor atom berkurang 2.'
-        : I.jenis === 'beta' ? 'Nomor massa tetap, nomor atom bertambah 1.'
-        : 'Nomor massa dan nomor atom tidak berubah, hanya energi yang dilepas.',
-        PX + 16, 202, { size: 11, weight: 500, color: P.dim, base: 'middle' });
-
-      /* ---------- waktu paruh ---------- */
-      D.roundRect(c, PX, 226, PW, 104, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'WAKTU PARUH', PX + 16, 246,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, Sim.sci(I.t, 3) + ' ' + I.satuan, PX + 16, 272,
-        { size: 20, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      D.text(c, 'Nt = N₀ × (1/2)^(t / t½)', PX + 16, 298,
-        { size: 12.5, weight: 650, color: P.dim, base: 'middle', mono: true });
-      D.text(c, 'Setelah ' + Sim.fmt(nParuh, 2) + ' waktu paruh → ' +
-        Sim.fmt(f * 100, 2) + '% tersisa',
-        PX + 16, 318, { size: 11.5, weight: 600, color: P.accent2, base: 'middle' });
-
-      /* ---------- grafik peluruhan ---------- */
-      if (sim.get('grafik')) {
-        const g = { x: 90, y: 400, w: 300, h: 140 };
-        const map = Plot.axes(c, {
-          x: g.x, y: g.y, w: g.w, h: g.h,
-          xmin: 0, xmax: 8, ymin: 0, ymax: 100,
-          xlabel: 'waktu (× waktu paruh)', ylabel: '% inti tersisa',
-          judul: 'Kurva peluruhan', xticks: 5, yticks: 5
-        });
-        Plot.fungsi(c, map, function (x) { return 100 * Math.pow(0.5, x); },
-          { color: P.accent, lw: 2.4, isi: true });
-        // garis setengah berurutan
-        for (let k = 1; k <= 4; k++) {
-          Plot.acuan(c, map, { y: 100 * Math.pow(0.5, k),
-            color: 'rgba(255,255,255,.14)' });
-        }
-        Plot.titik(c, map, nParuh, f * 100, { r: 5, color: '#fff', halo: true });
-        D.text(c, 'tiap satu waktu paruh, jumlahnya tinggal separuh',
-          g.x, g.y + g.h + 42, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
+  function atur(p, n, depan) {
+    const d = p.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      const aktif = depan ? i < n : i >= d.length - n;
+      if (!d[i].aktif && aktif) {
+        d[i].pos.set(S.acak(-1.8, 1.8), S.acak(-1.3, 1.3), S.acak(-1.8, 1.8));
       }
+      d[i].aktif = aktif;
+    }
+    p.userData.tulis();
+  }
 
-      /* ---------- daya tembus ---------- */
-      const DX = 420, DY = 358, DW = W - DX - 40;
-      D.roundRect(c, DX, DY, DW, 110, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'DAYA TEMBUS SINAR ' + S.n.toUpperCase(), DX + 16, DY + 20,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
+  function aturHalangan(s) {
+    const hal = parseInt(s.get('penghalang'), 10) || 0;
+    const info = [
+      { n: '', w: 0xd8d4c8, t: 0.2 },
+      { n: 'kertas', w: 0xf0ece0, t: 0.06 },
+      { n: 'aluminium 3 mm', w: 0xc8ced4, t: 0.16 },
+      { n: 'timbal 5 cm', w: 0x5a6068, t: 0.4 }
+    ][hal];
+    s.data.hal.visible = hal > 0;
+    s.data.hal.material.color.setHex(info.w);
+    s.data.hal.material.metalness = hal >= 2 ? 0.7 : 0.05;
+    s.data.hal.scale.x = info.t / 0.2;
+    s.data.lblHal.userData.ganti(info.n);
+    s.data.lblHal.visible = hal > 0;
+  }
 
-      // penghalang berlapis
-      const sx = DX + 30, sy = DY + 56;
-      const halangan = [
-        { n: 'kertas', x: 60, batas: 0.2 },
-        { n: 'aluminium', x: 130, batas: 0.6 },
-        { n: 'timbal', x: 200, batas: 1.1 }
-      ];
-      D.circle(c, sx, sy, 8, SJ.w);
-      D.text(c, 'sumber', sx, sy + 24,
-        { size: 9.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const z = isotop(s);
+    const n = s.get('paruh');
 
-      halangan.forEach(function (hl) {
-        const x = sx + hl.x;
-        D.roundRect(c, x, sy - 26, 10, 52, 2, 'rgba(255,255,255,.26)', 'rgba(255,255,255,.4)', 1.2);
-        D.text(c, hl.n, x + 5, sy + 40,
-          { size: 9.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
+    if (s.get('panel') === 'paruh') {
+      const kurva = [];
+      for (let i = 0; i <= 160; i++) {
+        const x = i / 160 * 8;
+        kurva.push([x, Math.pow(0.5, x) * 100]);
+      }
+      const garis = [];
+      for (let k = 1; k <= 4; k++) {
+        garis.push({ v: k, warna: 'rgba(214,228,240,.22)',
+          label: k === 1 ? 't½' : k + '·t½' });
+      }
+      S.gambarGrafik(s.data.g1, {
+        judul: 'Kurva peluruhan ' + z.n.split(' ')[0] + ' — setiap t½ tersisa separuh',
+        xMin: 0, xMax: 8, yMin: 0, yMax: 100,
+        xLabel: 'waktu (× waktu paruh)', yLabel: 'inti tersisa (%)',
+        seri: [{ titik: kurva, warna: '#f0a94a', tebal: 3.4, nama: 'N / N₀' }],
+        garisX: garis,
+        garisY: [{ v: 50, warna: 'rgba(79,209,192,.6)', label: '50 %' }],
+        titikTebal: [{ x: n, y: sisa(s) * 100, warna: '#ffffff', r: 7 }]
       });
+      return;
+    }
 
-      // berkas sinar berhenti sesuai daya tembusnya
-      const jauh = S.tembus * 250;
-      D.line(c, sx + 10, sy, sx + 10 + jauh, sy, S.w, 3.4);
-      for (let i = 0; i < 4; i++) {
-        const px = sx + 16 + ((sim.t * 60 + i * 24) % Math.max(jauh - 10, 10));
-        D.circle(c, px, sy, 4, S.w);
-      }
-      if (S.tembus < 1) {
-        D.text(c, '✕', sx + 10 + jauh + 8, sy,
-          { size: 15, weight: 800, color: P.red, align: 'c', base: 'middle' });
-      }
+    // penanggalan: dari fraksi C-14 tersisa ke umur sampel
+    const kurva = [];
+    const t12 = 5730;      // tahun, C-14
+    for (let i = 0; i <= 160; i++) {
+      const umur = i / 160 * 45000;
+      kurva.push([umur, Math.pow(0.5, umur / t12) * 100]);
+    }
+    const f = sisa(s);
+    const umurS = -Math.log2(Math.max(0.0001, f)) * t12;
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Penanggalan karbon — kadar C-14 menunjukkan umur sampel',
+      xMin: 0, xMax: 45000, yMin: 0, yMax: 100,
+      xLabel: 'umur sampel (tahun)', yLabel: 'kadar C-14 tersisa (%)',
+      seri: [{ titik: kurva, warna: '#6fb6ff', tebal: 3.4, nama: 'C-14, t½ = 5.730 tahun' }],
+      garisY: [{ v: f * 100, warna: 'rgba(240,208,64,.8)',
+        label: 'kadar sekarang ' + S.fmt(f * 100, 1) + ' %' }],
+      garisX: [{ v: Math.min(45000, umurS), warna: 'rgba(79,209,192,.8)',
+        label: '≈ ' + S.fmtRapi(Math.round(umurS)) + ' tahun' }],
+      titikTebal: [{ x: Math.min(45000, umurS), y: f * 100, warna: '#ffffff', r: 7 }]
+    });
+  }
 
-      D.text(c, S.partikel + ' · muatan ' + S.muatan + ' · ' + S.daya,
-        DX + 16, DY + 98, { size: 11, weight: 500, color: P.dim, base: 'middle' });
+  function pasang(s) {
+    const z = isotop(s);
+    const j = JENIS[z.jenis];
+    s.data.jalan = false;
 
-      /* ---------- penanggalan karbon ---------- */
-      const UX = 420, UY = 482;
-      D.roundRect(c, UX, UY, DW, 82, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PENANGGALAN KARBON-14', UX + 16, UY + 20,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const kadar = sim.get('kadar') / 100;
-      const umur = kadar > 0 ? Math.log(kadar) / Math.log(0.5) * 5730 : 0;
-      D.text(c, 'Kadar C-14 tersisa ' + Math.round(kadar * 100) + '% dari makhluk hidup',
-        UX + 16, UY + 42, { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-      D.text(c, 'Umur ≈ ' + Sim.fmt(umur, 0).replace(',00', '') + ' tahun',
-        UX + 16, UY + 66, { size: 17, weight: 700, color: P.accent2, base: 'middle', mono: true });
+    s.data.induk.material.color.setHex(0xf0a94a);
+    s.data.induk.material.emissive.setHex(0xf0a94a);
+    s.data.anak.material.color.setHex(0x6fb6ff);
+    s.data.anak.material.emissive.setHex(0x6fb6ff);
+    perbaruiJumlah(s);
 
-      /* ---------- kegunaan ---------- */
-      D.roundRect(c, 50, 552, 340, 34, 8, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', 1.1);
-      D.text(c, 'Kegunaan: ' + I.guna, 66, 569,
-        { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-    },
+    // jumlah nukleon terlihat mengikuti nomor massa (dibatasi)
+    const nTampil = Math.round(S.clamp(z.A / 238, 0.18, 1) * 64);
+    s.data.nukleon.forEach(function (m, i) { m.visible = i < nTampil; });
 
-    readoutsUpdate: function (sim) {
-      const I = isotopAktif(sim);
-      const nParuh = sim.get('paruh');
-      const f = sisa(nParuh);
-      sim.readout('sisa', Sim.fmt(f * 100, 2) + '<span class="unit">%</span>');
-      sim.readout('paruhke', Sim.fmt(nParuh, 2));
-      sim.readout('waktu', Sim.sci(nParuh * I.t, 2) + '<span class="unit"> ' + I.satuan + '</span>');
-      const kadar = sim.get('kadar') / 100;
-      const umur = kadar > 0 ? Math.log(kadar) / Math.log(0.5) * 5730 : 0;
-      sim.readout('umur', Sim.fmt(umur, 0).replace(',00', '') + '<span class="unit"> thn</span>');
-    },
-
-    notes: `
-      <p>Sebagian inti atom tidak stabil karena perbandingan neutron terhadap protonnya
-      berada di luar daerah kestabilan. Inti seperti itu
-      <strong>meluruh secara spontan</strong> sambil memancarkan radiasi.</p>
-
-      <h3>Tiga jenis sinar radioaktif</h3>
-      <table>
-        <thead><tr><th>Sinar</th><th>Partikel</th><th>Muatan</th><th>Daya tembus</th></tr></thead>
-        <tbody>
-          <tr><td>Alfa (α)</td><td>inti helium ⁴₂He</td><td>+2</td><td>terhalang kertas</td></tr>
-          <tr><td>Beta (β)</td><td>elektron ⁰₋₁e</td><td>−1</td><td>terhalang aluminium</td></tr>
-          <tr><td>Gama (γ)</td><td>gelombang elektromagnetik</td><td>0</td><td>perlu timbal tebal</td></tr>
-        </tbody>
-      </table>
-
-      <p>Perhatikan hubungan terbalik: makin besar muatan dan massa partikelnya, makin
-      besar daya ionisasinya tetapi makin kecil daya tembusnya.</p>
-
-      <h3>Perubahan nomor atom dan nomor massa</h3>
-      <span class="formula">Peluruhan α:  A berkurang 4, Z berkurang 2
-Peluruhan β:  A tetap, Z bertambah 1
-Peluruhan γ:  A dan Z tidak berubah</span>
-
-      <p>Pada peluruhan beta, satu neutron berubah menjadi proton sambil memancarkan
-      elektron. Karena itu nomor atomnya naik satu, tetapi jumlah total nukleonnya tetap.</p>
-
-      <h3>Waktu paruh</h3>
-      <p>Waktu paruh (t½) adalah waktu yang diperlukan agar <strong>separuh inti
-      meluruh</strong>. Nilainya khas untuk setiap isotop dan
-      <strong>tidak dapat diubah</strong> oleh suhu, tekanan, atau reaksi kimia apa pun.
-      Sifat inilah yang membuatnya dapat dipakai sebagai jam alam.</p>
-
-      <span class="formula">Nt = N₀ × (1/2)^(t / t½)</span>
-
-      <p>Setelah 1 waktu paruh tersisa 50%, setelah 2 tersisa 25%, setelah 3 tersisa 12,5%,
-      dan seterusnya. Secara teori tidak pernah habis sama sekali — hanya terus membelah
-      menjadi separuh.</p>
-
-      <h3>Penanggalan karbon-14</h3>
-      <p>Makhluk hidup terus menyerap karbon dari lingkungan, sehingga kadar C-14 dalam
-      tubuhnya sama dengan kadar di atmosfer. Begitu mati, penyerapan berhenti dan C-14
-      yang ada mulai meluruh dengan waktu paruh 5.730 tahun.</p>
-
-      <p>Dengan mengukur sisa kadar C-14 pada fosil, umurnya dapat dihitung. Metode ini
-      efektif sampai sekitar 50.000 tahun; untuk batuan yang jauh lebih tua dipakai
-      uranium-238 dengan waktu paruh 4,5 miliar tahun.</p>
-
-      <h3>Reaksi fisi dan fusi</h3>
-      <ul>
-        <li><strong>Fisi</strong> — inti berat terbelah menjadi inti lebih ringan,
-            misalnya U-235 ditumbuk neutron. Dipakai pada PLTN.</li>
-        <li><strong>Fusi</strong> — inti ringan bergabung menjadi inti lebih berat,
-            misalnya hidrogen menjadi helium di matahari. Energinya jauh lebih besar,
-            tetapi memerlukan suhu jutaan derajat.</li>
-      </ul>
-
-      <h3>Manfaat dan risiko</h3>
-      <p>Radioisotop dipakai luas: Co-60 dan I-131 untuk terapi kanker, Tc-99m untuk
-      pemindaian organ, P-32 untuk melacak serapan pupuk, dan iradiasi untuk mengawetkan
-      makanan.</p>
-
-      <p>Namun radiasi pengion dapat merusak DNA dan menyebabkan kanker. Karena itu
-      pekerja radiasi memakai pelindung timbal, menjaga jarak, dan membatasi waktu
-      paparan — tiga asas keselamatan radiasi.</p>
-
-      <div class="callout" data-tone="warn">
-        <strong>Waktu paruh tidak dapat dipercepat</strong>
-        Tidak ada cara kimia untuk mempercepat atau memperlambat peluruhan. Inilah
-        sebabnya penanganan limbah radioaktif menjadi persoalan yang sulit: limbah itu
-        harus disimpan aman selama ribuan tahun sampai meluruh sendiri.
-      </div>
-    `,
-
-    explore: [
-      'Pilih <strong>Karbon-14</strong>, jalankan waktu sampai 3 waktu paruh. Berapa persen inti tersisa?',
-      'Bandingkan <strong>Iodin-131</strong> (8 hari) dan <strong>Uranium-238</strong> (4,5 miliar tahun). Mengapa I-131 dipilih untuk terapi medis?',
-      'Lihat persamaan peluruhan <strong>Uranium-238</strong>. Berapa perubahan nomor atom dan nomor massanya?',
-      'Pada penanggalan karbon, atur kadar menjadi 25%. Berapa umur sampelnya? Cocokkan dengan dua waktu paruh.'
-    ],
-
-    quiz: [
-      {
-        q: 'Inti ²³⁸₉₂U memancarkan sinar alfa. Inti yang terbentuk adalah…',
-        options: ['²³⁴₉₀Th', '²³⁸₉₃Np', '²³⁴₉₂U', '²³⁶₉₀Th'],
-        answer: 0,
-        explain: 'Peluruhan alfa memancarkan inti helium ⁴₂He, sehingga nomor massa berkurang 4 (238 → 234) dan nomor atom berkurang 2 (92 → 90). Unsur dengan Z = 90 adalah torium.'
-      },
-      {
-        q: 'Suatu isotop memiliki waktu paruh 10 hari. Setelah 30 hari, jumlah inti yang tersisa adalah…',
-        options: ['50%', '25%', '12,5%', '0%'],
-        answer: 2,
-        explain: '30 hari sama dengan 3 waktu paruh. Setelah tiga kali membelah dua: 100% → 50% → 25% → 12,5%.'
-      },
-      {
-        q: 'Manakah sinar radioaktif dengan daya tembus paling besar?',
-        options: ['Alfa', 'Beta', 'Gama', 'Ketiganya sama'],
-        answer: 2,
-        explain: 'Sinar gama tidak bermassa dan tidak bermuatan, sehingga sedikit berinteraksi dengan materi dan dapat menembus jauh. Diperlukan beton atau timbal tebal untuk menahannya.'
-      },
-      {
-        q: 'Sebuah fosil mengandung 25% karbon-14 dibanding makhluk hidup. Bila waktu paruh C-14 adalah 5.730 tahun, umur fosil tersebut adalah…',
-        options: ['5.730 tahun', '11.460 tahun', '17.190 tahun', '22.920 tahun'],
-        answer: 1,
-        explain: 'Dari 100% menjadi 25% berarti dua kali membelah dua (100 → 50 → 25), yaitu 2 waktu paruh. Umurnya 2 × 5.730 = 11.460 tahun.'
-      }
-    ]
-  });
-})();
+    s.data.lblSampel.userData.ganti('sampel ' + N0 + ' inti ' + z.n.split(' ')[0]);
+    s.data.lblInti.userData.ganti('satu inti  Z=' + z.Z + '  A=' + z.A);
+    s.data.lbl.userData.ganti(z.n + '   —   ' + j.n);
+    s.data.g1.visible = s.get('grafik');
+    s.data.det.visible = s.get('detektor');
+    aturHalangan(s);
+    gambar(s);
+  }
+})());

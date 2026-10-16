@@ -1,408 +1,453 @@
-/* Polimer dan Biomolekul — Fase F
-   Rangkai monomer menjadi polimer adisi dan kondensasi, lalu jalankan uji
-   karbohidrat, protein, dan lemak. */
+/* Makromolekul: Polimer dan Biomolekul — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('makromolekul', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 600;
-
+  /* -------------------- polimer -------------------- */
   const POLIMER = [
-    { id: 'pe', n: 'Polietilena (PE)', monomer: 'etena (CH₂=CH₂)', jenis: 'adisi', asal: 'sintetis',
-      guna: 'Kantong plastik, botol, pembungkus makanan', w: '#5b9bf5' },
-    { id: 'pp', n: 'Polipropilena (PP)', monomer: 'propena', jenis: 'adisi', asal: 'sintetis',
-      guna: 'Wadah makanan, karung, tali plastik', w: '#4fd1c0' },
-    { id: 'pvc', n: 'PVC', monomer: 'vinil klorida', jenis: 'adisi', asal: 'sintetis',
-      guna: 'Pipa air, pelapis lantai, kabel listrik', w: '#f0a94a' },
-    { id: 'ps', n: 'Polistirena', monomer: 'stirena', jenis: 'adisi', asal: 'sintetis',
-      guna: 'Styrofoam, gelas sekali pakai', w: '#b795f0' },
-    { id: 'nilon', n: 'Nilon 6,6', monomer: 'asam adipat + heksametilendiamina', jenis: 'kondensasi', asal: 'sintetis',
-      guna: 'Serat kain, tali, parasut', w: '#f0718f' },
-    { id: 'pet', n: 'PET (poliester)', monomer: 'asam tereftalat + etilena glikol', jenis: 'kondensasi', asal: 'sintetis',
-      guna: 'Botol minuman, serat poliester', w: '#6fcf7f' },
-    { id: 'amilum', n: 'Amilum (pati)', monomer: 'glukosa', jenis: 'kondensasi', asal: 'alami',
-      guna: 'Cadangan makanan tumbuhan', w: '#f0d04a' },
-    { id: 'selulosa', n: 'Selulosa', monomer: 'glukosa', jenis: 'kondensasi', asal: 'alami',
-      guna: 'Dinding sel tumbuhan, kertas, kapas', w: '#c8a070' },
-    { id: 'protein', n: 'Protein', monomer: 'asam amino', jenis: 'kondensasi', asal: 'alami',
-      guna: 'Enzim, otot, antibodi, hemoglobin', w: '#ef6a52' },
-    { id: 'karet', n: 'Karet alam', monomer: 'isoprena', jenis: 'adisi', asal: 'alami',
-      guna: 'Ban, sarung tangan, alas kaki', w: '#8d939a' }
+    { n: 'Polietilena (PE)', monomer: 'etena  CH₂=CH₂', jenis: 'adisi',
+      ulang: '—CH₂—CH₂—', guna: 'kantong plastik, botol', w: 0xdfe8ee, cabang: 'H' },
+    { n: 'Polipropilena (PP)', monomer: 'propena  CH₂=CH—CH₃', jenis: 'adisi',
+      ulang: '—CH₂—CH(CH₃)—', guna: 'wadah makanan, karung', w: 0xeaf0f4, cabang: 'C' },
+    { n: 'PVC', monomer: 'vinil klorida  CH₂=CHCl', jenis: 'adisi',
+      ulang: '—CH₂—CHCl—', guna: 'pipa air, pelapis kabel', w: 0xd8f0d8, cabang: 'Cl' },
+    { n: 'Polistirena', monomer: 'stirena  CH₂=CH—C₆H₅', jenis: 'adisi',
+      ulang: '—CH₂—CH(C₆H₅)—', guna: 'styrofoam, gelas plastik', w: 0xf0f0e8, cabang: 'C' },
+    { n: 'Teflon (PTFE)', monomer: 'tetrafluoroetena  CF₂=CF₂', jenis: 'adisi',
+      ulang: '—CF₂—CF₂—', guna: 'pelapis wajan antilengket', w: 0xe8f4d8, cabang: 'F' },
+    { n: 'Nilon 6,6', monomer: 'asam adipat + heksametilendiamina', jenis: 'kondensasi',
+      ulang: '—CO—(CH₂)₄—CO—NH—(CH₂)₆—NH—', guna: 'serat kain, tali, parasut',
+      w: 0xf0e8d0, cabang: 'N', lepas: 'H₂O' },
+    { n: 'Dakron (PET)', monomer: 'asam tereftalat + etilena glikol', jenis: 'kondensasi',
+      ulang: '—CO—C₆H₄—CO—O—CH₂CH₂—O—', guna: 'botol minuman, serat poliester',
+      w: 0xdfeef4, cabang: 'O', lepas: 'H₂O' },
+    { n: 'Protein (polipeptida)', monomer: 'asam amino', jenis: 'kondensasi',
+      ulang: '—NH—CHR—CO—', guna: 'enzim, otot, antibodi',
+      w: 0xf0d8d8, cabang: 'N', lepas: 'H₂O' },
+    { n: 'Amilum (polisakarida)', monomer: 'glukosa', jenis: 'kondensasi',
+      ulang: '—(glukosa)—O—', guna: 'cadangan makanan tumbuhan',
+      w: 0xf0e8c0, cabang: 'O', lepas: 'H₂O' },
+    { n: 'Karet alam', monomer: 'isoprena', jenis: 'adisi',
+      ulang: '—CH₂—C(CH₃)=CH—CH₂—', guna: 'ban, sarung tangan', w: 0xd8cfc0, cabang: 'C' }
   ];
 
-  const BAHAN_UJI = [
-    { n: 'Nasi', amilum: true, glukosa: false, protein: false, lemak: false },
-    { n: 'Kentang', amilum: true, glukosa: false, protein: false, lemak: false },
-    { n: 'Putih telur', amilum: false, glukosa: false, protein: true, lemak: false },
-    { n: 'Tahu', amilum: false, glukosa: false, protein: true, lemak: true },
-    { n: 'Minyak goreng', amilum: false, glukosa: false, protein: false, lemak: true },
-    { n: 'Susu', amilum: false, glukosa: true, protein: true, lemak: true },
-    { n: 'Pisang matang', amilum: true, glukosa: true, protein: false, lemak: false },
-    { n: 'Kacang tanah', amilum: false, glukosa: false, protein: true, lemak: true }
+  /* -------------------- uji biomolekul -------------------- */
+  const UJI = [
+    { n: 'Amilum + larutan iodin', zat: 'Amilum (karbohidrat)', awal: 0xf0f2f4,
+      akhir: 0x1a2a6a, hasil: 'biru kehitaman', positif: true,
+      ket: 'uji iodin untuk polisakarida' },
+    { n: 'Glukosa + Fehling', zat: 'Glukosa (gula pereduksi)', awal: 0x3f8fd0,
+      akhir: 0xc84a2a, hasil: 'endapan merah bata Cu₂O', positif: true,
+      ket: 'uji Fehling untuk gula pereduksi' },
+    { n: 'Sukrosa + Fehling', zat: 'Sukrosa (bukan pereduksi)', awal: 0x3f8fd0,
+      akhir: 0x3f8fd0, hasil: 'tetap biru', positif: false,
+      ket: 'sukrosa bukan gula pereduksi' },
+    { n: 'Protein + Biuret', zat: 'Albumin (protein)', awal: 0x6fa8d8,
+      akhir: 0x9a3ac8, hasil: 'ungu', positif: true,
+      ket: 'uji Biuret untuk ikatan peptida' },
+    { n: 'Protein + Xantoprotein', zat: 'Protein cincin benzena', awal: 0xeaf2f6,
+      akhir: 0xf0a030, hasil: 'jingga', positif: true,
+      ket: 'uji xantoprotein untuk gugus benzena' },
+    { n: 'Protein + Timbal asetat', zat: 'Protein berbelerang', awal: 0xeaf2f6,
+      akhir: 0x2a2a2a, hasil: 'endapan hitam PbS', positif: true,
+      ket: 'uji belerang pada protein' },
+    { n: 'Lemak + kertas buram', zat: 'Minyak (lipid)', awal: 0xf0e8c0,
+      akhir: 0xe0d090, hasil: 'kertas menjadi transparan', positif: true,
+      ket: 'uji kelarutan dan noda lemak' },
+    { n: 'Lemak + Sudan III', zat: 'Minyak (lipid)', awal: 0xf0e8c0,
+      akhir: 0xd84a3a, hasil: 'merah jingga', positif: true,
+      ket: 'uji Sudan III untuk lipid' }
   ];
 
-  const UJI = {
-    lugol: { n: 'Lugol (iodin)', untuk: 'amilum', positif: 'biru kehitaman', wPos: '#1e2a6e', wNeg: '#c08030' },
-    benedict: { n: 'Benedict', untuk: 'glukosa', positif: 'merah bata', wPos: '#c0442a', wNeg: '#3a7fd0' },
-    biuret: { n: 'Biuret', untuk: 'protein', positif: 'ungu', wPos: '#8a3fc0', wNeg: '#5aa0d8' },
-    kertas: { n: 'Kertas buram', untuk: 'lemak', positif: 'noda transparan', wPos: '#d8c8a0', wNeg: '#f0ead8' }
+  function polimer(s) { return POLIMER[parseInt(s.get('p'), 10) || 0]; }
+  function uji(s) { return UJI[parseInt(s.get('u'), 10) || 0]; }
+
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 12, phi: 1.08, theta: 0.6, targetY: 0.6, lajuPutar: 0.12 },
+
+    kendali: [
+      { judul: 'Mode', isi: [
+        { type: 'segment', id: 'mode', value: 'polimer', label: 'Yang dikerjakan', options: [
+          { value: 'polimer', label: 'Polimerisasi' },
+          { value: 'uji', label: 'Uji biomolekul' }
+        ]}
+      ]},
+      { judul: 'Polimerisasi', isi: [
+        { type: 'select', id: 'p', value: 0, label: 'Polimer yang dibuat',
+          options: POLIMER.map(function (p, i) { return { value: i, label: p.n }; }) },
+        { type: 'slider', id: 'n', value: 6, min: 2, max: 14, step: 1,
+          label: 'Jumlah monomer', unit: ' unit', dec: 0 },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Rangkai', utama: true, klik: function (s) { s.data.jalan = true; } },
+          { label: '↺ Pisahkan', klik: function (s) { s.data.t = 0; s.data.jalan = false; } }
+        ]},
+        { type: 'slider', id: 'laju', value: 1, min: 0.2, max: 3, step: 0.1,
+          label: 'Kecepatan', unit: '×', dec: 1 },
+        { type: 'toggle', id: 'putar', value: true, label: 'Putar rantai' }
+      ]},
+      { judul: 'Uji biomolekul', isi: [
+        { type: 'select', id: 'u', value: 0, label: 'Uji yang dilakukan',
+          options: UJI.map(function (u, i) { return { value: i, label: u.n }; }) },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Teteskan reagen', utama: true, klik: function (s) { s.data.jalanU = true; } },
+          { label: '↺ Ulangi', klik: function (s) { s.data.tu = 0; s.data.jalanU = false; } }
+        ]},
+        { type: 'toggle', id: 'panas', value: false, label: 'Panaskan tabung' }
+      ]}
+    ],
+
+    baca: [
+      { id: 'a', label: 'Keterangan', tone: 'aksen' },
+      { id: 'b', label: 'Monomer' },
+      { id: 'c', label: 'Jenis reaksi' },
+      { id: 'd', label: 'Satuan berulang' },
+      { id: 'e', label: 'Kegunaan / hasil uji' }
+    ],
+
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 10, warna: 0x0b1118, y: -2.6 }));
+
+      /* ================= mode polimerisasi ================= */
+      const gP = new T.Group();
+      s.data.gP = gP;
+      s.tambah(gP);
+
+      s.data.unit = [];     // tiap unit: { g, x0, y0, z0 }
+      s.data.ikat = [];     // batang penghubung
+      s.data.lepas = [];    // molekul kecil yang dilepas (H₂O)
+
+      const lblP = S.teks('', { skala: 0.4, lebar: 36, warna: '#d8e4ec' });
+      lblP.position.set(0, 3.1, 0);
+      s.data.lblP = lblP;
+      gP.add(lblP);
+
+      const lblU = S.teks('', { skala: 0.28, lebar: 34, warna: '#aebbc6' });
+      lblU.position.set(0, -2.1, 0);
+      s.data.lblU = lblU;
+      gP.add(lblU);
+
+      const rantai = new T.Group();
+      s.data.rantai = rantai;
+      gP.add(rantai);
+
+      /* ================= mode uji ================= */
+      const gU = new T.Group();
+      gU.visible = false;
+      s.data.gU = gU;
+      s.tambah(gU);
+
+      // rak kecil
+      const papan = new T.Mesh(new T.BoxGeometry(3.4, 0.16, 1.4),
+        new T.MeshStandardMaterial({ color: 0x3a2f26, roughness: 0.8 }));
+      papan.position.set(0, -1.5, 0);
+      gU.add(papan);
+
+      // tabung uji besar di tengah
+      const tb = S.tabung({ r: 0.46, h: 2.6, level: 0.55, warna: 0xf0f2f4 });
+      tb.position.set(0, -1.4, 0);
+      s.data.tb = tb;
+      gU.add(tb);
+
+      // penjepit
+      const jepit = new T.Mesh(new T.TorusGeometry(0.56, 0.055, 10, 32),
+        S.matLogam(0xb0b8c0));
+      jepit.rotation.x = Math.PI / 2;
+      jepit.position.set(0, 0.2, 0);
+      gU.add(jepit);
+
+      // pipet reagen
+      const pip = new T.Group();
+      const badanP = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 1.3, 18),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+      pip.add(badanP);
+      const isiP = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.9, 16),
+        S.matCairan(0x3f8fd0, { opacity: 0.85 }));
+      pip.add(isiP);
+      s.data.isiP = isiP;
+      const ujungP = new T.Mesh(new T.ConeGeometry(0.11, 0.34, 16),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+      ujungP.position.y = -0.8;
+      ujungP.rotation.x = Math.PI;
+      pip.add(ujungP);
+      const karet = new T.Mesh(S.geoBola(16),
+        new T.MeshStandardMaterial({ color: 0xd04a5a, roughness: 0.8 }));
+      karet.scale.set(0.18, 0.23, 0.18);
+      karet.position.y = 0.85;
+      pip.add(karet);
+      pip.position.set(0, 2.3, 0);
+      s.data.pip = pip;
+      gU.add(pip);
+
+      // tetesan reagen
+      const tetes = [];
+      for (let i = 0; i < 5; i++) {
+        const m = new T.Mesh(S.geoBola(10),
+          new T.MeshStandardMaterial({ color: 0x3f8fd0, emissive: 0x3f8fd0,
+            emissiveIntensity: 0.4, roughness: 0.2 }));
+        m.scale.setScalar(0.07);
+        m.visible = false;
+        gU.add(m);
+        tetes.push({ m: m, y: 9 });
+      }
+      s.data.tetes = tetes;
+
+      // endapan hasil uji
+      const butir = [];
+      for (let i = 0; i < 34; i++) {
+        const m = new T.Mesh(S.geoBola(10),
+          new T.MeshStandardMaterial({ color: 0xc84a2a, roughness: 0.65 }));
+        const sk = S.acak(0.04, 0.085);
+        m.scale.setScalar(sk);
+        m.position.set(S.acak(-0.3, 0.3), -1.1 + Math.random() * 0.2, S.acak(-0.3, 0.3));
+        m.visible = false;
+        gU.add(m);
+        butir.push(m);
+      }
+      s.data.butir = butir;
+
+      // pembakar
+      const kaki = new T.Mesh(new T.CylinderGeometry(0.34, 0.42, 0.18, 24),
+        S.matLogam(0x5a6672, { roughness: 0.6 }));
+      kaki.position.set(0, -2.45, 0);
+      gU.add(kaki);
+      const ny = S.nyala({ r: 0.26, h: 0.6 });
+      ny.position.set(0, -2.3, 0);
+      s.data.ny = ny;
+      gU.add(ny);
+
+      const lblUji = S.teks('', { skala: 0.36, lebar: 36, warna: '#d8e4ec' });
+      lblUji.position.set(0, 3.1, 0);
+      s.data.lblUji = lblUji;
+      gU.add(lblUji);
+
+      const lblHasil = S.teks('', { skala: 0.3, lebar: 28, warna: '#9fe8ad' });
+      lblHasil.position.set(0, -1.95, 0);
+      s.data.lblHasil = lblHasil;
+      gU.add(lblHasil);
+
+      s.data.t = 0; s.data.jalan = false;
+      s.data.tu = 0; s.data.jalanU = false;
+      bangunRantai(s);
+      pasangUji(s);
+      aturMode(s);
+    },
+
+    ubah: function (s, id) {
+      if (id === 'mode') { aturMode(s); return; }
+      if (id === 'p' || id === 'n') { bangunRantai(s); }
+      if (id === 'u') pasangUji(s);
+    },
+
+    langkah: function (s, dt) {
+      if (s.get('mode') === 'polimer') {
+        const p = polimer(s);
+        if (s.data.jalan) s.data.t = Math.min(1, s.data.t + dt * s.get('laju') * 0.3);
+        const t = mulus(s.data.t);
+
+        // unit bergerak dari tebaran acak ke posisi dalam rantai
+        s.data.unit.forEach(function (u, i) {
+          u.g.position.lerpVectors(u.acak, u.target, t);
+          u.g.rotation.y = S.lerp(u.rot, 0, t);
+          u.g.rotation.z = S.lerp(u.rotZ, 0, t);
+        });
+
+        // batang ikatan baru muncul setelah unit mendekat
+        s.data.ikat.forEach(function (m, i) {
+          const u = S.clamp((t - 0.55) / 0.45, 0, 1);
+          m.visible = u > 0.02;
+          m.scale.y = u;
+          m.material.opacity = u;
+        });
+
+        // molekul kecil yang dilepas pada kondensasi
+        s.data.lepas.forEach(function (o, i) {
+          const u = S.clamp((t - 0.6) / 0.4, 0, 1);
+          o.m.visible = p.jenis === 'kondensasi' && u > 0.02;
+          if (o.m.visible) {
+            o.m.position.set(o.x, o.y + u * 1.5 + Math.sin(s.waktu * 2 + i) * 0.08, o.z + u * 0.5);
+            o.m.material.opacity = u * (1 - u * 0.4);
+          }
+        });
+
+        if (s.get('putar')) s.data.rantai.rotation.y += dt * 0.3;
+        return;
+      }
+
+      /* ---- mode uji ---- */
+      const u = uji(s);
+      if (s.data.jalanU) s.data.tu = Math.min(1, s.data.tu + dt * 0.42);
+      const t = s.data.tu;
+
+      // tetesan reagen jatuh
+      s.data.tetes.forEach(function (q) {
+        if (s.data.jalanU && t < 0.5 && q.y > 8 && Math.random() < dt * 3) q.y = 1.7;
+        if (q.y < 8) {
+          q.y -= dt * 3.6;
+          q.m.visible = true;
+          q.m.position.set(0, q.y, 0);
+          if (q.y < 0.2) { q.y = 9; q.m.visible = false; }
+        } else q.m.visible = false;
+      });
+
+      // warna larutan berubah
+      const c = new T.Color(u.awal).lerp(new T.Color(u.akhir),
+        u.positif ? mulus(S.clamp((t - 0.3) / 0.7, 0, 1)) : 0);
+      s.data.tb.userData.setLevel(0.55, c.getHex());
+
+      // endapan untuk uji yang membentuk endapan
+      const berEndap = u.hasil.indexOf('endapan') >= 0;
+      const n = berEndap ? Math.round(S.clamp((t - 0.5) / 0.5, 0, 1) * s.data.butir.length) : 0;
+      s.data.butir.forEach(function (m, i) {
+        m.visible = i < n;
+        m.material.color.setHex(u.akhir);
+      });
+
+      // pembakar
+      s.data.ny.userData.perbarui(s.waktu, s.get('panas') ? 0.9 : 0.0);
+      s.data.ny.visible = s.get('panas');
+
+      // gelembung ringan saat dipanaskan
+      s.data.pip.position.y = 2.3 + Math.sin(s.waktu * 1.2) * 0.05;
+    },
+
+    bacaUbah: function (s) {
+      if (s.get('mode') === 'polimer') {
+        const p = polimer(s);
+        const n = Math.round(s.get('n'));
+        s.baca('a', p.n + '  —  ' + n + ' monomer tersambung '
+          + Math.round((s.data.t || 0) * 100) + ' %');
+        s.baca('b', p.monomer);
+        s.baca('c', p.jenis === 'adisi'
+          ? 'Polimerisasi adisi — ikatan rangkap terbuka, tidak ada zat yang dilepas'
+          : 'Polimerisasi kondensasi — melepas ' + (p.lepas || 'H₂O') + ' setiap sambungan',
+          p.jenis === 'adisi' ? 'aksen' : 'warn');
+        s.baca('d', p.ulang + '   ditulis  (' + p.ulang.replace(/—/g, '') + ')ₙ');
+        s.baca('e', p.guna);
+      } else {
+        const u = uji(s);
+        const t = s.data.tu || 0;
+        s.baca('a', u.n + (t > 0.95 ? '  — selesai' : t > 0.02 ? '  — berjalan' : ''));
+        s.baca('b', u.zat);
+        s.baca('c', u.ket);
+        s.baca('d', t > 0.5 ? 'Perubahan terlihat: ' + u.hasil : 'Belum ada perubahan');
+        s.baca('e', u.positif ? 'Hasil positif ✓ — zat yang diuji terdeteksi'
+          : 'Hasil negatif — zat tidak memberi reaksi pada uji ini',
+          u.positif ? 'aksen' : 'danger');
+      }
+    }
   };
 
-  function polimerAktif(sim) {
-    return POLIMER.find(function (p) { return p.id === sim.get('polimer'); }) || POLIMER[0];
+  function mulus(t) { return t * t * (3 - 2 * t); }
+
+  function aturMode(s) {
+    const pol = s.get('mode') === 'polimer';
+    s.data.gP.visible = pol;
+    s.data.gU.visible = !pol;
+    if (s.orbit) s.orbit.set({ jarak: pol ? 12 : 9, targetY: pol ? 0.6 : 0.2 });
   }
 
-  function siapkan(sim) {
-    sim.data.n = 1;
-    sim.data.jalan = false;
-    sim.data.ujiJalan = 0;
+  /* ---------------- rantai polimer 3D ---------------- */
+  function bangunRantai(s) {
+    const r = s.data.rantai;
+    while (r.children.length) S.buangObjek(r.children.pop());
+    s.data.unit = [];
+    s.data.ikat = [];
+    s.data.lepas = [];
+    s.data.t = 0;
+    s.data.jalan = false;
+
+    const p = polimer(s);
+    const n = Math.round(s.get('n'));
+    const jarak = 1.05;
+    const lebar = (n - 1) * jarak;
+
+    const matC = S.matBola(S.UNSUR.C.w, { unik: true });
+    const matCab = S.matBola((S.UNSUR[p.cabang] || S.UNSUR.X).w, { unik: true });
+
+    for (let i = 0; i < n; i++) {
+      const g = new T.Group();
+
+      // dua atom C tulang belakang per unit
+      [-0.26, 0.26].forEach(function (dx, k) {
+        const m = new T.Mesh(S.geoBola(24), matC);
+        m.scale.setScalar(S.UNSUR.C.r * 0.52);
+        m.position.set(dx, k === 0 ? 0.16 : -0.16, 0);
+        m.castShadow = true;
+        g.add(m);
+      });
+      g.add(S.ikatan([-0.26, 0.16, 0], [0.26, -0.16, 0], { tebal: 0.065 }));
+
+      // gugus samping
+      const cab = new T.Mesh(S.geoBola(20), matCab);
+      cab.scale.setScalar((S.UNSUR[p.cabang] || S.UNSUR.X).r * 0.48);
+      cab.position.set(0.3, -0.16, 0.6);
+      g.add(cab);
+      g.add(S.ikatan([0.26, -0.16, 0], [0.3, -0.16, 0.6], { tebal: 0.05, warna: 0x8d97a1 }));
+
+      // dua atom H
+      [[-0.3, 0.16, 0.58], [-0.3, 0.16, -0.58]].forEach(function (q) {
+        const h = new T.Mesh(S.geoBola(14), S.matBola(S.UNSUR.H.w, { unik: true }));
+        h.scale.setScalar(S.UNSUR.H.r * 0.5);
+        h.position.set(q[0], q[1], q[2]);
+        g.add(h);
+        g.add(S.ikatan([-0.26, 0.16, 0], q, { tebal: 0.042, warna: 0x8d97a1 }));
+      });
+
+      const target = new T.Vector3(-lebar / 2 + i * jarak, (i % 2) * 0.22 - 0.11, 0);
+      const a = Math.random() * Math.PI * 2;
+      const rr = 3.2 + Math.random() * 1.6;
+      const acak = new T.Vector3(Math.cos(a) * rr, S.acak(-1.6, 1.8), Math.sin(a) * rr * 0.6);
+      g.position.copy(acak);
+      const rot = S.acak(-2.4, 2.4), rotZ = S.acak(-1.2, 1.2);
+      g.rotation.set(0, rot, rotZ);
+      r.add(g);
+      s.data.unit.push({ g: g, target: target, acak: acak, rot: rot, rotZ: rotZ });
+
+      // batang penghubung antar unit (muncul setelah merapat)
+      if (i > 0) {
+        const m = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, jarak - 0.52, 14),
+          new T.MeshStandardMaterial({ color: 0xf0d040, roughness: 0.4,
+            emissive: 0xf0d040, emissiveIntensity: 0.4, transparent: true, opacity: 0 }));
+        m.rotation.z = Math.PI / 2;
+        m.position.set(-lebar / 2 + (i - 0.5) * jarak, 0, 0);
+        m.visible = false;
+        r.add(m);
+        s.data.ikat.push(m);
+
+        // molekul kecil yang dilepas (kondensasi)
+        const w = new T.Mesh(S.geoBola(14),
+          new T.MeshStandardMaterial({ color: 0x6fb6ff, emissive: 0x6fb6ff,
+            emissiveIntensity: 0.5, transparent: true, opacity: 0 }));
+        w.scale.setScalar(0.12);
+        w.visible = false;
+        r.add(w);
+        s.data.lepas.push({ m: w, x: -lebar / 2 + (i - 0.5) * jarak, y: 0.4, z: 0 });
+      }
+    }
+
+    s.data.lblP.userData.ganti(p.n);
+    s.data.lblU.userData.ganti('satuan berulang:  ' + p.ulang);
+    r.rotation.y = 0;
   }
 
-  Sim.create({
-    title: 'Polimer dan Biomolekul',
-    subtitle: 'Molekul raksasa tersusun dari satuan kecil yang berulang. Prinsip yang sama berlaku pada plastik buatan maupun protein dalam tubuh kita.',
-    fase: 'F', jenjang: 'SMA Kelas 12',
-    topik: ['Polimer', 'Biomolekul'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Polimer',
-        items: [
-          { type: 'select', id: 'polimer', value: 'pe', label: 'Pilih polimer',
-            options: POLIMER.map(function (p) { return { value: p.id, label: p.n }; }) },
-          { type: 'slider', id: 'panjang', value: 6, min: 2, max: 14, step: 1,
-            label: 'Jumlah monomer (n)', dec: 0 },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Polimerisasi', primary: true, onClick: function (sim) {
-              sim.data.n = 1; sim.data.jalan = true;
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Uji biomolekul',
-        items: [
-          { type: 'select', id: 'bahan', value: 0, label: 'Bahan makanan',
-            options: BAHAN_UJI.map(function (b, i) { return { value: i, label: b.n }; }) },
-          { type: 'segment', id: 'uji', value: 'lugol', label: 'Pereaksi',
-            options: Object.keys(UJI).map(function (k) {
-              return { value: k, label: UJI[k].n.split(' ')[0] }; }) },
-          { type: 'buttons', label: '', items: [
-            { label: '💧 Uji bahan ini', primary: true, onClick: function (sim) {
-              sim.data.ujiJalan = 1;
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'tabel', value: true, label: 'Tabel hasil uji semua bahan' }
-        ]
-      }
-    ],
-
-    readouts: [
-      { id: 'jenis', label: 'Jenis polimerisasi', tone: 'accent' },
-      { id: 'asal', label: 'Asal polimer' },
-      { id: 'monomer', label: 'Monomer' },
-      { id: 'uji', label: 'Hasil uji' }
-    ],
-
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) {
-      if (id === 'polimer' || id === 'panjang') { sim.data.n = 1; sim.data.jalan = false; }
-      if (id === 'bahan' || id === 'uji') sim.data.ujiJalan = 0;
-    },
-
-    update: function (sim, dt) {
-      const target = Math.round(sim.get('panjang'));
-      if (sim.data.jalan) {
-        sim.data.n += dt * 2.6;
-        if (sim.data.n >= target) { sim.data.n = target; sim.data.jalan = false; }
-      }
-      if (sim.data.ujiJalan > 0 && sim.data.ujiJalan < 1.0001) {
-        sim.data.ujiJalan = Math.min(1, sim.data.ujiJalan + dt * 0.9);
-      }
-    },
-
-    draw: function (c, sim) {
-      const Pm = polimerAktif(sim);
-      const nTampil = Math.floor(sim.data.n);
-      const target = Math.round(sim.get('panjang'));
-      const adisi = Pm.jenis === 'adisi';
-
-      /* ---------- rantai polimer ---------- */
-      D.text(c, 'POLIMERISASI ' + Pm.jenis.toUpperCase(), 40, 44,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, Pm.n, 40, 70, { size: 22, weight: 700, color: Pm.w, base: 'middle' });
-      D.text(c, 'monomer: ' + Pm.monomer, 40, 94,
-        { size: 12, weight: 500, color: P.faint, base: 'middle' });
-
-      const RX = 60, RY = 160, lebar = Math.min(48, 640 / target);
-      for (let i = 0; i < target; i++) {
-        const x = RX + i * lebar;
-        const tersambung = i < nTampil;
-        const y = RY + (tersambung ? 0 : Math.sin(i * 2.1) * 26);
-
-        // ikatan antarmonomer
-        if (i > 0 && tersambung) {
-          D.line(c, x - lebar + 18, RY, x - 2, RY, 'rgba(255,255,255,.45)', 3.4);
-        }
-        // satuan monomer
-        D.roundRect(c, x - 2, y - 15, lebar - 8, 30, 5,
-          tersambung ? Pm.w : D.alpha(Pm.w, 0.3),
-          'rgba(255,255,255,.3)', 1.3);
-        D.text(c, '—', x + (lebar - 8) / 2 - 2, y,
-          { size: 13, weight: 700, color: D.readable(Pm.w), align: 'c', base: 'middle' });
-
-        // molekul kecil yang dilepas pada polimerisasi kondensasi
-        if (!adisi && tersambung && i > 0) {
-          D.circle(c, x - lebar / 2 + 8, RY - 34, 7, D.alpha('#5b9bf5', 0.8));
-          D.text(c, 'H₂O', x - lebar / 2 + 8, RY - 48,
-            { size: 9, weight: 700, color: '#8fd0ff', align: 'c', base: 'middle' });
-        }
-      }
-
-      D.text(c, 'n = ' + nTampil + ' dari ' + target + ' monomer', RX, RY + 48,
-        { size: 13, weight: 700, color: P.accent2, base: 'middle' });
-      D.text(c, adisi
-        ? 'Monomer berikatan rangkap terbuka dan menyambung langsung — tidak ada zat lain yang dilepas.'
-        : 'Setiap sambungan melepaskan satu molekul kecil (air), sehingga disebut kondensasi.',
-        RX, RY + 70, { size: 12, weight: 500, color: P.dim, base: 'middle' });
-
-      /* ---------- keterangan polimer ---------- */
-      const KX = 60, KY = 254, KW = 340;
-      D.roundRect(c, KX, KY, KW, 110, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'KETERANGAN', KX + 16, KY + 20,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const ket = [
-        ['Jenis polimerisasi', Pm.jenis],
-        ['Asal', Pm.asal],
-        ['Monomer penyusun', Pm.monomer],
-        ['Kegunaan', Pm.guna]
-      ];
-      ket.forEach(function (k, i) {
-        const y = KY + 42 + i * 18;
-        D.text(c, k[0], KX + 16, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        const teks = k[1].length > 36 ? k[1].slice(0, 34) + '…' : k[1];
-        D.text(c, teks, KX + 140, y,
-          { size: 10.5, weight: 650, color: P.dim, base: 'middle' });
-      });
-
-      /* ---------- adisi vs kondensasi ---------- */
-      const AX = 416, AW = W - AX - 40;
-      D.roundRect(c, AX, KY, AW, 110, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'DUA JENIS POLIMERISASI', AX + 16, KY + 20,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      [['ADISI', 'Monomer berikatan rangkap. Ikatan rangkap terbuka lalu menyambung. Tidak ada zat sampingan.', 'PE, PP, PVC, karet', adisi],
-       ['KONDENSASI', 'Monomer bergugus fungsi. Setiap sambungan melepas molekul kecil (air).', 'Nilon, PET, protein, pati', !adisi]
-      ].forEach(function (q, i) {
-        const y = KY + 42 + i * 34;
-        if (q[3]) D.roundRect(c, AX + 10, y - 13, AW - 20, 32, 5, 'rgba(79,209,192,.12)');
-        D.text(c, q[0], AX + 18, y - 3,
-          { size: 11, weight: 800, color: q[3] ? P.accent2 : P.dim, base: 'middle' });
-        D.text(c, q[2], AX + AW - 18, y - 3,
-          { size: 10, weight: 600, color: P.faint, align: 'r', base: 'middle' });
-        D.text(c, q[1].length > 68 ? q[1].slice(0, 66) + '…' : q[1], AX + 18, y + 11,
-          { size: 10, weight: 500, color: P.faint, base: 'middle' });
-      });
-
-      /* ---------- uji biomolekul ---------- */
-      const B = BAHAN_UJI[parseInt(sim.get('bahan'), 10) || 0];
-      const ujiKunci = sim.get('uji');
-      const U = UJI[ujiKunci];
-      const positif = B[U.untuk];
-      const a = sim.data.ujiJalan;
-
-      const TX = 60, TY = 390;
-      D.text(c, 'UJI BIOMOLEKUL', TX, TY,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      // tabung reaksi
-      const tubeX = TX + 20, tubeY = TY + 20;
-      D.tube(c, tubeX, tubeY, 42, 110,
-        0.6, D.alpha(a > 0.4 ? (positif ? U.wPos : U.wNeg) : '#d8d0b8', 0.9));
-      D.text(c, B.n, tubeX + 21, tubeY + 128,
-        { size: 13, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, '+ ' + U.n, tubeX + 21, tubeY + 146,
-        { size: 10.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-
-      // hasil
-      D.roundRect(c, TX + 90, TY + 24, 260, 100, 12,
-        a > 0.4 ? D.alpha(positif ? P.green : P.faint, 0.1) : 'rgba(255,255,255,.04)',
-        a > 0.4 ? (positif ? P.green : 'rgba(255,255,255,.14)') : 'rgba(255,255,255,.12)', 1.4);
-      D.text(c, 'HASIL UJI', TX + 106, TY + 44,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      if (a > 0.4) {
-        D.text(c, positif ? 'POSITIF' : 'NEGATIF', TX + 106, TY + 70,
-          { size: 20, weight: 800, color: positif ? P.green : P.faint, base: 'middle' });
-        D.text(c, positif ? 'Warna berubah menjadi ' + U.positif
-          : 'Warna tidak berubah', TX + 106, TY + 94,
-          { size: 12, weight: 600, color: P.dim, base: 'middle' });
-        D.text(c, (positif ? 'Mengandung ' : 'Tidak mengandung ') + U.untuk,
-          TX + 106, TY + 112, { size: 11.5, weight: 500, color: P.faint, base: 'middle' });
-      } else {
-        D.text(c, 'Tekan "Uji bahan ini" untuk melihat hasilnya.',
-          TX + 106, TY + 76, { size: 12, weight: 500, color: P.faint, base: 'middle' });
-      }
-
-      /* ---------- tabel uji ---------- */
-      if (sim.get('tabel')) {
-        const JX = 416, JW = W - JX - 40, JY = 390;
-        D.roundRect(c, JX, JY + 16, JW, 164, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'HASIL UJI SELURUH BAHAN', JX + 16, JY + 36,
-          { size: 10, weight: 700, color: P.faint, base: 'middle' });
-
-        const kol = ['Bahan', 'Amilum', 'Glukosa', 'Protein', 'Lemak'];
-        const lebarKol = [110, 60, 60, 60, 60];
-        let x0 = JX + 16;
-        kol.forEach(function (k, i) {
-          D.text(c, k, x0, JY + 56, { size: 9, weight: 700, color: P.faint, base: 'middle' });
-          x0 += lebarKol[i];
-        });
-        D.line(c, JX + 14, JY + 64, JX + JW - 14, JY + 64, 'rgba(255,255,255,.14)', 1);
-
-        BAHAN_UJI.forEach(function (b, i) {
-          const y = JY + 80 + i * 14;
-          const aktif = b.n === B.n;
-          if (aktif) D.roundRect(c, JX + 10, y - 7, JW - 20, 14, 3, 'rgba(79,209,192,.12)');
-          let x = JX + 16;
-          D.text(c, b.n, x, y, {
-            size: 10, weight: aktif ? 700 : 500,
-            color: aktif ? P.accent2 : P.dim, base: 'middle'
-          });
-          x += lebarKol[0];
-          ['amilum', 'glukosa', 'protein', 'lemak'].forEach(function (k, ki) {
-            D.text(c, b[k] ? '✓' : '·', x + 12, y, {
-              size: 11, weight: 700, align: 'c', base: 'middle',
-              color: b[k] ? P.green : P.faint
-            });
-            x += lebarKol[ki + 1];
-          });
-        });
-      }
-    },
-
-    readoutsUpdate: function (sim) {
-      const Pm = polimerAktif(sim);
-      const B = BAHAN_UJI[parseInt(sim.get('bahan'), 10) || 0];
-      const U = UJI[sim.get('uji')];
-      sim.readout('jenis', Pm.jenis.charAt(0).toUpperCase() + Pm.jenis.slice(1));
-      sim.readout('asal', Pm.asal.charAt(0).toUpperCase() + Pm.asal.slice(1),
-        Pm.asal === 'alami' ? 'accent' : null);
-      sim.readout('monomer', Pm.monomer.length > 22 ? Pm.monomer.slice(0, 20) + '…' : Pm.monomer);
-      sim.readout('uji', sim.data.ujiJalan > 0.4 ? (B[U.untuk] ? 'Positif' : 'Negatif') : '—',
-        sim.data.ujiJalan > 0.4 ? (B[U.untuk] ? 'accent' : null) : null);
-    },
-
-    notes: `
-      <p>Makromolekul adalah molekul raksasa yang tersusun dari satuan kecil berulang.
-      Satuan kecilnya disebut <strong>monomer</strong>, hasil gabungannya disebut
-      <strong>polimer</strong>, dan prosesnya disebut <strong>polimerisasi</strong>.</p>
-
-      <h3>Dua jenis polimerisasi</h3>
-      <table>
-        <thead><tr><th></th><th>Adisi</th><th>Kondensasi</th></tr></thead>
-        <tbody>
-          <tr><td>Monomer</td><td>berikatan rangkap</td><td>bergugus fungsi (dua gugus)</td></tr>
-          <tr><td>Zat sampingan</td><td>tidak ada</td><td>molekul kecil, biasanya air</td></tr>
-          <tr><td>Contoh sintetis</td><td>PE, PP, PVC, polistirena</td><td>nilon, PET, bakelit</td></tr>
-          <tr><td>Contoh alami</td><td>karet alam</td><td>protein, pati, selulosa, DNA</td></tr>
-        </tbody>
-      </table>
-
-      <p>Perhatikan bahwa hampir seluruh polimer alami terbentuk lewat polimerisasi
-      kondensasi. Tubuh kita menyambung asam amino menjadi protein dengan melepaskan
-      molekul air pada setiap ikatan peptida.</p>
-
-      <h3>Empat golongan biomolekul</h3>
-      <ul>
-        <li><strong>Karbohidrat</strong> — monomernya monosakarida seperti glukosa.
-            Pati, selulosa, dan glikogen semuanya polimer glukosa; yang membedakan hanya
-            jenis ikatan dan percabangannya. Itulah sebabnya kita dapat mencerna pati
-            tetapi tidak selulosa.</li>
-        <li><strong>Protein</strong> — monomernya asam amino yang disambung
-            <strong>ikatan peptida</strong>. Ada 20 jenis asam amino, dan urutannya
-            menentukan bentuk serta fungsi protein.</li>
-        <li><strong>Lipid</strong> — bukan polimer sejati. Tersusun dari gliserol dan asam
-            lemak. Lemak jenuh berwujud padat, lemak tak jenuh berwujud cair (minyak).</li>
-        <li><strong>Asam nukleat</strong> — DNA dan RNA, monomernya nukleotida. Membawa
-            keterangan genetik.</li>
-      </ul>
-
-      <h3>Uji biomolekul di laboratorium</h3>
-      <table>
-        <thead><tr><th>Pereaksi</th><th>Menguji</th><th>Hasil positif</th></tr></thead>
-        <tbody>
-          <tr><td>Lugol (iodin)</td><td>amilum</td><td>biru kehitaman</td></tr>
-          <tr><td>Benedict / Fehling</td><td>gula pereduksi</td><td>endapan merah bata</td></tr>
-          <tr><td>Biuret</td><td>protein (ikatan peptida)</td><td>ungu</td></tr>
-          <tr><td>Xantoproteat</td><td>protein bercincin benzena</td><td>jingga</td></tr>
-          <tr><td>Kertas buram</td><td>lemak</td><td>noda transparan</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Masalah plastik</h3>
-      <p>Sifat yang membuat plastik berguna — kuat, ringan, dan tahan reaksi kimia —
-      justru membuatnya sulit terurai. Polietilena memerlukan ratusan tahun untuk hancur
-      di alam.</p>
-
-      <p>Beberapa jalan keluar yang dikembangkan: polimer <strong>biodegradable</strong>
-      seperti PLA dari pati jagung, daur ulang mekanik maupun kimia, serta mengurangi
-      pemakaian plastik sekali pakai. Kode daur ulang pada kemasan (1 sampai 7) membantu
-      pemilahan.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Pati dan selulosa dari monomer yang sama</strong>
-        Keduanya polimer glukosa, tetapi arah ikatannya berbeda. Enzim amilase manusia
-        hanya cocok dengan ikatan pada pati, sehingga kita bisa mencerna nasi tetapi tidak
-        kertas. Sapi bisa, karena bakteri di rumennya memiliki enzim selulase.
-      </div>
-    `,
-
-    explore: [
-      'Jalankan polimerisasi <strong>Polietilena</strong> lalu <strong>Nilon 6,6</strong>. Apa yang muncul berbeda di antara monomernya?',
-      'Bandingkan <strong>Amilum</strong> dan <strong>Selulosa</strong>. Monomernya sama — mengapa sifatnya sangat berbeda?',
-      'Uji <strong>Nasi</strong> dengan Lugol, lalu dengan Biuret. Mengapa hasilnya berbeda?',
-      'Cari bahan yang positif pada tiga uji sekaligus. Bahan apa itu?'
-    ],
-
-    quiz: [
-      {
-        q: 'Polimerisasi yang melepaskan molekul air pada setiap pembentukan ikatan disebut polimerisasi…',
-        options: ['Adisi', 'Kondensasi', 'Substitusi', 'Eliminasi'],
-        answer: 1,
-        explain: 'Pada polimerisasi kondensasi, monomer bergugus fungsi bergabung sambil melepaskan molekul kecil, umumnya air. Protein, nilon, dan pati terbentuk dengan cara ini.'
-      },
-      {
-        q: 'Suatu bahan makanan diuji dengan Biuret dan berubah menjadi ungu. Bahan tersebut mengandung…',
-        options: ['Amilum', 'Glukosa', 'Protein', 'Lemak'],
-        answer: 2,
-        explain: 'Uji Biuret mendeteksi ikatan peptida yang hanya terdapat pada protein. Warna ungu menandakan hasil positif.'
-      },
-      {
-        q: 'Amilum dan selulosa sama-sama polimer glukosa, tetapi manusia hanya dapat mencerna amilum. Penyebabnya adalah…',
-        options: [
-          'Selulosa bukan karbohidrat',
-          'Jenis ikatan antarglukosanya berbeda sehingga enzim manusia tidak cocok',
-          'Selulosa tidak larut dalam air',
-          'Amilum memiliki monomer yang berbeda'
-        ],
-        answer: 1,
-        explain: 'Arah ikatan glikosida pada amilum dan selulosa berbeda. Enzim amilase manusia hanya cocok dengan ikatan pada amilum. Hewan pemamah biak dapat mencerna selulosa karena dibantu bakteri bersenzim selulase.'
-      },
-      {
-        q: 'Manakah polimer yang terbentuk melalui polimerisasi adisi?',
-        options: ['Nilon 6,6', 'Protein', 'Polietilena', 'PET'],
-        answer: 2,
-        explain: 'Polietilena terbentuk dari monomer etena yang memiliki ikatan rangkap C=C. Ikatan rangkap terbuka lalu menyambung tanpa melepaskan zat lain — ciri polimerisasi adisi.'
-      }
-    ]
-  });
-})();
+  function pasangUji(s) {
+    const u = uji(s);
+    s.data.tu = 0;
+    s.data.jalanU = false;
+    s.data.tb.userData.setLevel(0.55, u.awal);
+    s.data.isiP.material.color.setHex(u.akhir === u.awal ? 0x3f8fd0 : u.akhir);
+    s.data.tetes.forEach(function (q) {
+      q.m.visible = false; q.y = 9;
+      q.m.material.color.setHex(u.akhir === u.awal ? 0x3f8fd0 : u.akhir);
+      q.m.material.emissive.setHex(u.akhir === u.awal ? 0x3f8fd0 : u.akhir);
+    });
+    s.data.butir.forEach(function (m) { m.visible = false; });
+    s.data.lblUji.userData.ganti(u.n);
+    s.data.lblHasil.userData.ganti('diharapkan: ' + u.hasil,
+      u.positif ? '#9fe8ad' : '#ef6a52');
+  }
+})());

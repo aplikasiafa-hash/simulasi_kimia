@@ -1,406 +1,406 @@
-/* Laju Reaksi dan Faktor-Faktornya — Fase F
-   Ubah konsentrasi, suhu, luas permukaan, dan katalis; amati tumbukan
-   partikel, grafik konsentrasi, dan diagram energi aktivasi. */
+/* Laju Reaksi dan Faktor-faktornya — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('laju-reaksi', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  const BENTUK = [
+    { id: 'serbuk', n: 'Serbuk', luas: 1.0, butir: 44, r: 0.075 },
+    { id: 'butiran', n: 'Butiran', luas: 0.55, butir: 14, r: 0.16 },
+    { id: 'lempeng', n: 'Satu lempeng', luas: 0.22, butir: 1, r: 0.42 }
+  ];
 
-  const W = 800, H = 590;
-  const KX = 46, KY = 118, KW = 290, KH = 190;
+  const KATALIS = [
+    { n: 'Tanpa katalis', ea: 60, f: 1.0, warna: 0x9aa8b4 },
+    { n: 'CuSO₄ (sedikit)', ea: 48, f: 1.9, warna: 0x4a9fd8 },
+    { n: 'MnO₂', ea: 40, f: 3.1, warna: 0x3a3a42 },
+    { n: 'Enzim katalase', ea: 26, f: 6.5, warna: 0x9fe8ad }
+  ];
 
-  function siapkan(sim) {
-    const sys = new SistemPartikel({ x: KX, y: KY, w: KW, h: KH, tumbukan: true });
-    sim.data.sys = sys;
-    sim.data.konsenSisa = 1;
-    sim.data.jejak = new Plot.Buffer(800);
-    sim.data.jejakLaju = new Plot.Buffer(800);
-    sim.data.tumbukan = 0;
-    sim.data.efektif = 0;
-    isiPartikel(sim);
+  const R_GAS = 8.314;
+
+  function bentuk(s) {
+    const id = s.get('bentuk');
+    for (let i = 0; i < BENTUK.length; i++) if (BENTUK[i].id === id) return BENTUK[i];
+    return BENTUK[0];
+  }
+  function katalis(s) { return KATALIS[parseInt(s.get('kat'), 10) || 0]; }
+
+  /* laju awal relatif (satuan sembarang, dinormalkan agar enak dibaca) */
+  function hitung(s) {
+    const c = s.get('c');
+    const Tk = s.get('suhu') + 273.15;
+    const b = bentuk(s);
+    const k = katalis(s);
+    const ea = k.ea * 1000;                       // J/mol
+    const A = 4.2e9;
+    const kLaju = A * Math.exp(-ea / (R_GAS * Tk));
+    const laju = kLaju * c * b.luas;              // orde 1 terhadap [HCl]
+    const vMaks = 60 * c * (b.luas * 0.5 + 0.5);  // volume gas maksimum (mL)
+    return { laju: laju, ea: k.ea, b: b, k: k, vMaks: vMaks, Tk: Tk, c: c };
   }
 
-  function isiPartikel(sim) {
-    const sys = sim.data.sys;
-    sys.kosongkan();
-    const n = Math.round(10 + sim.get('konsentrasi') * 22);
-    const laju = 24 + sim.get('suhu') * 0.5;
-    const r = sim.get('serbuk') ? 5 : 9;
-    for (let i = 0; i < n; i++) {
-      const a = Sim.rnd(0, Math.PI * 2);
-      const v = laju * Sim.rnd(0.6, 1.5);
-      sys.tambah(new Partikel(
-        Sim.rnd(KX + 12, KX + KW - 12), Sim.rnd(KY + 12, KY + KH - 12),
-        r, i % 2 === 0 ? '#5b9bf5' : '#f0a94a',
-        { vx: Math.cos(a) * v, vy: Math.sin(a) * v, jenis: i % 2 === 0 ? 'A' : 'B' }
-      ));
-    }
+  /* volume gas pada waktu t (detik) — peluruhan eksponensial menuju vMaks */
+  function volume(h, t) {
+    const tau = 1 / Math.max(1e-4, h.laju * 0.09);
+    return h.vMaks * (1 - Math.exp(-t / tau));
   }
 
-  /** Energi aktivasi efektif (kJ/mol). */
-  function Ea(sim) {
-    return sim.get('katalis') ? 32 : 58;
-  }
+  return {
+    latar: 0x070d13,
+    kamera: { jarak: 11, phi: 1.04, theta: 0.58, targetY: 1.6, lajuPutar: 0.1 },
 
-  /** Laju reaksi relatif menurut faktor-faktornya. */
-  function lajuReaksi(sim) {
-    const konsen = sim.get('konsentrasi') * sim.data.konsenSisa;
-    const orde = sim.get('orde');
-    const T = sim.get('suhu') + 273;
-    const k = C.arrhenius(2.6e7, Ea(sim), T);
-    const luas = sim.get('serbuk') ? 2.1 : 1;
-    return k * Math.pow(Math.max(konsen, 0), orde) * luas * 42;
-  }
-
-  Sim.create({
-    title: 'Laju Reaksi dan Faktor-Faktornya',
-    subtitle: 'Reaksi terjadi saat partikel bertumbukan dengan arah tepat dan energi cukup. Setiap faktor yang mempercepat reaksi bekerja lewat salah satu dari dua syarat itu.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Laju Reaksi', 'Katalis', 'Energi Aktivasi'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Faktor yang diubah',
-        items: [
-          { type: 'slider', id: 'konsentrasi', value: 1, min: 0.2, max: 2, step: 0.1,
-            label: 'Konsentrasi awal', unit: 'M', dec: 1,
-            hint: 'Lebih pekat berarti lebih banyak partikel per satuan volume.' },
-          { type: 'slider', id: 'suhu', value: 25, min: 0, max: 100, step: 5,
-            label: 'Suhu', unit: '°C', dec: 0,
-            hint: 'Naik 10 °C umumnya melipatgandakan laju reaksi.' },
-          { type: 'toggle', id: 'serbuk', value: false, label: 'Zat padat dihaluskan',
-            hint: 'Serbuk punya luas permukaan sentuh jauh lebih besar.' },
-          { type: 'toggle', id: 'katalis', value: false, label: 'Tambahkan katalis',
-            hint: 'Katalis menyediakan jalan reaksi dengan energi aktivasi lebih rendah.' }
-        ]
-      },
-      {
-        title: 'Persamaan laju',
-        items: [
-          { type: 'segment', id: 'orde', value: 1, numeric: true, label: 'Orde reaksi terhadap A',
-            options: [{ value: 0, label: 'Orde 0' }, { value: 1, label: 'Orde 1' }, { value: 2, label: 'Orde 2' }] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'diagram', value: true, label: 'Diagram energi aktivasi' },
-          { type: 'buttons', label: '', items: [
-            { label: '↺ Ulangi reaksi', onClick: function (sim) {
-              sim.data.konsenSisa = 1; sim.data.jejak.clear();
-              sim.data.jejakLaju.clear(); sim.t = 0; isiPartikel(sim);
-            } }
-          ] }
-        ]
-      }
+    kendali: [
+      { judul: 'Pereaksi', isi: [
+        { type: 'slider', id: 'c', value: 1, min: 0.1, max: 3, step: 0.05,
+          label: 'Konsentrasi HCl', unit: ' M', dec: 2 },
+        { type: 'slider', id: 'suhu', value: 25, min: 5, max: 90, step: 1,
+          label: 'Suhu', unit: ' °C', dec: 0 },
+        { type: 'segment', id: 'bentuk', value: 'serbuk', label: 'Bentuk logam Mg',
+          options: BENTUK.map(function (b) { return { value: b.id, label: b.n }; }) },
+        { type: 'select', id: 'kat', value: 0, label: 'Katalis',
+          options: KATALIS.map(function (k, i) { return { value: i, label: k.n }; }) }
+      ]},
+      { judul: 'Percobaan', isi: [
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Mulai reaksi', utama: true, klik: function (s) { s.data.jalan = true; } },
+          { label: '⏸ Jeda', klik: function (s) { s.data.jalan = false; } },
+          { label: '↺ Ulangi', klik: function (s) { ulang(s); } },
+          { label: '＋ Simpan kurva', klik: function (s) { simpan(s); } }
+        ]},
+        { type: 'slider', id: 'laju', value: 1, min: 0.2, max: 4, step: 0.1,
+          label: 'Kecepatan waktu', unit: '×', dec: 1 }
+      ]},
+      { judul: 'Panel', isi: [
+        { type: 'segment', id: 'panel', value: 'volume', label: 'Grafik', options: [
+          { value: 'volume', label: 'Volume gas' },
+          { value: 'energi', label: 'Energi aktivasi' }
+        ]},
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan panel' },
+        { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan tumbukan partikel' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'laju', label: 'Laju reaksi', tone: 'accent' },
-      { id: 'sisa', label: 'Sisa pereaksi' },
+    baca: [
+      { id: 'laju', label: 'Laju awal', tone: 'aksen' },
+      { id: 'vol', label: 'Volume H₂ terkumpul' },
+      { id: 'waktu', label: 'Waktu berjalan' },
       { id: 'ea', label: 'Energi aktivasi' },
-      { id: 'k', label: 'Tetapan laju k' }
+      { id: 'luas', label: 'Luas permukaan relatif' },
+      { id: 'sebab', label: 'Faktor paling berpengaruh' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) {
-      if (id === 'konsentrasi' || id === 'serbuk') isiPartikel(sim);
-      if (id === 'suhu') {
-        const target = 24 + sim.get('suhu') * 0.5;
-        const sek = sim.data.sys.lajuRata();
-        if (sek > 1) sim.data.sys.skalaLaju(Sim.clamp(target / sek, 0.4, 2.4));
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9, warna: 0x0c1218 }));
+
+      /* ---------- labu tempat reaksi ---------- */
+      const labu = S.labu({ r: 1.25, h: 2.2, level: 0.5, warna: 0xdfe8ee });
+      labu.position.set(-1.6, 0.05, 0);
+      s.data.labu = labu;
+      s.tambah(labu);
+
+      // sumbat + selang ke tabung ukur
+      const sumbat = new T.Mesh(new T.CylinderGeometry(0.42, 0.36, 0.34, 24),
+        new T.MeshStandardMaterial({ color: 0xd8923a, roughness: 0.85 }));
+      sumbat.position.set(-1.6, 2.3, 0);
+      s.tambah(sumbat);
+
+      const kurva = new T.CatmullRomCurve3([
+        new T.Vector3(-1.6, 2.5, 0), new T.Vector3(-1.3, 3.3, 0.3),
+        new T.Vector3(0.4, 3.7, 0.3), new T.Vector3(1.9, 3.3, 0.1),
+        new T.Vector3(2.1, 2.6, 0)
+      ]);
+      const selang = new T.Mesh(new T.TubeGeometry(kurva, 60, 0.07, 12, false),
+        new T.MeshStandardMaterial({ color: 0x3e4a56, roughness: 0.6 }));
+      s.tambah(selang);
+
+      /* ---------- tabung ukur gas (suntikan) ---------- */
+      const silinder = new T.Mesh(new T.CylinderGeometry(0.44, 0.44, 3.0, 36, 1, true),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.2, side: T.DoubleSide, depthWrite: false }));
+      silinder.position.set(2.1, 1.6, 0);
+      s.tambah(silinder);
+      const dasarS = new T.Mesh(new T.CylinderGeometry(0.46, 0.46, 0.1, 36), S.matLogam(0x8d99a4));
+      dasarS.position.set(2.1, 0.1, 0);
+      s.tambah(dasarS);
+
+      // gas terkumpul (kolom biru muda)
+      const gasKolom = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 1, 32),
+        new T.MeshStandardMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.45,
+          emissive: 0x4a9fd8, emissiveIntensity: 0.18 }));
+      s.data.gasKolom = gasKolom;
+      s.tambah(gasKolom);
+
+      // piston
+      const piston = new T.Mesh(new T.CylinderGeometry(0.43, 0.43, 0.16, 32),
+        S.matLogam(0xd0d6dc, { roughness: 0.4 }));
+      s.data.piston = piston;
+      s.tambah(piston);
+      const tangkai = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 1.4, 14), S.matLogam(0xb0b8c0));
+      s.data.tangkai = tangkai;
+      s.tambah(tangkai);
+
+      // skala tabung
+      for (let i = 0; i <= 6; i++) {
+        const g = new T.Mesh(new T.BoxGeometry(0.14, 0.014, 0.014),
+          new T.MeshBasicMaterial({ color: 0x8d97a1 }));
+        g.position.set(2.56, 0.2 + i * 0.47, 0);
+        s.tambah(g);
       }
+      const lblV = S.teks('0 mL', { skala: 0.3, lebar: 10, warna: '#bfe8ff' });
+      lblV.position.set(3.2, 2.4, 0);
+      s.data.lblV = lblV;
+      s.tambah(lblV);
+
+      /* ---------- butiran logam di dasar labu ---------- */
+      const logam = new T.Group();
+      s.data.logam = logam;
+      s.tambah(logam);
+
+      /* ---------- partikel asam + gelembung ---------- */
+      const asam = S.partikel(70, { r: 0.065, warna: 0xf0d040, kotak: { x: 0.85, y: 0.4, z: 0.85 } });
+      asam.position.set(-1.6, 0.6, 0);
+      asam.material.transparent = true;
+      asam.material.opacity = 0.9;
+      s.data.asam = asam;
+      s.tambah(asam);
+
+      const gel = S.gelembung({ n: 44, sebar: 0.75, tinggi: 1.5, warna: 0xeaf4fa });
+      gel.position.set(-1.6, 0.18, 0);
+      s.data.gel = gel;
+      s.tambah(gel);
+
+      // kilatan tumbukan berhasil
+      const kilat = [];
+      for (let i = 0; i < 10; i++) {
+        const m = new T.Mesh(S.geoBola(12), new T.MeshBasicMaterial({
+          color: 0xfff0a0, transparent: true, opacity: 0
+        }));
+        m.scale.setScalar(0.14);
+        s.tambah(m);
+        kilat.push({ m: m, t: 9 });
+      }
+      s.data.kilat = kilat;
+
+      /* ---------- panel grafik ---------- */
+      const g1 = S.panelGrafik({ w: 4.8, px: 700, py: 440 });
+      g1.position.set(0.2, 5.4, -1.8);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      // termometer kecil
+      const lblS = S.teks('', { skala: 0.3, lebar: 14, warna: '#ef8a52' });
+      lblS.position.set(-3.6, 2.4, 0);
+      s.data.lblS = lblS;
+      s.tambah(lblS);
+
+      const lbl = S.teks('Mg(s) + 2HCl(aq) → MgCl₂(aq) + H₂(g)',
+        { skala: 0.36, lebar: 44, warna: '#d8e4ec' });
+      lbl.position.set(0, 7.1, 0);
+      s.tambah(lbl);
+
+      s.data.tersimpan = [];
+      ulang(s);
+      pasang(s);
     },
 
-    update: function (sim, dt) {
-      const sys = sim.data.sys;
-      sys.langkah(dt);
-
-      // jaga laju partikel sesuai suhu
-      const target = 24 + sim.get('suhu') * 0.5;
-      const sek = sys.lajuRata();
-      if (sek > 1) sys.skalaLaju(Sim.lerp(1, target / sek, Math.min(1, dt * 1.4)));
-
-      // pereaksi berkurang menurut laju
-      const v = lajuReaksi(sim);
-      sim.data.konsenSisa = Math.max(0, sim.data.konsenSisa - v * dt * 0.09);
-
-      // perkiraan tumbukan efektif
-      const pecahanEfektif = Math.exp(-Ea(sim) * 1000 / (C.R * (sim.get('suhu') + 273)));
-      sim.data.tumbukan += dt * sys.partikel.length * 2.2;
-      sim.data.efektif += dt * sys.partikel.length * 2.2 * pecahanEfektif * 1e9;
-
-      // sebagian partikel memudar seiring reaksi
-      const hidup = Math.ceil(sys.partikel.length * (0.25 + sim.data.konsenSisa * 0.75));
-      sys.partikel.forEach(function (p, i) { p.hidup = i < hidup; });
-
-      sim.data.jejak.push(sim.t, sim.get('konsentrasi') * sim.data.konsenSisa);
-      sim.data.jejakLaju.push(sim.t, v);
+    ubah: function (s, id) {
+      if (id === 'bentuk' || id === 'c' || id === 'kat') { pasang(s); ulang(s); }
+      if (id === 'suhu') { pasang(s); ulang(s); }
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'partikel') {
+        s.data.asam.visible = s.get('partikel');
+        s.data.logam.visible = true;
+      }
+      gambar(s);
     },
 
-    draw: function (c, sim) {
-      const sys = sim.data.sys;
-      const v = lajuReaksi(sim);
-      const T = sim.get('suhu');
-
-      /* ---------- wadah partikel ---------- */
-      D.text(c, 'TUMBUKAN PARTIKEL', KX, 100,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.roundRect(c, KX - 3, KY - 3, KW + 6, KH + 6, 5,
-        'rgba(255,255,255,.03)', 'rgba(255,255,255,.3)', 2);
-      sys.gambar(c, { label: false });
-
-      // keterangan suhu & kondisi
-      const info = [];
-      info.push(Math.round(T) + ' °C');
-      info.push(Sim.fmt(sim.get('konsentrasi'), 1) + ' M');
-      if (sim.get('serbuk')) info.push('serbuk');
-      if (sim.get('katalis')) info.push('+ katalis');
-      D.roundRect(c, KX + 6, KY + 6, D.measure(c, info.join(' · '), { size: 11, weight: 600 }) + 20, 22, 11,
-        'rgba(0,0,0,.45)');
-      D.text(c, info.join(' · '), KX + 16, KY + 17,
-        { size: 11, weight: 600, color: P.dim, base: 'middle' });
-
-      // bilah sisa pereaksi
-      D.text(c, 'Sisa pereaksi', KX, KY + KH + 24,
-        { size: 10.5, weight: 600, color: P.faint, base: 'middle' });
-      D.roundRect(c, KX, KY + KH + 32, KW, 14, 7, 'rgba(255,255,255,.07)');
-      D.roundRect(c, KX, KY + KH + 32, KW * sim.data.konsenSisa, 14, 7,
-        D.ramp(['#ef6a52', '#f0a94a', '#4fd1c0'], sim.data.konsenSisa));
-      D.text(c, Math.round(sim.data.konsenSisa * 100) + '%', KX + KW + 10, KY + KH + 39,
-        { size: 12, weight: 700, color: P.dim, base: 'middle', mono: true });
-
-      /* ---------- diagram energi aktivasi ---------- */
-      if (sim.get('diagram')) {
-        const DX = 390, DY = 118, DW = 370, DH = 190;
-        D.roundRect(c, DX, DY, DW, DH, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'DIAGRAM ENERGI REAKSI', DX + 16, DY + 20,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-        const gx = DX + 40, gy = DY + 40, gw = DW - 70, gh = DH - 76;
-        const yPereaksi = gy + gh - 36;
-        const yHasil = gy + gh - 12;
-
-        // lengkung tanpa katalis
-        function lengkung(ea, warna, lw, dash) {
-          c.save();
-          if (dash) c.setLineDash(dash);
-          c.beginPath();
-          const puncak = yPereaksi - (ea / 70) * (gh - 40);
-          c.moveTo(gx, yPereaksi);
-          c.bezierCurveTo(gx + gw * 0.26, yPereaksi, gx + gw * 0.34, puncak, gx + gw * 0.5, puncak);
-          c.bezierCurveTo(gx + gw * 0.66, puncak, gx + gw * 0.74, yHasil, gx + gw, yHasil);
-          c.strokeStyle = warna; c.lineWidth = lw; c.stroke();
-          c.restore();
-          return puncak;
+    langkah: function (s, dt) {
+      const h = hitung(s);
+      if (s.data.jalan) {
+        s.data.jam += dt * s.get('laju') * 1.6;
+        if (s.data.rekam.length < 500) {
+          s.data.rekam.push([s.data.jam, volume(h, s.data.jam)]);
         }
+      }
+      const v = volume(h, s.data.jam);
+      const f = S.clamp(v / Math.max(0.001, h.vMaks), 0, 1);
 
-        const puncakTanpa = lengkung(58, sim.get('katalis') ? 'rgba(255,255,255,.22)' : P.amber,
-          sim.get('katalis') ? 1.8 : 2.6, sim.get('katalis') ? [5, 4] : null);
-        if (sim.get('katalis')) {
-          const puncakKat = lengkung(32, P.accent, 2.8);
-          D.arrow(c, gx + gw * 0.5 + 44, puncakTanpa, gx + gw * 0.5 + 44, puncakKat, P.accent, 2, 7);
-          D.text(c, 'Ea turun', gx + gw * 0.5 + 50, (puncakTanpa + puncakKat) / 2,
-            { size: 10.5, weight: 700, color: P.accent, base: 'middle' });
+      // kolom gas & piston naik
+      const tinggi = f * 2.6 + 0.02;
+      s.data.gasKolom.scale.y = tinggi;
+      s.data.gasKolom.position.set(2.1, 0.15 + tinggi / 2, 0);
+      s.data.piston.position.set(2.1, 0.15 + tinggi + 0.08, 0);
+      s.data.tangkai.position.set(2.1, 0.15 + tinggi + 0.85, 0);
+      s.data.lblV.userData.ganti(S.fmt(v, 1) + ' mL');
+
+      // gelembung: makin cepat bila laju besar, berhenti bila habis
+      const kecepatan = s.data.jalan ? S.clamp(h.laju * 0.6 * (1 - f * 0.85), 0, 3) : 0;
+      s.data.gel.userData.perbarui(dt, kecepatan);
+
+      // partikel asam bergerak; makin panas makin cepat
+      const cepat = 0.3 + (s.get('suhu') + 20) / 60;
+      s.data.asam.userData.gerak(dt, cepat);
+
+      // logam mengecil saat bereaksi
+      s.data.logam.children.forEach(function (m, i) {
+        const sk = Math.max(0.05, 1 - f * 0.92);
+        m.scale.setScalar(m.userData.r0 * sk);
+        m.position.y = m.userData.y0 * sk + 0.04;
+      });
+
+      // kilatan tumbukan berhasil (frekuensi ~ laju)
+      s.data.kilat.forEach(function (k) {
+        k.t += dt;
+        if (s.data.jalan && kecepatan > 0.05 && k.t > 0.25 + 1.2 / Math.max(0.1, kecepatan)) {
+          k.t = 0;
+          const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+          k.m.position.set(-1.6 + Math.cos(a) * rr, 0.25 + Math.random() * 0.5,
+            Math.sin(a) * rr);
         }
-
-        // garis pereaksi/hasil
-        D.line(c, gx, yPereaksi, gx + 44, yPereaksi, P.blue, 2.4);
-        D.text(c, 'pereaksi', gx, yPereaksi - 10,
-          { size: 10, weight: 650, color: P.blue, base: 'middle' });
-        D.line(c, gx + gw - 44, yHasil, gx + gw, yHasil, P.rose, 2.4);
-        D.text(c, 'hasil', gx + gw, yHasil + 14,
-          { size: 10, weight: 650, color: P.rose, align: 'r', base: 'middle' });
-
-        // Ea
-        const puncakAktif = sim.get('katalis')
-          ? yPereaksi - (32 / 70) * (gh - 40)
-          : puncakTanpa;
-        D.arrow(c, gx + gw * 0.5 - 56, yPereaksi, gx + gw * 0.5 - 56, puncakAktif,
-          sim.get('katalis') ? P.accent : P.amber, 2, 7);
-        D.text(c, 'Ea = ' + Ea(sim) + ' kJ/mol', gx + gw * 0.5 - 52, (yPereaksi + puncakAktif) / 2,
-          { size: 10.5, weight: 700, color: sim.get('katalis') ? P.accent : P.amber, base: 'middle' });
-
-        D.text(c, 'energi', DX + 16, gy + 10,
-          { size: 10, weight: 600, color: P.faint, base: 'middle' });
-        D.text(c, 'jalannya reaksi →', DX + DW - 16, gy + gh + 22,
-          { size: 10, weight: 600, color: P.faint, align: 'r', base: 'middle' });
-      }
-
-      /* ---------- grafik konsentrasi & laju ---------- */
-      const tMax = Math.max(10, sim.t);
-      const g1 = { x: 80, y: 376, w: 300, h: 110 };
-      const map1 = Plot.axes(c, {
-        x: g1.x, y: g1.y, w: g1.w, h: g1.h,
-        xmin: 0, xmax: Math.max(20, tMax), ymin: 0, ymax: sim.get('konsentrasi') * 1.15,
-        xlabel: 'waktu (detik)', ylabel: '[A] (M)',
-        judul: 'Konsentrasi pereaksi', yticks: 3, xticks: 4
+        const u = S.clamp(1 - k.t / 0.35, 0, 1);
+        k.m.material.opacity = u * 0.85;
+        k.m.scale.setScalar(0.08 + (1 - u) * 0.2);
       });
-      Plot.line(c, map1, sim.data.jejak.data, { color: P.blue, lw: 2.4, isi: true });
 
-      const g2 = { x: 450, y: 376, w: 300, h: 110 };
-      const lajuMaks = Math.max(1, Math.max.apply(null,
-        sim.data.jejakLaju.data.map(function (p) { return p[1]; }).concat([v, 1])));
-      const map2 = Plot.axes(c, {
-        x: g2.x, y: g2.y, w: g2.w, h: g2.h,
-        xmin: 0, xmax: Math.max(20, tMax), ymin: 0, ymax: lajuMaks * 1.15,
-        xlabel: 'waktu (detik)', ylabel: 'laju',
-        judul: 'Laju reaksi', yticks: 3, xticks: 4
-      });
-      Plot.line(c, map2, sim.data.jejakLaju.data, { color: P.accent, lw: 2.4, isi: true });
-
-      /* ---------- empat faktor ---------- */
-      const FY = 508;
-      D.roundRect(c, 40, FY, W - 80, 66, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'EMPAT FAKTOR DAN CARA KERJANYA', 58, FY + 18,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const faktor = [
-        ['Konsentrasi', 'partikel lebih rapat → tumbukan lebih sering', sim.get('konsentrasi') > 1.2],
-        ['Suhu', 'partikel lebih cepat → lebih banyak yang berenergi cukup', T > 50],
-        ['Luas permukaan', 'serbuk → bidang sentuh lebih luas', sim.get('serbuk')],
-        ['Katalis', 'menurunkan Ea → lebih banyak tumbukan efektif', sim.get('katalis')]
-      ];
-      faktor.forEach(function (f, i) {
-        const x = 58 + i * ((W - 140) / 4);
-        D.text(c, f[0], x, FY + 38, {
-          size: 11.5, weight: 700, base: 'middle',
-          color: f[2] ? P.accent2 : P.dim
-        });
-        const kata = f[1].split(' ');
-        let baris = [''];
-        kata.forEach(function (w) {
-          const coba = baris[baris.length - 1] ? baris[baris.length - 1] + ' ' + w : w;
-          if (D.measure(c, coba, { size: 10 }) > (W - 140) / 4 - 16) baris.push(w);
-          else baris[baris.length - 1] = coba;
-        });
-        baris.slice(0, 2).forEach(function (b, bi) {
-          D.text(c, b, x, FY + 52 + bi * 12,
-            { size: 10, weight: 500, color: P.faint, base: 'middle' });
-        });
-      });
+      s.data.v = v;
+      if (s.data.jalan) gambar(s);
     },
 
-    readoutsUpdate: function (sim) {
-      const v = lajuReaksi(sim);
-      const T = sim.get('suhu') + 273;
-      sim.readout('laju', Sim.fmt(v, 2) + '<span class="unit"> M/s</span>');
-      sim.readout('sisa', Math.round(sim.data.konsenSisa * 100) + '<span class="unit">%</span>',
-        sim.data.konsenSisa < 0.2 ? 'warn' : null);
-      sim.readout('ea', Ea(sim) + '<span class="unit"> kJ/mol</span>',
-        sim.get('katalis') ? 'accent' : null);
-      sim.readout('k', Sim.sci(C.arrhenius(2.6e7, Ea(sim), T), 2));
-    },
+    bacaUbah: function (s) {
+      const h = hitung(s);
+      const v = s.data.v || 0;
+      const f = v / Math.max(0.001, h.vMaks);
+      s.baca('laju', S.fmtRapi(h.laju) + ' satuan/s',
+        h.laju > 3 ? 'aksen' : h.laju > 0.5 ? 'warn' : 'danger');
+      s.baca('vol', S.fmt(v, 1) + ' mL dari ' + S.fmt(h.vMaks, 1) + ' mL  ('
+        + Math.round(f * 100) + ' %)');
+      s.baca('waktu', S.fmt(s.data.jam, 1) + ' s' + (s.data.jalan ? ' — berjalan' : ' — berhenti'));
+      s.baca('ea', h.ea + ' kJ/mol  (' + h.k.n + ')', h.ea < 45 ? 'aksen' : 'warn');
+      s.baca('luas', S.fmt(h.b.luas, 2) + ' ×  (' + h.b.n + ')');
+      s.baca('sebab', faktorUtama(s));
+      gambar(s);
+    }
+  };
 
-    notes: `
-      <p>Laju reaksi menyatakan <strong>cepatnya pereaksi berkurang atau hasil
-      bertambah</strong> per satuan waktu.</p>
-      <span class="formula">v = −Δ[pereaksi] ÷ Δt = +Δ[hasil] ÷ Δt</span>
+  function faktorUtama(s) {
+    const dasar = { c: 1, suhu: 25, luas: 1, ea: 60 };
+    const h = hitung(s);
+    const skor = [
+      { n: 'konsentrasi', v: Math.abs(Math.log(h.c / dasar.c)) },
+      { n: 'suhu', v: Math.abs((s.get('suhu') - 25) / 25) * 1.3 },
+      { n: 'luas permukaan', v: Math.abs(Math.log(h.b.luas)) },
+      { n: 'katalis', v: Math.abs((60 - h.ea) / 20) * 1.1 }
+    ].sort(function (a, b) { return b.v - a.v; });
+    if (skor[0].v < 0.08) return 'Semua faktor masih di keadaan dasar';
+    return 'Perubahan ' + skor[0].n + ' paling banyak mengubah laju';
+  }
 
-      <h3>Teori tumbukan</h3>
-      <p>Reaksi terjadi bila partikel bertumbukan, tetapi tidak semua tumbukan
-      menghasilkan reaksi. Tumbukan disebut <strong>efektif</strong> bila memenuhi dua
-      syarat:</p>
-      <ol>
-        <li>Energinya <strong>melebihi energi aktivasi (Ea)</strong>, yaitu energi minimum
-            untuk memutus ikatan lama.</li>
-        <li><strong>Arahnya tepat</strong> (orientasi yang sesuai).</li>
-      </ol>
+  function ulang(s) {
+    s.data.jam = 0;
+    s.data.jalan = false;
+    s.data.rekam = [[0, 0]];
+    gambar(s);
+  }
 
-      <p>Semua faktor yang mempercepat reaksi bekerja dengan menambah jumlah tumbukan
-      efektif per satuan waktu.</p>
+  function simpan(s) {
+    const h = hitung(s);
+    const warna = ['#f0a94a', '#6fb6ff', '#c58ef0', '#9fe8ad', '#ef6a52'];
+    s.data.tersimpan.push({
+      titik: s.data.rekam.slice(),
+      warna: warna[s.data.tersimpan.length % warna.length],
+      nama: S.fmt(h.c, 1) + ' M · ' + Math.round(s.get('suhu')) + '°C · ' + h.b.n
+    });
+    if (s.data.tersimpan.length > 4) s.data.tersimpan.shift();
+    gambar(s);
+  }
 
-      <h3>Empat faktor</h3>
-      <table>
-        <thead><tr><th>Faktor</th><th>Pengaruh</th><th>Alasannya</th></tr></thead>
-        <tbody>
-          <tr><td>Konsentrasi ↑</td><td>laju ↑</td><td>partikel lebih rapat, tumbukan lebih sering</td></tr>
-          <tr><td>Suhu ↑</td><td>laju ↑↑</td><td>partikel lebih cepat dan lebih banyak yang berenergi ≥ Ea</td></tr>
-          <tr><td>Luas permukaan ↑</td><td>laju ↑</td><td>bidang sentuh antarzat lebih luas</td></tr>
-          <tr><td>Katalis</td><td>laju ↑↑</td><td>menyediakan jalan dengan Ea lebih rendah</td></tr>
-        </tbody>
-      </table>
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const h = hitung(s);
 
-      <p>Perhatikan bahwa suhu berpengaruh paling kuat. Kenaikan 10 °C umumnya
-      <strong>melipatgandakan</strong> laju reaksi, karena pengaruhnya bersifat
-      eksponensial lewat persamaan Arrhenius:</p>
-      <span class="formula">k = A · e^(−Ea/RT)</span>
-
-      <h3>Katalis</h3>
-      <p>Katalis mempercepat reaksi tanpa ikut habis. Yang perlu ditekankan: katalis
-      <strong>tidak menurunkan ΔH</strong> dan <strong>tidak menggeser kesetimbangan</strong>.
-      Ia hanya menurunkan Ea, sehingga reaksi mencapai kesetimbangan lebih cepat — baik
-      ke arah maju maupun balik.</p>
-
-      <h3>Orde reaksi</h3>
-      <p>Persamaan laju v = k[A]ᵐ[B]ⁿ. Pangkat m dan n adalah orde reaksi, dan
-      <strong>hanya dapat ditentukan lewat percobaan</strong>, bukan dari koefisien
-      persamaan reaksi.</p>
-      <ul>
-        <li><strong>Orde 0</strong> — laju tidak bergantung konsentrasi. Grafik [A] terhadap
-            waktu berupa garis lurus menurun.</li>
-        <li><strong>Orde 1</strong> — laju sebanding dengan konsentrasi. Grafiknya
-            melengkung menurun (peluruhan eksponensial).</li>
-        <li><strong>Orde 2</strong> — konsentrasi digandakan, laju menjadi empat kali.</li>
-      </ul>
-
-      <div class="callout" data-tone="tip">
-        <strong>Mengapa makanan disimpan di kulkas?</strong>
-        Pembusukan adalah reaksi kimia. Menurunkan suhu dari 25 °C ke 4 °C memperlambat
-        lajunya beberapa kali lipat, sehingga makanan bertahan jauh lebih lama.
-      </div>
-    `,
-
-    explore: [
-      'Mulai pada 25 °C, catat lajunya. Naikkan ke 35 °C. Kira-kira berapa kali lipat lajunya?',
-      'Kembalikan suhu, lalu nyalakan <strong>katalis</strong>. Perhatikan diagram energi — apa yang berubah dan apa yang tidak?',
-      'Nyalakan <strong>Zat padat dihaluskan</strong>. Bandingkan ukuran partikel dan kecepatan pereaksi berkurang.',
-      'Ganti orde reaksi dari 1 ke 2, lalu gandakan konsentrasi. Berapa kali lipat lajunya naik?'
-    ],
-
-    quiz: [
-      {
-        q: 'Mengapa kenaikan suhu mempercepat reaksi jauh lebih kuat daripada kenaikan konsentrasi?',
-        options: [
-          'Karena suhu menambah jumlah partikel',
-          'Karena suhu menambah laju partikel sekaligus memperbesar pecahan partikel yang berenergi di atas Ea',
-          'Karena suhu menurunkan energi aktivasi',
-          'Karena suhu mengubah orde reaksi'
+    if (s.get('panel') === 'energi') {
+      const jalur = function (ea, warna, nama, putus) {
+        const t = [[0, 0], [0.2, 0]];
+        for (let i = 0; i <= 24; i++) {
+          const u = i / 24;
+          t.push([0.2 + u * 0.5, S.lerp(0, -466, u) + (ea + 233) * Math.sin(Math.PI * u)]);
+        }
+        t.push([0.7, -466]); t.push([1, -466]);
+        return { titik: t, warna: warna, nama: nama, putus: putus, tebal: 3 };
+      };
+      const seri = [jalur(60, '#9aa8b4', 'tanpa katalis', true)];
+      if (h.ea !== 60) seri.push(jalur(h.ea, '#9fe8ad', h.k.n, false));
+      S.gambarGrafik(s.data.g1, {
+        judul: 'Diagram energi — katalis menurunkan Ea',
+        xMin: 0, xMax: 1, yMin: -560, yMax: 130,
+        xLabel: 'jalannya reaksi', yLabel: 'entalpi (kJ)',
+        seri: seri,
+        garisY: [
+          { v: 0, warna: 'rgba(214,228,240,.5)', label: 'Mg + 2HCl' },
+          { v: -466, warna: 'rgba(240,169,74,.7)', label: 'MgCl₂ + H₂   −466 kJ' }
         ],
-        answer: 1,
-        explain: 'Suhu bekerja lewat dua jalur sekaligus: tumbukan menjadi lebih sering dan, yang lebih penting, pecahan partikel berenergi ≥ Ea naik secara eksponensial sesuai persamaan Arrhenius.'
-      },
-      {
-        q: 'Katalis mempercepat reaksi dengan cara…',
-        options: [
-          'Menaikkan energi pereaksi',
-          'Menurunkan energi aktivasi dengan menyediakan jalan reaksi alternatif',
-          'Menurunkan ΔH reaksi',
-          'Menambah jumlah pereaksi'
-        ],
-        answer: 1,
-        explain: 'Katalis menyediakan mekanisme lain dengan energi aktivasi lebih rendah, sehingga lebih banyak tumbukan menjadi efektif. ΔH reaksi tidak berubah karena keadaan awal dan akhir tetap sama.'
-      },
-      {
-        q: 'Suatu reaksi berorde 2 terhadap A. Bila konsentrasi A digandakan, lajunya menjadi…',
-        options: ['2 kali', '4 kali', '8 kali', 'tetap'],
-        answer: 1,
-        explain: 'Pada orde 2, v = k[A]². Bila [A] menjadi 2×, maka lajunya menjadi 2² = 4 kali lipat.'
-      },
-      {
-        q: 'Serbuk kapur bereaksi dengan asam jauh lebih cepat daripada bongkahan kapur yang massanya sama. Penjelasannya adalah…',
-        options: [
-          'Serbuk memiliki energi aktivasi lebih rendah',
-          'Serbuk memiliki luas permukaan sentuh yang jauh lebih besar',
-          'Serbuk lebih pekat',
-          'Serbuk memiliki suhu lebih tinggi'
-        ],
-        answer: 1,
-        explain: 'Reaksi zat padat dengan larutan hanya terjadi di permukaan. Menghaluskan bongkahan menjadi serbuk memperbesar luas bidang sentuh secara drastis, sehingga tumbukan per detik jauh lebih banyak.'
-      }
-    ]
-  });
-})();
+        titikTebal: [{ x: 0.45, y: h.ea, warna: '#f0d040', r: 6 }]
+      });
+      return;
+    }
+
+    const maksX = Math.max(20, s.data.jam * 1.15);
+    const seri = s.data.tersimpan.map(function (t) {
+      return { titik: t.titik, warna: t.warna, nama: t.nama, tebal: 2, putus: true };
+    });
+    seri.push({ titik: s.data.rekam.length > 1 ? s.data.rekam : [[0, 0], [0.001, 0]],
+      warna: '#4fd1c0', tebal: 3.4, nama: 'percobaan sekarang' });
+
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Volume gas H₂ terhadap waktu',
+      xMin: 0, xMax: maksX, yMin: 0, yMax: Math.max(20, h.vMaks * 1.15),
+      xLabel: 'waktu (s)', yLabel: 'volume H₂ (mL)',
+      seri: seri,
+      garisY: [{ v: h.vMaks, warna: 'rgba(240,208,64,.7)',
+        label: 'volume maksimum ' + S.fmt(h.vMaks, 0) + ' mL' }]
+    });
+  }
+
+  function pasang(s) {
+    const h = hitung(s);
+    const b = h.b;
+
+    // butiran logam
+    const g = s.data.logam;
+    while (g.children.length) S.buangObjek(g.children.pop());
+    const mat = S.matLogam(0xb8c2cc, { roughness: 0.45 });
+    for (let i = 0; i < b.butir; i++) {
+      const m = new T.Mesh(b.butir === 1
+        ? new T.BoxGeometry(1.3, 0.1, 0.8)
+        : new T.DodecahedronGeometry(1, 0), mat);
+      const r0 = b.butir === 1 ? 1 : b.r;
+      m.userData.r0 = r0;
+      m.scale.setScalar(r0);
+      const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+      const y0 = b.butir === 1 ? 0.12 : b.r + 0.05;
+      m.userData.y0 = y0;
+      m.position.set(-1.6 + (b.butir === 1 ? 0 : Math.cos(a) * rr), 0.08 + y0,
+        b.butir === 1 ? 0 : Math.sin(a) * rr);
+      m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+      m.castShadow = true;
+      g.add(m);
+    }
+
+    // warna larutan ikut katalis
+    s.data.labu.userData.setLevel(0.5,
+      h.k.warna === 0x9aa8b4 ? 0xdfe8ee : h.k.warna);
+    s.data.labu.userData.cair.material.opacity = 0.55 + S.clamp(h.c / 3, 0, 0.3);
+
+    // kerapatan partikel asam ikut konsentrasi
+    const d = s.data.asam.userData.p;
+    const n = Math.round(S.clamp(h.c / 3, 0.08, 1) * d.length);
+    for (let i = 0; i < d.length; i++) d[i].aktif = i < n;
+    s.data.asam.userData.tulis();
+    s.data.asam.visible = s.get('partikel');
+
+    s.data.lblS.userData.ganti(Math.round(s.get('suhu')) + ' °C',
+      s.get('suhu') > 55 ? '#ef6a52' : s.get('suhu') < 15 ? '#6fb6ff' : '#f0a94a');
+    s.data.g1.visible = s.get('grafik');
+  }
+})());

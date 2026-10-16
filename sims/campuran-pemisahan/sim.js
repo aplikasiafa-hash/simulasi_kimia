@@ -1,356 +1,355 @@
-/* Campuran dan Cara Memisahkannya — Fase C
-   Susun campuran dari beberapa bahan, pilih metode pemisahan, jalankan, dan
-   lihat komponen mana yang berhasil terpisah dan mana yang belum. */
+/* Campuran dan Cara Memisahkannya — Fase C — adegan 3D */
 
-(function () {
+Sim3D.daftar('campuran-pemisahan', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-
-  const KOMPONEN = {
-    pasir:  { nama: 'Pasir',       warna: '#d8c08a', larut: false, magnet: false, rho: 2.6, uap: false },
-    garam:  { nama: 'Garam',       warna: '#ffffff', larut: true,  magnet: false, rho: 2.2, uap: false },
-    besi:   { nama: 'Serbuk besi', warna: '#8d939a', larut: false, magnet: true,  rho: 7.9, uap: false },
-    kapur:  { nama: 'Kapur',       warna: '#f0f0ea', larut: false, magnet: false, rho: 2.7, uap: false },
-    minyak: { nama: 'Minyak',      warna: '#e8c84a', larut: false, magnet: false, rho: 0.9, uap: false },
-    air:    { nama: 'Air',         warna: '#4a9fd0', larut: true,  magnet: false, rho: 1.0, uap: true }
-  };
-
-  const RESEP = [
-    { id: 'pasir-air',   label: 'Pasir + air',              isi: ['pasir', 'air'] },
-    { id: 'garam-air',   label: 'Garam + air',              isi: ['garam', 'air'] },
-    { id: 'besi-pasir',  label: 'Serbuk besi + pasir',      isi: ['besi', 'pasir'] },
-    { id: 'minyak-air',  label: 'Minyak + air',             isi: ['minyak', 'air'] },
-    { id: 'kapur-air',   label: 'Kapur + air',              isi: ['kapur', 'air'] },
-    { id: 'lengkap',     label: 'Pasir + garam + besi + air', isi: ['pasir', 'garam', 'besi', 'air'] }
+  const CAMPURAN = [
+    { n: 'Pasir + air', a: { n: 'pasir', w: 0xc2a878, larut: false, berat: true },
+      b: { n: 'air', w: 0x4a9fd8 }, cara: 'saring' },
+    { n: 'Garam + air', a: { n: 'garam', w: 0xffffff, larut: true },
+      b: { n: 'air', w: 0x4a9fd8 }, cara: 'uapkan' },
+    { n: 'Serbuk besi + pasir', a: { n: 'besi', w: 0x6b747c, magnet: true },
+      b: { n: 'pasir', w: 0xc2a878 }, cara: 'magnet' },
+    { n: 'Minyak + air', a: { n: 'minyak', w: 0xe8c54a, ringan: true },
+      b: { n: 'air', w: 0x4a9fd8 }, cara: 'tuang' },
+    { n: 'Kapur + air', a: { n: 'kapur', w: 0xf0f2f4, larut: false, berat: true },
+      b: { n: 'air', w: 0x4a9fd8 }, cara: 'endap' }
   ];
 
-  const METODE = {
-    filtrasi: {
-      nama: 'Penyaringan (filtrasi)',
-      dasar: 'Memisahkan zat padat yang tidak larut dari cairannya.',
-      bisa: function (k) { return !KOMPONEN[k].larut && k !== 'minyak' && k !== 'air'; }
+  const CARA = {
+    saring: { n: 'Penyaringan (filtrasi)', ket: 'butiran tertahan kertas saring' },
+    uapkan: { n: 'Penguapan (evaporasi)', ket: 'air menguap, zat terlarut tertinggal' },
+    magnet: { n: 'Penarikan magnet', ket: 'hanya bahan bersifat magnet yang tertarik' },
+    tuang:  { n: 'Dekantasi (menuang)', ket: 'lapisan atas dituang terpisah' },
+    endap:  { n: 'Pengendapan (sedimentasi)', ket: 'butiran berat turun ke dasar' }
+  };
+
+  const N = 170;
+
+  function camp(s) { return CAMPURAN[parseInt(s.get('camp'), 10) || 0]; }
+
+  return {
+    latar: 0x091016,
+    kamera: { jarak: 9.6, phi: 1.08, theta: 0.6, targetY: 1.5, lajuPutar: 0.1 },
+
+    kendali: [
+      { judul: 'Campuran', isi: [
+        { type: 'select', id: 'camp', value: 0, label: 'Yang akan dipisahkan',
+          options: CAMPURAN.map(function (c, i) { return { value: i, label: c.n }; }) }
+      ]},
+      { judul: 'Cara memisahkan', isi: [
+        { type: 'segment', id: 'cara', value: 'saring', label: 'Alat yang dipakai', options: [
+          { value: 'saring', label: 'Saring' }, { value: 'uapkan', label: 'Uapkan' },
+          { value: 'magnet', label: 'Magnet' }, { value: 'endap', label: 'Diamkan' }
+        ]},
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Mulai memisahkan', utama: true, klik: function (s) { s.data.maju = true; } },
+          { label: '↺ Ulangi', klik: function (s) { pasang(s); } }
+        ]},
+        { type: 'slider', id: 'laju', value: 1, min: 0.2, max: 3, step: 0.1,
+          label: 'Kecepatan proses', unit: '×', dec: 1 }
+      ]}
+    ],
+
+    baca: [
+      { id: 'cara', label: 'Cara', tone: 'aksen' },
+      { id: 'tepat', label: 'Apakah cocok?' },
+      { id: 'maju', label: 'Kemajuan' },
+      { id: 'dasar', label: 'Dasar pemisahan' }
+    ],
+
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 8, warna: 0x0f1620 }));
+
+      /* --- gelas atas (campuran) --- */
+      const atas = S.gelas({ r: 1.0, h: 1.7, level: 0.62 });
+      atas.position.y = 2.5;
+      s.data.atas = atas;
+      s.tambah(atas);
+
+      /* --- corong + kertas saring --- */
+      const corong = new T.Group();
+      const kerucut = new T.Mesh(new T.ConeGeometry(0.85, 1.0, 40, 1, true), S.matKaca({ opacity: 0.2 }));
+      kerucut.rotation.x = Math.PI;
+      kerucut.position.y = 0.5;
+      corong.add(kerucut);
+      const pipa = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.7, 20), S.matKaca({ opacity: 0.2 }));
+      pipa.position.y = -0.35;
+      corong.add(pipa);
+      const kertas = new T.Mesh(new T.ConeGeometry(0.78, 0.9, 36, 1, true),
+        new T.MeshStandardMaterial({ color: 0xf2efe4, roughness: 0.92, side: T.DoubleSide }));
+      kertas.rotation.x = Math.PI; kertas.position.y = 0.46;
+      corong.add(kertas);
+      corong.position.y = 1.45;
+      corong.visible = false;
+      s.data.corong = corong;
+      s.tambah(corong);
+
+      /* --- gelas bawah (hasil) --- */
+      const bawah = S.gelas({ r: 1.05, h: 1.5, level: 0 });
+      s.data.bawah = bawah;
+      s.tambah(bawah);
+
+      /* --- cawan penguap + pembakar --- */
+      const cawan = new T.Group();
+      const mangkuk = new T.Mesh(
+        new T.SphereGeometry(1.0, 40, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2.6),
+        new T.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.55, side: T.DoubleSide }));
+      mangkuk.position.y = 0.55;
+      cawan.add(mangkuk);
+      cawan.visible = false;
+      cawan.position.y = 1.5;
+      s.data.cawan = cawan;
+      s.tambah(cawan);
+
+      const api = S.nyala();
+      api.position.y = 0.6;
+      api.visible = false;
+      s.data.api = api;
+      s.tambah(api);
+
+      const kakiApi = new T.Group();
+      for (let i = 0; i < 3; i++) {
+        const a = i / 3 * Math.PI * 2;
+        const b = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 1.45, 10), S.matLogam(0x6b747c));
+        b.position.set(Math.cos(a) * 0.8, 0.72, Math.sin(a) * 0.8);
+        kakiApi.add(b);
+      }
+      const cincin = new T.Mesh(new T.TorusGeometry(0.82, 0.04, 10, 36), S.matLogam(0x6b747c));
+      cincin.rotation.x = Math.PI / 2; cincin.position.y = 1.45;
+      kakiApi.add(cincin);
+      kakiApi.visible = false;
+      s.data.kakiApi = kakiApi;
+      s.tambah(kakiApi);
+
+      /* --- magnet --- */
+      const magnet = new T.Group();
+      const batangM = new T.Mesh(new T.BoxGeometry(0.34, 1.3, 0.34), S.matLogam(0xd0402a, { metalness: 0.5 }));
+      const batangM2 = new T.Mesh(new T.BoxGeometry(0.34, 0.5, 0.34), S.matLogam(0x3a6fd0, { metalness: 0.5 }));
+      batangM2.position.y = -0.9;
+      magnet.add(batangM, batangM2);
+      magnet.position.set(0, 4.4, 0);
+      magnet.visible = false;
+      s.data.magnet = magnet;
+      s.tambah(magnet);
+
+      /* --- partikel campuran --- */
+      const pa = S.partikel(N, { r: 0.06, warna: 0xc2a878, kotak: { x: 0.85, y: 0.6, z: 0.85 } });
+      s.data.pa = pa;
+      s.tambah(pa);
+
+      /* --- aliran tetesan --- */
+      const tetes = S.partikel(30, { r: 0.05, warna: 0x4a9fd8, kotak: { x: 0.2, y: 1, z: 0.2 } });
+      tetes.visible = false;
+      s.data.tetes = tetes;
+      s.tambah(tetes);
+
+      /* --- uap air --- */
+      const uap = S.partikel(50, { r: 0.07, warna: 0xd8eef8, kotak: { x: 1, y: 1.4, z: 1 } });
+      uap.material.transparent = true; uap.material.opacity = 0.42;
+      uap.position.y = 3.6;
+      uap.visible = false;
+      s.data.uap = uap;
+      s.tambah(uap);
+
+      const lbl = S.teks('', { skala: 0.44, lebar: 28, warna: '#d8e4ec' });
+      lbl.position.set(0, 5.4, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
     },
-    penguapan: {
-      nama: 'Penguapan',
-      dasar: 'Menguapkan pelarut sehingga zat terlarut tertinggal sebagai kristal.',
-      bisa: function (k) { return k === 'garam'; }
+
+    ubah: function (s, id) {
+      if (id === 'camp') {
+        s.setDiam('cara', camp(s).cara);
+      }
+      pasang(s);
     },
-    magnet: {
-      nama: 'Penarikan magnet',
-      dasar: 'Menarik komponen yang bersifat magnetis.',
-      bisa: function (k) { return KOMPONEN[k].magnet; }
+
+    langkah: function (s, dt) {
+      const c = camp(s);
+      const cara = s.get('cara');
+      const cocok = cara === c.cara;
+      const laju = s.get('laju');
+      const p = s.data.pa, d = p.userData.p;
+
+      if (s.data.maju) {
+        s.data.t = Math.min(1, (s.data.t || 0) + dt * laju * (cocok ? 0.26 : 0.1));
+      }
+      const t = s.data.t || 0;
+
+      if (cara === 'saring') {
+        // cairan turun ke gelas bawah, butiran tertahan di kertas
+        s.data.atas.userData.setLevel(0.62 * (1 - t));
+        s.data.bawah.userData.setLevel(0.72 * t * (cocok ? 1 : 0.7),
+          cocok ? c.b.w : campurWarna(c));
+        s.data.tetes.visible = s.data.maju && t < 0.99;
+        majuTetes(s, dt * laju);
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.aktif) continue;
+          if (cocok || !q.ikut) {
+            // tertahan: berkumpul di kerucut kertas saring
+            const tt = S.clamp(t * 1.4, 0, 1);
+            q.pos.y = S.lerp(q.asal.y, 1.75 + Math.random() * 0.05, tt);
+            const r = Math.hypot(q.asal.x, q.asal.z) * (1 - tt * 0.45);
+            const a = Math.atan2(q.asal.z, q.asal.x);
+            q.pos.x = Math.cos(a) * r; q.pos.z = Math.sin(a) * r;
+          } else {
+            // lolos ikut cairan
+            q.pos.y = S.lerp(q.asal.y, 0.4, S.clamp(t * 1.2, 0, 1));
+          }
+        }
+      } else if (cara === 'uapkan') {
+        s.data.atas.userData.setLevel(0);
+        s.data.api.userData.perbarui(s.waktu, s.data.maju ? 1 : 0);
+        s.data.uap.visible = s.data.maju && t < 0.98;
+        majuUap(s, dt * laju);
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.aktif) continue;
+          // zat terlarut muncul sebagai kristal di dasar cawan
+          const muncul = cocok ? S.clamp((t - 0.25) * 1.6, 0, 1) : 0;
+          q.r = (c.a.larut ? 0.055 : 0.06) * (c.a.larut ? muncul : 1);
+          q.pos.y = S.lerp(q.asal.y, 1.62, S.clamp(t * 1.3, 0, 1));
+          const r = Math.hypot(q.asal.x, q.asal.z) * 0.8;
+          const a = Math.atan2(q.asal.z, q.asal.x) + t * 0.6;
+          q.pos.x = Math.cos(a) * r; q.pos.z = Math.sin(a) * r;
+        }
+      } else if (cara === 'magnet') {
+        s.data.magnet.position.y = S.lerp(4.4, 3.1, t);
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.aktif) continue;
+          if (cocok && q.magnetik) {
+            const tt = S.clamp(t * 1.5, 0, 1);
+            q.pos.y = S.lerp(q.asal.y, 2.9, tt);
+            q.pos.x = S.lerp(q.asal.x, q.asal.x * 0.3, tt);
+            q.pos.z = S.lerp(q.asal.z, q.asal.z * 0.3, tt);
+          } else {
+            q.pos.copy(q.asal);
+            q.pos.y += Math.sin(s.waktu * 2 + i) * 0.006;
+          }
+        }
+      } else {
+        // pengendapan
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.aktif) continue;
+          const tt = S.clamp(t * 1.3, 0, 1);
+          if (q.berat) {
+            q.pos.y = S.lerp(q.asal.y, 2.08 + Math.random() * 0.04, tt);
+          } else if (q.ringan) {
+            q.pos.y = S.lerp(q.asal.y, 3.08, tt);
+          } else {
+            q.pos.y = q.asal.y + Math.sin(s.waktu * 1.6 + i) * 0.02;
+          }
+        }
+        s.data.atas.userData.setLevel(0.62);
+      }
+      p.userData.tulis();
     },
-    dekantasi: {
-      nama: 'Pengendapan & dekantasi',
-      dasar: 'Mendiamkan campuran lalu menuang cairan bening di bagian atas.',
-      bisa: function (k) { return k === 'minyak' || k === 'pasir'; }
+
+    bacaUbah: function (s) {
+      const c = camp(s);
+      const cara = s.get('cara');
+      const cocok = cara === c.cara;
+      s.baca('cara', CARA[cara].n, cocok ? 'aksen' : 'warn');
+      s.baca('tepat', cocok ? 'Cara yang tepat' : 'Kurang tepat untuk campuran ini',
+        cocok ? 'aksen' : 'danger');
+      s.baca('maju', Math.round((s.data.t || 0) * 100) + '%');
+      s.baca('dasar', CARA[cara].ket);
     }
   };
 
-  const W = 790, H = 520;
-
-  function resepAktif(sim) {
-    return RESEP.find(function (r) { return r.id === sim.get('campuran'); }) || RESEP[0];
+  function campurWarna(c) {
+    const a = new T.Color(c.a.w), b = new T.Color(c.b.w);
+    return a.lerp(b, 0.6).getHex();
   }
 
-  function siapkan(sim) {
-    const r = resepAktif(sim);
-    sim.data.terpisah = {};
-    sim.data.anim = 0;
-    sim.data.jalan = false;
-    sim.data.pesan = 'Pilih metode pemisahan, lalu tekan Jalankan.';
-    sim.data.butir = [];
-    r.isi.forEach(function (k) {
-      if (k === 'air' || k === 'minyak') return;
-      for (let i = 0; i < 22; i++) {
-        sim.data.butir.push({
-          k: k, x: Sim.rnd(126, 254), y: Sim.rnd(150, 262),
-          r: KOMPONEN[k].larut ? 2.2 : Sim.rnd(2.6, 4.6),
-          ox: 0, oy: 0, keluar: false
-        });
-      }
-    });
-  }
-
-  function jalankan(sim) {
-    const r = resepAktif(sim);
-    const m = sim.get('metode');
-    const met = METODE[m];
-    const berhasil = r.isi.filter(function (k) { return met.bisa(k) && !sim.data.terpisah[k]; });
-
-    if (!berhasil.length) {
-      sim.data.pesan = met.nama + ' tidak memisahkan apa pun dari campuran ini.';
-      sim.data.jalan = true; sim.data.anim = 0;
-      return;
+  function majuTetes(s, dt) {
+    const d = s.data.tetes.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      d[i].pos.y -= dt * 2.6;
+      if (d[i].pos.y < 0.4) d[i].pos.set(S.acak(-0.05, 0.05), 1.05, S.acak(-0.05, 0.05));
     }
-    berhasil.forEach(function (k) { sim.data.terpisah[k] = m; });
-    sim.data.pesan = met.nama + ' berhasil memisahkan ' +
-      berhasil.map(function (k) { return KOMPONEN[k].nama.toLowerCase(); }).join(' dan ') + '.';
-    sim.data.jalan = true; sim.data.anim = 0;
+    s.data.tetes.userData.tulis();
   }
 
-  Sim.create({
-    title: 'Campuran dan Cara Memisahkannya',
-    subtitle: 'Komponen dalam campuran tidak berubah menjadi zat lain, jadi selalu bisa dipisahkan kembali — asal kita memakai perbedaan sifat yang tepat.',
-    fase: 'C', jenjang: 'SD Kelas 5–6',
-    topik: ['Campuran', 'Pemisahan'],
-    stage: { w: W, h: H },
-    showPlay: false,
+  function majuUap(s, dt) {
+    const d = s.data.uap.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      d[i].pos.y += dt * 0.8;
+      d[i].pos.x += Math.sin(s.waktu * 2 + i) * dt * 0.1;
+      if (d[i].pos.y > 1.3) d[i].pos.set(S.acak(-0.45, 0.45), -1.1, S.acak(-0.45, 0.45));
+    }
+    s.data.uap.userData.tulis();
+  }
 
-    controls: [
-      {
-        title: 'Campuran',
-        items: [
-          { type: 'select', id: 'campuran', value: 'pasir-air', label: 'Pilih campuran',
-            options: RESEP.map(function (r) { return { value: r.id, label: r.label }; }) }
-        ]
-      },
-      {
-        title: 'Metode pemisahan',
-        items: [
-          { type: 'segment', id: 'metode', value: 'filtrasi', label: '',
-            options: [
-              { value: 'filtrasi', label: 'Saring' },
-              { value: 'penguapan', label: 'Uapkan' },
-              { value: 'magnet', label: 'Magnet' },
-              { value: 'dekantasi', label: 'Endapkan' }
-            ] },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Jalankan', primary: true, onClick: jalankan },
-            { label: 'Ulangi dari awal', onClick: function (sim) { siapkan(sim); } }
-          ] }
-        ]
+  function pasang(s) {
+    const c = camp(s);
+    const cara = s.get('cara');
+    s.data.t = 0;
+    s.data.maju = false;
+
+    s.data.corong.visible = cara === 'saring';
+    s.data.cawan.visible = cara === 'uapkan';
+    s.data.api.visible = cara === 'uapkan';
+    s.data.kakiApi.visible = cara === 'uapkan';
+    s.data.magnet.visible = cara === 'magnet';
+    s.data.magnet.position.y = 4.4;
+    s.data.atas.visible = cara !== 'uapkan' && cara !== 'magnet';
+    s.data.bawah.visible = cara === 'saring';
+    s.data.tetes.visible = false;
+    s.data.uap.visible = false;
+    s.data.api.userData.perbarui(0, 0);
+
+    s.data.atas.position.y = cara === 'saring' ? 2.9 : 1.6;
+    s.data.atas.userData.setLevel(0.62, c.b.w);
+    s.data.bawah.userData.setLevel(0);
+
+    const p = s.data.pa, d = p.userData.p;
+    const campuranDuaPadat = cara === 'magnet' || c.cara === 'magnet';
+    p.material.color.setHex(c.a.w);
+    p.material.emissive.setHex(c.a.w);
+
+    for (let i = 0; i < d.length; i++) {
+      const q = d[i];
+      q.aktif = true;
+      q.r = 0.06;
+      q.magnetik = !!c.a.magnet && i % 2 === 0;
+      q.berat = !!c.a.berat;
+      q.ringan = !!c.a.ringan;
+      q.ikut = !!c.a.larut;          // zat larut lolos saringan
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.72;
+      const yDasar = cara === 'saring' ? 2.9 : cara === 'magnet' ? 1.1 : cara === 'uapkan' ? 1.6 : 1.6;
+      q.asal = new T.Vector3(Math.cos(a) * r,
+        yDasar + Math.random() * 0.85, Math.sin(a) * r);
+      q.pos.copy(q.asal);
+    }
+    // campuran dua padat: tumpukan di piring, bukan di gelas
+    if (campuranDuaPadat) {
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.95;
+        d[i].asal = new T.Vector3(Math.cos(a) * r, 1.14 + Math.random() * 0.12, Math.sin(a) * r);
+        d[i].pos.copy(d[i].asal);
+        d[i].magnetik = i % 2 === 0;
       }
-    ],
-
-    readouts: [
-      { id: 'komponen', label: 'Jumlah komponen', tone: 'accent' },
-      { id: 'sudah', label: 'Sudah terpisah' },
-      { id: 'belum', label: 'Belum terpisah' }
-    ],
-
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) { if (id === 'campuran') siapkan(sim); },
-
-    update: function (sim, dt) {
-      if (sim.data.jalan) {
-        sim.data.anim += dt * 0.55;
-        if (sim.data.anim >= 1) { sim.data.anim = 1; sim.data.jalan = false; }
+      if (!s.data.piring) {
+        const piring = new T.Mesh(new T.CylinderGeometry(1.25, 1.15, 0.2, 44),
+          new T.MeshStandardMaterial({ color: 0xdedacf, roughness: 0.6 }));
+        piring.position.y = 1.05;
+        s.data.piring = piring;
+        s.tambah(piring);
       }
-      const m = sim.get('metode');
-      const a = sim.data.anim;
-      sim.data.butir.forEach(function (b) {
-        const terpisah = sim.data.terpisah[b.k];
-        if (!terpisah) {
-          b.oy += (0 - b.oy) * dt * 4;
-          b.ox += (0 - b.ox) * dt * 4;
-          return;
-        }
-        // pindahkan butir ke wadah hasil sesuai metodenya
-        let tx = 0, ty = 0;
-        if (terpisah === 'filtrasi') { tx = 0; ty = -58; }
-        else if (terpisah === 'magnet') { tx = 0; ty = -96; }
-        else if (terpisah === 'penguapan') { tx = 300; ty = 96; }
-        else { tx = 300; ty = 30; }
-        b.ox += (tx - b.ox) * Math.min(1, dt * 3.4);
-        b.oy += (ty - b.oy) * Math.min(1, dt * 3.4);
-      });
-    },
+    }
+    if (s.data.piring) s.data.piring.visible = campuranDuaPadat;
+    p.userData.tulis();
 
-    draw: function (c, sim) {
-      const r = resepAktif(sim);
-      const m = sim.get('metode');
-      const met = METODE[m];
-      const a = sim.data.anim;
-      const adaAir = r.isi.indexOf('air') >= 0;
-      const adaMinyak = r.isi.indexOf('minyak') >= 0;
-
-      /* ---------- kiri: alat pemisah ---------- */
-      const GX = 120, GY = 140, GW = 150, GH = 140;
-
-      D.text(c, 'CAMPURAN AWAL', GX, 104,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, r.label, GX, 124, { size: 15, weight: 650, color: P.text, base: 'middle' });
-
-      if (m === 'filtrasi') {
-        // corong + kertas saring di atas gelas
-        const fx = GX + GW / 2;
-        c.beginPath();
-        c.moveTo(fx - 56, GY - 72); c.lineTo(fx + 56, GY - 72);
-        c.lineTo(fx + 7, GY - 10); c.lineTo(fx - 7, GY - 10); c.closePath();
-        c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 2.2; c.stroke();
-        c.fillStyle = 'rgba(255,255,255,.05)'; c.fill();
-        D.text(c, 'kertas saring', fx, GY - 86,
-          { size: 10.5, weight: 600, color: P.dim, align: 'c', base: 'middle' });
-        // tetesan filtrat
-        if (sim.data.jalan || a > 0) {
-          for (let i = 0; i < 4; i++) {
-            const dy = ((sim.t * 90 + i * 24) % 44);
-            D.circle(c, fx, GY - 6 + dy, 3, D.alpha('#4a9fd0', 0.8));
-          }
-        }
-      } else if (m === 'magnet') {
-        const mx = GX + GW / 2, my = GY - 92 + (1 - a) * 44;
-        D.roundRect(c, mx - 30, my, 60, 22, 4, '#c23b3b', 'rgba(255,255,255,.3)', 1.4);
-        D.roundRect(c, mx - 30, my, 30, 22, 4, '#3b6fc2');
-        D.text(c, 'U', mx - 15, my + 11, { size: 12, weight: 800, color: '#fff', align: 'c', base: 'middle' });
-        D.text(c, 'S', mx + 15, my + 11, { size: 12, weight: 800, color: '#fff', align: 'c', base: 'middle' });
-      } else if (m === 'penguapan') {
-        D.flame(c, GX + GW / 2, GY + GH + 30, 0.8, sim.t);
-        D.roundRect(c, GX + GW / 2 - 16, GY + GH + 22, 32, 22, 4, '#3b434b', 'rgba(255,255,255,.2)', 1.2);
-        for (let i = 0; i < 6; i++) {
-          const uy = GY - 10 - ((sim.t * 42 + i * 22) % 72);
-          D.circle(c, GX + 30 + i * 18 + Math.sin(sim.t * 2 + i) * 6, uy, 4 + i * 0.4,
-            D.alpha('#bcd8e8', 0.3 * a));
-        }
-      } else {
-        D.text(c, 'didiamkan…', GX + GW / 2, GY - 24,
-          { size: 11.5, weight: 600, color: P.dim, align: 'c', base: 'middle' });
-      }
-
-      // gelas campuran
-      const tersisaAir = adaAir && !(m === 'penguapan' && sim.data.terpisah['garam']);
-      const level = m === 'penguapan' && sim.data.terpisah['garam'] ? 0.1 : 0.72;
-      D.beaker(c, GX, GY, GW, GH, adaAir ? level : 0.3,
-        adaAir ? D.alpha('#4a9fd0', 0.6) : 'rgba(255,255,255,.05)');
-
-      // lapisan minyak terpisah saat dekantasi
-      if (adaMinyak) {
-        const sudah = sim.data.terpisah['minyak'];
-        const ketebalan = 20;
-        const topY = GY + GH * 0.28;
-        if (!sudah) {
-          D.roundRect(c, GX + 1, topY - ketebalan, GW - 2, ketebalan,
-            0, D.alpha('#e8c84a', m === 'dekantasi' ? 0.6 + a * 0.3 : 0.4));
-          if (m !== 'dekantasi') {
-            D.text(c, 'minyak & air masih bercampur', GX + GW / 2, topY - 34,
-              { size: 10, weight: 500, color: P.faint, align: 'c', base: 'middle' });
-          }
-        }
-      }
-
-      // butiran
-      sim.data.butir.forEach(function (b) {
-        const k = KOMPONEN[b.k];
-        const larutHilang = k.larut && adaAir && !sim.data.terpisah[b.k];
-        if (larutHilang) return;   // garam larut, tidak tampak
-        D.circle(c, b.x + b.ox, b.y + b.oy, b.r, k.warna, 'rgba(0,0,0,.2)', 0.8);
-      });
-
-      /* ---------- kanan: wadah hasil ---------- */
-      const RX = 430;
-      D.roundRect(c, RX, 92, 328, 232, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'HASIL PEMISAHAN', RX + 16, 112,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      r.isi.forEach(function (k, i) {
-        const komp = KOMPONEN[k];
-        const y = 142 + i * 44;
-        const sudah = sim.data.terpisah[k];
-        D.roundRect(c, RX + 16, y - 16, 296, 36, 7,
-          sudah ? 'rgba(111,207,127,.12)' : 'rgba(255,255,255,.04)',
-          sudah ? P.green : 'rgba(255,255,255,.1)', 1.2);
-        D.circle(c, RX + 36, y + 2, 9, komp.warna, 'rgba(255,255,255,.3)', 1.2);
-        D.text(c, komp.nama, RX + 54, y - 2,
-          { size: 13, weight: 650, color: P.text, base: 'middle' });
-        D.text(c, sudah ? 'terpisah dengan ' + METODE[sudah].nama.toLowerCase().split(' ')[0]
-          : 'masih dalam campuran',
-          RX + 54, y + 13, { size: 10.5, weight: 500, color: sudah ? P.green : P.faint, base: 'middle' });
-        D.text(c, sudah ? '✓' : '○', RX + 292, y + 2,
-          { size: 16, weight: 700, color: sudah ? P.green : P.faint, align: 'c', base: 'middle' });
-      });
-
-      /* ---------- bawah: penjelasan metode ---------- */
-      D.roundRect(c, 36, 348, W - 72, 128, 12, 'rgba(255,255,255,.05)', 'rgba(255,255,255,.14)', 1.3);
-      D.text(c, 'METODE YANG DIPILIH', 56, 370,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, met.nama, 56, 394, { size: 17, weight: 700, color: P.accent2, base: 'middle' });
-      D.text(c, met.dasar, 56, 418, { size: 13, weight: 500, color: P.dim, base: 'middle' });
-
-      D.roundRect(c, 56, 434, W - 112, 28, 7,
-        'rgba(79,209,192,.1)', 'rgba(79,209,192,.3)', 1.2);
-      D.text(c, sim.data.pesan, 72, 448,
-        { size: 12.5, weight: 600, color: P.accent2, base: 'middle' });
-    },
-
-    readoutsUpdate: function (sim) {
-      const r = resepAktif(sim);
-      const sudah = r.isi.filter(function (k) { return sim.data.terpisah[k]; }).length;
-      sim.readout('komponen', r.isi.length);
-      sim.readout('sudah', sudah, sudah === r.isi.length ? 'accent' : null);
-      sim.readout('belum', r.isi.length - sudah);
-    },
-
-    notes: `
-      <p>Dalam <strong>campuran</strong>, zat-zat penyusunnya bergabung tetapi tidak
-      berubah menjadi zat baru. Gula dalam air tetaplah gula. Karena itu, campuran
-      selalu bisa dipisahkan kembali — berbeda dengan senyawa yang perlu reaksi kimia.</p>
-
-      <h3>Kuncinya: cari perbedaan sifat</h3>
-      <p>Setiap metode pemisahan bekerja dengan memanfaatkan satu perbedaan sifat
-      antarkomponennya.</p>
-      <table>
-        <thead><tr><th>Metode</th><th>Memanfaatkan</th><th>Contoh</th></tr></thead>
-        <tbody>
-          <tr><td>Penyaringan</td><td>Ukuran partikel</td><td>Pasir dari air</td></tr>
-          <tr><td>Penguapan</td><td>Titik didih</td><td>Garam dari air laut</td></tr>
-          <tr><td>Magnet</td><td>Sifat magnetis</td><td>Serbuk besi dari pasir</td></tr>
-          <tr><td>Pengendapan</td><td>Massa jenis</td><td>Minyak dari air</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Mengapa garam tidak bisa disaring?</h3>
-      <p>Saat garam larut, partikelnya menjadi <strong>sangat kecil</strong> — jauh
-      lebih kecil daripada lubang kertas saring. Partikel garam lolos bersama air.
-      Untuk memisahkannya kita harus menguapkan airnya sehingga garam tertinggal
-      sebagai kristal. Inilah cara petani garam bekerja di tambak.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Sering perlu beberapa tahap</strong>
-        Campuran pasir + garam + besi + air tidak bisa dipisahkan dengan satu metode.
-        Coba urutkan: magnet dulu, lalu saring, lalu uapkan. Perhatikan urutannya penting.
-      </div>
-    `,
-
-    explore: [
-      'Pilih <strong>Pasir + air</strong>, coba Uapkan dulu. Lalu coba Saring. Mana yang berhasil?',
-      'Pilih <strong>Garam + air</strong> dan coba Saring. Mengapa garam tetap lolos?',
-      'Kerjakan campuran <strong>lengkap</strong> dengan tiga metode berurutan sampai semua komponen terpisah.',
-      'Pada <strong>Minyak + air</strong>, perhatikan posisi lapisan minyak. Hubungkan dengan massa jenisnya.'
-    ],
-
-    quiz: [
-      {
-        q: 'Air keruh dari sungai disaring dengan kertas saring. Yang tertinggal di kertas saring disebut…',
-        options: ['Filtrat', 'Residu', 'Larutan', 'Pelarut'],
-        answer: 1,
-        explain: 'Residu adalah zat padat yang tertahan di kertas saring. Cairan bening yang lolos disebut filtrat.'
-      },
-      {
-        q: 'Petani garam memperoleh garam dari air laut dengan cara…',
-        options: ['Penyaringan', 'Penguapan air laut oleh sinar matahari', 'Penarikan magnet', 'Pengendapan'],
-        answer: 1,
-        explain: 'Air laut dialirkan ke petak dangkal. Panas matahari menguapkan airnya, sehingga garam tertinggal sebagai kristal.'
-      },
-      {
-        q: 'Campuran serbuk besi dan pasir paling mudah dipisahkan dengan…',
-        options: ['Disaring', 'Diuapkan', 'Ditarik magnet', 'Didiamkan'],
-        answer: 2,
-        explain: 'Besi tertarik magnet sedangkan pasir tidak. Perbedaan sifat magnetis inilah yang dimanfaatkan.'
-      },
-      {
-        q: 'Mengapa campuran selalu dapat dipisahkan kembali menjadi komponennya?',
-        options: [
-          'Karena komponennya tidak berubah menjadi zat baru',
-          'Karena campuran selalu berupa cairan',
-          'Karena komponennya selalu berwarna berbeda',
-          'Karena campuran tidak stabil'
-        ],
-        answer: 0,
-        explain: 'Pada campuran, zat penyusunnya hanya bercampur secara fisik dan tetap mempertahankan sifatnya masing-masing. Sifat yang berbeda itulah yang kita manfaatkan untuk memisahkannya.'
-      }
-    ]
-  });
-})();
+    s.data.lbl.userData.ganti(c.n + '  →  ' + CARA[cara].n,
+      cara === c.cara ? '#9fe8ad' : '#f0d58a');
+    s.orbit.set({ targetY: cara === 'saring' ? 2.0 : cara === 'magnet' ? 2.2 : 1.6 });
+  }
+})());

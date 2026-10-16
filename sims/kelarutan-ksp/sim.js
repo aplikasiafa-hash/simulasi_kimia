@@ -1,416 +1,355 @@
-/* Kelarutan dan Hasil Kali Kelarutan — Fase F
-   Campurkan dua larutan, bandingkan Qc dengan Ksp, dan saksikan endapan
-   muncul tepat saat Qc melampaui Ksp. */
+/* Kelarutan dan Hasil Kali Kelarutan (Ksp) — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('kelarutan-ksp', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 590;
-
+  /* a, b = koefisien kation & anion dalam AaBb */
   const SENYAWA = [
-    { r: 'AgCl', Ksp: 1.8e-10, a: 1, b: 1, kat: 'Ag⁺', an: 'Cl⁻',
-      larut1: 'AgNO₃', larut2: 'NaCl', w: '#eeeeee', nama: 'perak klorida' },
-    { r: 'AgI', Ksp: 8.5e-17, a: 1, b: 1, kat: 'Ag⁺', an: 'I⁻',
-      larut1: 'AgNO₃', larut2: 'KI', w: '#f0d878', nama: 'perak iodida' },
-    { r: 'BaSO4', Ksp: 1.1e-10, a: 1, b: 1, kat: 'Ba²⁺', an: 'SO₄²⁻',
-      larut1: 'BaCl₂', larut2: 'Na₂SO₄', w: '#ffffff', nama: 'barium sulfat' },
-    { r: 'CaCO3', Ksp: 3.3e-9, a: 1, b: 1, kat: 'Ca²⁺', an: 'CO₃²⁻',
-      larut1: 'CaCl₂', larut2: 'Na₂CO₃', w: '#f4f4f0', nama: 'kalsium karbonat' },
-    { r: 'PbI2', Ksp: 9.8e-9, a: 1, b: 2, kat: 'Pb²⁺', an: 'I⁻',
-      larut1: 'Pb(NO₃)₂', larut2: 'KI', w: '#f0d040', nama: 'timbal(II) iodida' },
-    { r: 'Mg(OH)2', Ksp: 5.6e-12, a: 1, b: 2, kat: 'Mg²⁺', an: 'OH⁻',
-      larut1: 'MgCl₂', larut2: 'NaOH', w: '#f2f6f2', nama: 'magnesium hidroksida' },
-    { r: 'CuS', Ksp: 8.0e-37, a: 1, b: 1, kat: 'Cu²⁺', an: 'S²⁻',
-      larut1: 'CuSO₄', larut2: 'Na₂S', w: '#241c18', nama: 'tembaga(II) sulfida' }
+    { n: 'AgCl', ksp: 1.8e-10, a: 1, b: 1, kat: 'Ag⁺', ani: 'Cl⁻',
+      wK: 0xd8dde2, wA: 0x9fe8ad, wEndap: 0xf0f4f8 },
+    { n: 'AgBr', ksp: 5.0e-13, a: 1, b: 1, kat: 'Ag⁺', ani: 'Br⁻',
+      wK: 0xd8dde2, wA: 0xc06840, wEndap: 0xf0e8c8 },
+    { n: 'AgI', ksp: 8.5e-17, a: 1, b: 1, kat: 'Ag⁺', ani: 'I⁻',
+      wK: 0xd8dde2, wA: 0x9a4ac8, wEndap: 0xf0d860 },
+    { n: 'BaSO₄', ksp: 1.1e-10, a: 1, b: 1, kat: 'Ba²⁺', ani: 'SO₄²⁻',
+      wK: 0xe8e0c0, wA: 0xf0d040, wEndap: 0xffffff },
+    { n: 'CaCO₃ (kapur)', ksp: 3.3e-9, a: 1, b: 1, kat: 'Ca²⁺', ani: 'CO₃²⁻',
+      wK: 0xeae6dc, wA: 0x9aa8b4, wEndap: 0xf6f4ee },
+    { n: 'PbI₂', ksp: 7.1e-9, a: 1, b: 2, kat: 'Pb²⁺', ani: 'I⁻',
+      wK: 0x8d97a1, wA: 0x9a4ac8, wEndap: 0xf0d040 },
+    { n: 'PbCl₂', ksp: 1.7e-5, a: 1, b: 2, kat: 'Pb²⁺', ani: 'Cl⁻',
+      wK: 0x8d97a1, wA: 0x9fe8ad, wEndap: 0xf4f6f8 },
+    { n: 'Mg(OH)₂', ksp: 5.6e-12, a: 1, b: 2, kat: 'Mg²⁺', ani: 'OH⁻',
+      wK: 0xe0e8ec, wA: 0x6fb6ff, wEndap: 0xf0f6f8 },
+    { n: 'Fe(OH)₃', ksp: 2.8e-39, a: 1, b: 3, kat: 'Fe³⁺', ani: 'OH⁻',
+      wK: 0xd06a30, wA: 0x6fb6ff, wEndap: 0xa05020 },
+    { n: 'CaF₂', ksp: 3.9e-11, a: 1, b: 2, kat: 'Ca²⁺', ani: 'F⁻',
+      wK: 0xeae6dc, wA: 0xa8e85c, wEndap: 0xf4f4f0 },
+    { n: 'CaSO₄ (gipsum)', ksp: 4.9e-5, a: 1, b: 1, kat: 'Ca²⁺', ani: 'SO₄²⁻',
+      wK: 0xeae6dc, wA: 0xf0d040, wEndap: 0xf8f6f0 }
   ];
 
-  function senyawaAktif(sim) {
-    return SENYAWA.find(function (s) { return s.r === sim.get('senyawa'); }) || SENYAWA[0];
+  function senyawa(s) { return SENYAWA[parseInt(s.get('z'), 10) || 0]; }
+
+  /* kelarutan molar s dari Ksp = (a·s)^a · (b·s)^b */
+  function kelarutan(z) {
+    const n = z.a + z.b;
+    const fak = Math.pow(z.a, z.a) * Math.pow(z.b, z.b);
+    return Math.pow(z.ksp / fak, 1 / n);
   }
 
-  function hitung(sim) {
-    const S = senyawaAktif(sim);
-    const M1 = sim.get('M1'), V1 = sim.get('V1');
-    const M2 = sim.get('M2'), V2 = sim.get('V2');
-    const Vtot = V1 + V2;
+  function hitung(s) {
+    const z = senyawa(s);
+    const Vk = s.get('vk'), Va = s.get('va');
+    const Ck = s.get('ck'), Ca = s.get('ca');
+    const V = Vk + Va;
+    let ck = Ck * Vk / V;        // konsentrasi kation setelah pencampuran
+    let ca = Ca * Va / V;        // konsentrasi anion setelah pencampuran
 
-    // konsentrasi setelah dicampur (sebelum mengendap)
-    const cKat = M1 * V1 / Vtot;
-    const cAn = M2 * V2 / Vtot * S.b;   // koefisien anion dalam rumus
+    // ion sejenis dari garam tambahan
+    const sejenis = s.get('sejenis');
+    if (s.get('ionSejenis') === 'kation') ck += sejenis;
+    else if (s.get('ionSejenis') === 'anion') ca += sejenis;
 
-    const Qc = Math.pow(cKat, S.a) * Math.pow(cAn, S.b);
-    const s = C.kelarutan(S.Ksp, S.a, S.b);
-
-    return {
-      S: S, cKat: cKat, cAn: cAn, Qc: Qc, Vtot: Vtot, s: s,
-      mengendap: Qc > S.Ksp,
-      rasio: Qc / S.Ksp
-    };
+    const Qc = Math.pow(ck, z.a) * Math.pow(ca, z.b);
+    const sMolar = kelarutan(z);
+    const Mr = 1;  // tidak dipakai; kelarutan dilaporkan dalam mol/L
+    return { z: z, ck: ck, ca: ca, V: V, Qc: Qc, sMolar: sMolar,
+      lewat: Qc / z.ksp, mengendap: Qc > z.ksp };
   }
 
-  function siapkan(sim) {
-    sim.data.a = 0;
-    sim.data.jalan = false;
-    sim.data.butir = [];
-  }
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 11, phi: 1.04, theta: 0.6, targetY: 1.4, lajuPutar: 0.1 },
 
-  Sim.create({
-    title: 'Kelarutan dan Hasil Kali Kelarutan',
-    subtitle: 'Setiap garam sukar larut punya batas. Bandingkan hasil kali konsentrasi ion (Qc) dengan batas itu (Ksp) untuk meramalkan terbentuknya endapan.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Ksp', 'Kelarutan', 'Pengendapan'],
-    stage: { w: W, h: H },
+    kendali: [
+      { judul: 'Senyawa', isi: [
+        { type: 'select', id: 'z', value: 0, label: 'Garam sukar larut',
+          options: SENYAWA.map(function (z, i) { return { value: i, label: z.n + '   Ksp = ' + S.fmtRapi(z.ksp) }; }) }
+      ]},
+      { judul: 'Larutan yang dicampur', isi: [
+        { type: 'slider', id: 'ck', value: 0.001, min: 0.000001, max: 0.1, step: 0.000001,
+          label: 'Konsentrasi larutan kation', unit: ' M', dec: 6,
+          format: function (v) { return S.fmtRapi(v) + ' M'; } },
+        { type: 'slider', id: 'vk', value: 50, min: 5, max: 100, step: 1,
+          label: 'Volume larutan kation', unit: ' mL', dec: 0 },
+        { type: 'slider', id: 'ca', value: 0.001, min: 0.000001, max: 0.1, step: 0.000001,
+          label: 'Konsentrasi larutan anion', unit: ' M', dec: 6,
+          format: function (v) { return S.fmtRapi(v) + ' M'; } },
+        { type: 'slider', id: 'va', value: 50, min: 5, max: 100, step: 1,
+          label: 'Volume larutan anion', unit: ' mL', dec: 0 }
+      ]},
+      { judul: 'Pengaruh ion sejenis', isi: [
+        { type: 'segment', id: 'ionSejenis', value: 'tidak', label: 'Tambahkan garam ber-ion sejenis',
+          options: [
+            { value: 'tidak', label: 'Tidak' },
+            { value: 'kation', label: 'Ion kation' },
+            { value: 'anion', label: 'Ion anion' }
+          ]},
+        { type: 'slider', id: 'sejenis', value: 0, min: 0, max: 0.1, step: 0.0005,
+          label: 'Jumlah ion sejenis', unit: ' M', dec: 4,
+          format: function (v) { return S.fmtRapi(v) + ' M'; } },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Campurkan', utama: true, klik: function (s) { s.data.jalan = true; } },
+          { label: '↺ Pisahkan kembali', klik: function (s) { s.data.t = 0; s.data.jalan = false; } }
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan panel Qc vs Ksp' },
+        { type: 'toggle', id: 'ion', value: true, label: 'Tampilkan ion' }
+      ]}
+    ],
 
-    controls: [
-      {
-        title: 'Senyawa yang dibentuk',
-        items: [
-          { type: 'select', id: 'senyawa', value: 'AgCl', label: 'Pilih senyawa',
-            options: SENYAWA.map(function (s) {
-              return { value: s.r, label: Sim.formula(s.r) + ' — ' + s.nama }; }) }
-        ]
-      },
-      {
-        title: 'Larutan 1 (sumber kation)',
-        items: [
-          { type: 'slider', id: 'M1', value: 0.001, min: 0.00001, max: 0.02, step: 0.00001,
-            label: 'Konsentrasi', unit: 'M', dec: 5,
-            format: function (v) { return Sim.sci(v, 2) + ' M'; } },
-          { type: 'slider', id: 'V1', value: 50, min: 10, max: 100, step: 5,
-            label: 'Volume', unit: 'mL', dec: 0 }
-        ]
-      },
-      {
-        title: 'Larutan 2 (sumber anion)',
-        items: [
-          { type: 'slider', id: 'M2', value: 0.001, min: 0.00001, max: 0.02, step: 0.00001,
-            label: 'Konsentrasi', unit: 'M', dec: 5,
-            format: function (v) { return Sim.sci(v, 2) + ' M'; } },
-          { type: 'slider', id: 'V2', value: 50, min: 10, max: 100, step: 5,
-            label: 'Volume', unit: 'mL', dec: 0 },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Campurkan', primary: true, onClick: function (sim) {
-              sim.data.jalan = true; sim.data.a = 0;
-            } },
-            { label: '↺ Ulangi', onClick: function (sim) { siapkan(sim); } }
-          ] }
-        ]
+    baca: [
+      { id: 'hasil', label: 'Hasil pencampuran', tone: 'aksen' },
+      { id: 'qc', label: 'Qc hasil pencampuran' },
+      { id: 'ksp', label: 'Ksp senyawa' },
+      { id: 'bandingan', label: 'Qc / Ksp' },
+      { id: 'kelarutan', label: 'Kelarutan dalam air murni' },
+      { id: 'ion', label: 'Konsentrasi ion setelah dicampur' }
+    ],
+
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9, warna: 0x0b1118 }));
+
+      /* dua gelas kecil pereaksi + satu gelas besar hasil */
+      const gK = S.gelas({ r: 0.9, h: 1.5, level: 0.62, warna: 0xd8dde2, opacity: 0.6 });
+      gK.position.set(-3.3, 1.9, 0);
+      s.data.gK = gK;
+      s.tambah(gK);
+      const gA = S.gelas({ r: 0.9, h: 1.5, level: 0.62, warna: 0x9fe8ad, opacity: 0.6 });
+      gA.position.set(3.3, 1.9, 0);
+      s.data.gA = gA;
+      s.tambah(gA);
+
+      const lblK = S.teks('', { skala: 0.24, lebar: 16, warna: '#d8dde2' });
+      lblK.position.set(-3.3, 1.55, 0);
+      s.data.lblK = lblK;
+      s.tambah(lblK);
+      const lblA = S.teks('', { skala: 0.24, lebar: 16, warna: '#9fe8ad' });
+      lblA.position.set(3.3, 1.55, 0);
+      s.data.lblA = lblA;
+      s.tambah(lblA);
+
+      const gH = S.gelas({ r: 1.5, h: 2.2, level: 0.1, warna: 0xdfe8ee, opacity: 0.55 });
+      s.data.gH = gH;
+      s.tambah(gH);
+
+      /* aliran dari kedua gelas ke gelas tengah */
+      function aliran(x) {
+        const kurva = new T.CatmullRomCurve3([
+          new T.Vector3(x, 2.3, 0),
+          new T.Vector3(x * 0.6, 2.0, 0),
+          new T.Vector3(x * 0.2, 1.3, 0),
+          new T.Vector3(x * 0.08, 0.8, 0)
+        ]);
+        const m = new T.Mesh(new T.TubeGeometry(kurva, 40, 0.055, 10, false),
+          new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, transmission: 0.7,
+            transparent: true, opacity: 0.6, thickness: 0.2 }));
+        m.visible = false;
+        s.tambah(m);
+        return m;
       }
-    ],
+      s.data.alirK = aliran(-3.3);
+      s.data.alirA = aliran(3.3);
 
-    readouts: [
-      { id: 'hasil', label: 'Hasil', tone: 'accent' },
-      { id: 'qc', label: 'Nilai Qc' },
-      { id: 'ksp', label: 'Nilai Ksp' },
-      { id: 's', label: 'Kelarutan molar' }
-    ],
+      /* ion di gelas tengah */
+      function awan(warna, n, r) {
+        const p = S.partikel(n, { r: r, warna: warna, kotak: { x: 1.15, y: 0.5, z: 1.15 } });
+        p.position.y = 0.7;
+        p.material.transparent = true;
+        p.material.opacity = 0.92;
+        s.tambah(p);
+        return p;
+      }
+      s.data.pK = awan(0xd8dde2, 70, 0.085);
+      s.data.pA = awan(0x9fe8ad, 70, 0.1);
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) {
-      if (id === 'senyawa') siapkan(sim);
-      else { sim.data.a = 0; sim.data.jalan = false; sim.data.butir = []; }
+      /* endapan: butiran menumpuk di dasar */
+      const endap = new T.Group();
+      s.data.butir = [];
+      for (let i = 0; i < 90; i++) {
+        const m = new T.Mesh(S.geoBola(10),
+          new T.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.55 }));
+        const sk = S.acak(0.05, 0.1);
+        m.scale.setScalar(sk);
+        m.userData.sk = sk;
+        const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 1.3;
+        m.userData.x = Math.cos(a) * rr;
+        m.userData.z = Math.sin(a) * rr;
+        m.userData.y = 0.04 + Math.random() * 0.22;
+        m.position.set(m.userData.x, m.userData.y, m.userData.z);
+        m.visible = false;
+        endap.add(m);
+        s.data.butir.push(m);
+      }
+      s.data.endap = endap;
+      s.tambah(endap);
+
+      // kekeruhan larutan
+      const keruh = new T.Mesh(new T.CylinderGeometry(1.42, 1.42, 1, 36),
+        new T.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0,
+          depthWrite: false }));
+      s.data.keruh = keruh;
+      s.tambah(keruh);
+
+      /* panel grafik */
+      const g1 = S.panelGrafik({ w: 4.8, px: 700, py: 440 });
+      g1.position.set(0, 5.0, -1.6);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      const lbl = S.teks('', { skala: 0.4, lebar: 36, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.6, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.t = 0;
+      s.data.jalan = false;
+      pasang(s);
     },
 
-    update: function (sim, dt) {
-      const h = hitung(sim);
-      if (sim.data.jalan) {
-        sim.data.a += dt * 0.6;
-        if (sim.data.a >= 1) { sim.data.a = 1; sim.data.jalan = false; }
-        if (h.mengendap && sim.data.butir.length < 60 && Math.random() < dt * 90) {
-          sim.data.butir.push({
-            x: Sim.rnd(300, 430), y: Sim.rnd(250, 290),
-            vy: Sim.rnd(10, 36), r: Sim.rnd(2.4, 5)
-          });
+    ubah: function (s, id) {
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      else if (id === 'ion') {
+        s.data.pK.visible = s.get('ion');
+        s.data.pA.visible = s.get('ion');
+      } else pasang(s);
+      gambar(s);
+    },
+
+    langkah: function (s, dt) {
+      const h = hitung(s);
+      if (s.data.jalan) s.data.t = Math.min(1, s.data.t + dt * 0.45);
+      const t = s.data.t;
+
+      // aliran terlihat saat 0.05 < t < 0.65
+      const mengalir = t > 0.03 && t < 0.7;
+      s.data.alirK.visible = mengalir;
+      s.data.alirA.visible = mengalir;
+      s.data.alirK.material.color.setHex(h.z.wK);
+      s.data.alirA.material.color.setHex(h.z.wA);
+
+      // gelas pereaksi mengosong, gelas tengah terisi
+      s.data.gK.userData.setLevel(0.62 * (1 - t), h.z.wK);
+      s.data.gA.userData.setLevel(0.62 * (1 - t), h.z.wA);
+      const lv = 0.1 + t * 0.62;
+      s.data.gH.userData.setLevel(lv, h.mengendap && t > 0.7 ? 0xe8eef2 : 0xdfe8ee);
+
+      // ion di gelas tengah
+      const frak = S.clamp(t * 1.4, 0, 1);
+      const nK = Math.round(skala(h.ck) * 70 * frak);
+      const nA = Math.round(skala(h.ca) * 70 * frak);
+      atur(s.data.pK, h.mengendap && t > 0.8 ? Math.round(nK * 0.25) : nK);
+      atur(s.data.pA, h.mengendap && t > 0.8 ? Math.round(nA * 0.25) : nA);
+      s.data.pK.position.y = 0.1 + lv * 1.1;
+      s.data.pK.userData.kotak = { x: 1.15, y: Math.max(0.2, lv * 0.95), z: 1.15 };
+      s.data.pA.position.copy(s.data.pK.position);
+      s.data.pA.userData.kotak = s.data.pK.userData.kotak;
+      s.data.pK.userData.gerak(dt, 1.0);
+      s.data.pA.userData.gerak(dt, 0.9);
+
+      // endapan tumbuh
+      const banyak = h.mengendap
+        ? S.clamp(Math.log10(Math.max(1.0001, h.lewat)) / 6, 0.05, 1) : 0;
+      const nEnd = Math.round(banyak * 90 * S.clamp((t - 0.6) / 0.4, 0, 1));
+      s.data.butir.forEach(function (m, i) {
+        m.visible = i < nEnd;
+        m.material.color.setHex(h.z.wEndap);
+        if (m.visible) {
+          m.position.y = m.userData.y + Math.sin(s.waktu * 2 + i) * 0.004;
         }
-      }
-      sim.data.butir.forEach(function (b) {
-        b.vy += 60 * dt;
-        b.y = Math.min(b.y + b.vy * dt, 348);
-        if (b.y >= 348) b.vy = 0;
       });
+      s.data.keruh.material.opacity = banyak * 0.22 * S.clamp((t - 0.6) / 0.4, 0, 1);
+      s.data.keruh.material.color.setHex(h.z.wEndap);
+      s.data.keruh.scale.y = lv * 2.1;
+      s.data.keruh.position.y = lv * 2.1 / 2;
     },
 
-    draw: function (c, sim) {
-      const h = hitung(sim);
-      const S = h.S;
-      const a = sim.data.a;
+    bacaUbah: function (s) {
+      const h = hitung(s);
+      const z = h.z;
+      s.baca('hasil', h.mengendap
+        ? 'Qc > Ksp → terbentuk endapan ' + z.n
+        : Math.abs(h.lewat - 1) < 0.02 ? 'Qc = Ksp → tepat jenuh, di ambang mengendap'
+          : 'Qc < Ksp → larutan belum jenuh, tidak ada endapan',
+        h.mengendap ? 'warn' : 'aksen');
+      s.baca('qc', S.fmtRapi(h.Qc));
+      s.baca('ksp', S.fmtRapi(z.ksp) + '   (' + z.n + ')');
+      s.baca('bandingan', S.fmtRapi(h.lewat) + ' ×',
+        h.lewat > 1 ? 'warn' : 'aksen');
+      s.baca('kelarutan', S.fmtRapi(h.sMolar) + ' mol/L');
+      s.baca('ion', '[' + z.kat + '] = ' + S.fmtRapi(h.ck) + ' M    ['
+        + z.ani + '] = ' + S.fmtRapi(h.ca) + ' M');
+      gambar(s);
+    }
+  };
 
-      /* ---------- dua gelas + hasil campuran ---------- */
-      const g1 = { x: 70, y: 150, w: 100, h: 110 };
-      const g2 = { x: 196, y: 150, w: 100, h: 110 };
-      D.beaker(c, g1.x, g1.y, g1.w, g1.h, 0.6, D.alpha('#5b9bf5', 0.4));
-      D.beaker(c, g2.x, g2.y, g2.w, g2.h, 0.6, D.alpha('#f0a94a', 0.35));
-      D.text(c, Sim.formula(S.larut1), g1.x + g1.w / 2, g1.y - 20,
-        { size: 13, weight: 700, color: P.blue, align: 'c', base: 'middle' });
-      D.text(c, Sim.sci(sim.get('M1'), 2) + ' M · ' + sim.get('V1') + ' mL',
-        g1.x + g1.w / 2, g1.y + g1.h + 18,
-        { size: 10.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-      D.text(c, Sim.formula(S.larut2), g2.x + g2.w / 2, g2.y - 20,
-        { size: 13, weight: 700, color: P.amber, align: 'c', base: 'middle' });
-      D.text(c, Sim.sci(sim.get('M2'), 2) + ' M · ' + sim.get('V2') + ' mL',
-        g2.x + g2.w / 2, g2.y + g2.h + 18,
-        { size: 10.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
+  function skala(c) {
+    return S.clamp((Math.log10(Math.max(1e-12, c)) + 12) / 11, 0.03, 1);
+  }
 
-      D.arrow(c, 310, 206, 352, 206, P.accent, 2.6, 10);
+  function atur(p, n) {
+    const d = p.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      if (!d[i].aktif && i < n) d[i].pos.set(S.acak(-1, 1), S.acak(-0.4, 0.4), S.acak(-1, 1));
+      d[i].aktif = i < n;
+    }
+    p.userData.tulis();
+  }
 
-      // gelas hasil
-      const g3 = { x: 290, y: 190, w: 150, h: 170 };
-      c.save();
-      c.globalAlpha = Math.min(1, a * 2);
-      D.beaker(c, g3.x, g3.y, g3.w, g3.h, 0.78,
-        D.alpha(h.mengendap ? D.mix('#4a7a9e', S.w, 0.25) : '#4a7a9e', 0.5));
-      c.restore();
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const h = hitung(s);
+    const z = h.z;
+    // kurva kelarutan: [anion] yang diperlukan untuk tiap [kation] agar Qc = Ksp
+    const titik = [];
+    for (let i = 0; i <= 120; i++) {
+      const lk = -10 + i / 120 * 10;        // log [kation] dari 1e-10 ke 1
+      const ck = Math.pow(10, lk);
+      const ca = Math.pow(z.ksp / Math.pow(ck, z.a), 1 / z.b);
+      const la = Math.log10(ca);
+      if (la > -12 && la < 1) titik.push([lk, la]);
+    }
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Garis jenuh ' + z.n + ' — titik di atas garis mengendap',
+      xMin: -10, xMax: 0, yMin: -12, yMax: 0,
+      xLabel: 'log [' + z.kat + ']', yLabel: 'log [' + z.ani + ']',
+      seri: [{ titik: titik, warna: '#f0d040', tebal: 3, nama: 'Qc = Ksp (jenuh)' }],
+      titikTebal: [{
+        x: S.clamp(Math.log10(Math.max(1e-10, h.ck)), -10, 0),
+        y: S.clamp(Math.log10(Math.max(1e-12, h.ca)), -12, 0),
+        warna: h.mengendap ? '#ef6a52' : '#4fd1c0', r: 8
+      }]
+    });
+  }
 
-      // ion mengambang
-      if (a > 0.15) {
-        for (let i = 0; i < 16; i++) {
-          const seed = i * 87.9;
-          const x = g3.x + 14 + ((seed * 5.7) % (g3.w - 28));
-          const y = g3.y + 50 + ((seed * 3.1) % (g3.h - 80));
-          const kat = i % 2 === 0;
-          c.globalAlpha = Math.min(1, a * 1.6) * (h.mengendap ? 0.45 : 1);
-          D.circle(c, x + Math.sin(sim.t + i) * 2.6, y + Math.cos(sim.t * 1.2 + i) * 2.6,
-            6, kat ? '#5b9bf5' : '#f0a94a');
-          c.globalAlpha = 1;
-        }
-      }
+  function pasang(s) {
+    const h = hitung(s);
+    const z = h.z;
+    s.data.t = 0;
+    s.data.jalan = false;
 
-      // endapan
-      sim.data.butir.forEach(function (b) {
-        D.circle(c, b.x, b.y, b.r, S.w, 'rgba(0,0,0,.2)', 0.7);
-      });
-      if (h.mengendap && a > 0.4) {
-        D.roundRect(c, g3.x + 2, 344, g3.w - 4, 14, 3, D.alpha(S.w, 0.9));
-      }
+    s.data.gK.userData.setLevel(0.62 * S.clamp(s.get('vk') / 100, 0.1, 1), z.wK);
+    s.data.gA.userData.setLevel(0.62 * S.clamp(s.get('va') / 100, 0.1, 1), z.wA);
+    s.data.gH.userData.setLevel(0.1, 0xdfe8ee);
+    s.data.pK.material.color.setHex(z.wK);
+    s.data.pK.material.emissive.setHex(z.wK);
+    s.data.pA.material.color.setHex(z.wA);
+    s.data.pA.material.emissive.setHex(z.wA);
+    atur(s.data.pK, 0); atur(s.data.pA, 0);
+    s.data.pK.visible = s.get('ion');
+    s.data.pA.visible = s.get('ion');
+    s.data.butir.forEach(function (m) { m.visible = false; });
+    s.data.keruh.material.opacity = 0;
+    s.data.alirK.visible = false;
+    s.data.alirA.visible = false;
 
-      D.text(c, 'campuran', g3.x + g3.w / 2, g3.y - 20,
-        { size: 13, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, 'volume total ' + h.Vtot + ' mL', g3.x + g3.w / 2, g3.y + g3.h + 18,
-        { size: 10.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-
-      /* ---------- perbandingan Qc dan Ksp ---------- */
-      const QX = 480, QW = 290;
-      D.roundRect(c, QX, 100, QW, 186, 12,
-        a > 0.4 ? D.alpha(h.mengendap ? P.amber : P.accent, 0.1) : 'rgba(255,255,255,.04)',
-        a > 0.4 ? (h.mengendap ? P.amber : P.accent) : 'rgba(255,255,255,.12)', 1.5);
-      D.text(c, 'MEMBANDINGKAN Qc DENGAN Ksp', QX + 16, 120,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      D.text(c, 'Qc  = [' + S.kat + ']' + (S.a > 1 ? Sim.sup(S.a) : '') +
-        ' [' + S.an + ']' + (S.b > 1 ? Sim.sup(S.b) : ''),
-        QX + 16, 146, { size: 12.5, weight: 700, color: P.accent2, base: 'middle', mono: true });
-
-      const rows = [
-        ['[' + S.kat + '] setelah dicampur', Sim.sci(h.cKat, 2) + ' M'],
-        ['[' + S.an + '] setelah dicampur', Sim.sci(h.cAn, 2) + ' M'],
-        ['Qc', Sim.sci(h.Qc, 2)],
-        ['Ksp ' + Sim.formula(S.r), Sim.sci(S.Ksp, 2)]
-      ];
-      rows.forEach(function (r, i) {
-        const y = 172 + i * 20;
-        D.text(c, r[0], QX + 16, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        D.text(c, r[1], QX + QW - 16, y, {
-          size: 11, weight: 700, align: 'r', base: 'middle', mono: true,
-          color: i >= 2 ? (i === 2 ? P.accent2 : P.amber) : P.dim
-        });
-      });
-
-      // pernyataan perbandingan
-      const tanda = h.Qc > S.Ksp ? '>' : h.Qc < S.Ksp ? '<' : '=';
-      D.roundRect(c, QX + 16, 252, QW - 32, 26, 6,
-        D.alpha(h.mengendap ? P.amber : P.accent, 0.18),
-        h.mengendap ? P.amber : P.accent, 1.3);
-      D.text(c, 'Qc ' + tanda + ' Ksp  →  ' +
-        (h.Qc > S.Ksp ? 'TERBENTUK ENDAPAN'
-          : h.Qc < S.Ksp ? 'LARUT SEMPURNA' : 'TEPAT JENUH'),
-        QX + QW / 2, 265, {
-          size: 12, weight: 800, align: 'c', base: 'middle',
-          color: h.mengendap ? P.amber : P.accent
-        });
-
-      /* ---------- skala logaritmik Qc vs Ksp ---------- */
-      const SX = 480, SW = 290, SY = 310;
-      D.text(c, 'PERBANDINGAN DALAM SKALA LOG', SX, SY - 10,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const lo = Math.log10(S.Ksp) - 6, hi = Math.log10(S.Ksp) + 6;
-      D.roundRect(c, SX, SY, SW, 22, 5, 'rgba(255,255,255,.06)');
-      // zona larut / mengendap
-      const xKsp = SX + (Math.log10(S.Ksp) - lo) / (hi - lo) * SW;
-      D.roundRect(c, SX, SY, xKsp - SX, 22, 5, D.alpha(P.accent, 0.18));
-      D.roundRect(c, xKsp, SY, SX + SW - xKsp, 22, 5, D.alpha(P.amber, 0.18));
-      D.line(c, xKsp, SY - 4, xKsp, SY + 26, P.rose, 2);
-      D.text(c, 'Ksp', xKsp, SY + 36,
-        { size: 10, weight: 700, color: P.rose, align: 'c', base: 'middle' });
-      D.text(c, 'larut', SX + 8, SY + 11,
-        { size: 10, weight: 700, color: P.accent, base: 'middle' });
-      D.text(c, 'mengendap', SX + SW - 8, SY + 11,
-        { size: 10, weight: 700, color: P.amber, align: 'r', base: 'middle' });
-
-      const logQ = Math.log10(Math.max(h.Qc, 1e-60));
-      const xQ = SX + Sim.clamp((logQ - lo) / (hi - lo), 0, 1) * SW;
-      c.beginPath();
-      c.moveTo(xQ, SY - 6); c.lineTo(xQ - 7, SY - 16); c.lineTo(xQ + 7, SY - 16);
-      c.closePath(); c.fillStyle = P.text; c.fill();
-      D.text(c, 'Qc', xQ, SY - 24,
-        { size: 10, weight: 700, color: P.text, align: 'c', base: 'middle' });
-
-      /* ---------- kelarutan molar ---------- */
-      const KX = 60, KY = 392, KW = 380;
-      D.roundRect(c, KX, KY, KW, 166, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'MENGHITUNG KELARUTAN DARI Ksp', KX + 16, KY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      const rumusKsp = S.b === 1
-        ? 'Ksp = s × s = s²  →  s = √Ksp'
-        : 'Ksp = s × (2s)² = 4s³  →  s = ∛(Ksp/4)';
-      D.text(c, Sim.formula(S.r) + ' ⇌ ' + S.kat + ' + ' + (S.b > 1 ? S.b : '') + S.an,
-        KX + 16, KY + 46, { size: 12.5, weight: 650, color: P.dim, base: 'middle', mono: true });
-      D.text(c, rumusKsp, KX + 16, KY + 70,
-        { size: 12.5, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      D.text(c, 's = ' + Sim.sci(h.s, 3) + ' mol/L', KX + 16, KY + 96,
-        { size: 16, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      D.text(c, '  = ' + Sim.sci(h.s * C.massaMolar(S.r.replace(/[()]/g, '')), 3) + ' g/L',
-        KX + 16, KY + 118, { size: 12.5, weight: 600, color: P.dim, base: 'middle', mono: true });
-      D.text(c, 'Makin kecil Ksp, makin sukar larut senyawanya.',
-        KX + 16, KY + 146, { size: 11, weight: 500, color: P.faint, base: 'middle' });
-
-      /* ---------- urutan kelarutan ---------- */
-      const UX = 480, UW = 290;
-      D.roundRect(c, UX, KY, UW, 166, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'URUTAN KSP — MAKIN KE BAWAH MAKIN SUKAR LARUT', UX + 16, KY + 20,
-        { size: 9.5, weight: 700, color: P.faint, base: 'middle' });
-      const urut = SENYAWA.slice().sort(function (p, q) { return q.Ksp - p.Ksp; });
-      urut.forEach(function (s, i) {
-        const y = KY + 42 + i * 17;
-        const aktif = s.r === S.r;
-        if (aktif) D.roundRect(c, UX + 10, y - 8, UW - 20, 17, 4, 'rgba(79,209,192,.12)');
-        D.text(c, Sim.formula(s.r), UX + 20, y,
-          { size: 11, weight: aktif ? 700 : 500, color: aktif ? P.accent2 : P.dim, base: 'middle' });
-        D.text(c, Sim.sci(s.Ksp, 1), UX + UW - 20, y,
-          { size: 10.5, weight: 600, color: aktif ? P.accent2 : P.faint,
-            align: 'r', base: 'middle', mono: true });
-      });
-    },
-
-    readoutsUpdate: function (sim) {
-      const h = hitung(sim);
-      sim.readout('hasil', h.mengendap ? 'Mengendap' : 'Larut',
-        h.mengendap ? 'warn' : 'accent');
-      sim.readout('qc', Sim.sci(h.Qc, 2));
-      sim.readout('ksp', Sim.sci(h.S.Ksp, 2));
-      sim.readout('s', Sim.sci(h.s, 2) + '<span class="unit"> M</span>');
-    },
-
-    notes: `
-      <p>Tidak ada senyawa yang benar-benar tidak larut. Yang ada hanyalah senyawa yang
-      <strong>sangat sedikit larut</strong>. Dalam larutan jenuhnya, terjadi kesetimbangan
-      antara padatan dan ion-ionnya.</p>
-
-      <span class="formula">AgCl(s) ⇌ Ag⁺(aq) + Cl⁻(aq)
-Ksp = [Ag⁺][Cl⁻]</span>
-
-      <h3>Hasil kali kelarutan (Ksp)</h3>
-      <p>Ksp adalah tetapan kesetimbangan untuk pelarutan. Seperti pada Kc, zat padat
-      tidak dimasukkan ke dalam ungkapannya. Makin kecil Ksp, makin sukar larut
-      senyawanya.</p>
-
-      <p>Untuk senyawa berbentuk AₐBᵦ:</p>
-      <span class="formula">AₐBᵦ(s) ⇌ aA(aq) + bB(aq)
-Ksp = [A]ᵃ[B]ᵇ = (as)ᵃ · (bs)ᵇ</span>
-
-      <p>Contoh perhitungan untuk dua bentuk yang paling sering muncul:</p>
-      <ul>
-        <li><strong>AB</strong> (seperti AgCl): Ksp = s², sehingga s = √Ksp</li>
-        <li><strong>AB₂</strong> (seperti PbI₂): Ksp = s(2s)² = 4s³, sehingga s = ∛(Ksp/4)</li>
-      </ul>
-
-      <h3>Meramalkan terbentuknya endapan</h3>
-      <p>Saat dua larutan dicampur, hitung <strong>Qc</strong> (hasil kali konsentrasi ion
-      saat itu) lalu bandingkan dengan Ksp:</p>
-      <table>
-        <thead><tr><th>Keadaan</th><th>Artinya</th></tr></thead>
-        <tbody>
-          <tr><td>Qc &lt; Ksp</td><td>belum jenuh, semua larut</td></tr>
-          <tr><td>Qc = Ksp</td><td>tepat jenuh, berada di ambang</td></tr>
-          <tr><td>Qc &gt; Ksp</td><td>lewat jenuh, <strong>terbentuk endapan</strong></td></tr>
-        </tbody>
-      </table>
-
-      <p>Jangan lupa: setelah dicampur, <strong>volume bertambah</strong> sehingga
-      konsentrasi kedua ion mengecil. Langkah pengenceran ini sering terlewat dalam
-      pengerjaan soal.</p>
-
-      <h3>Pengaruh ion senama</h3>
-      <p>Menambahkan ion yang sama dengan salah satu ion penyusun akan
-      <strong>memperkecil kelarutan</strong>. Sesuai asas Le Châtelier, penambahan ion
-      Cl⁻ menggeser kesetimbangan AgCl ke arah padatan.</p>
-
-      <p>Inilah alasan AgCl jauh lebih sukar larut dalam larutan NaCl daripada dalam air
-      murni. Prinsip ini dipakai untuk mengendapkan zat secara lebih sempurna dalam
-      analisis kimia.</p>
-
-      <h3>Penerapan</h3>
-      <ul>
-        <li><strong>BaSO₄</strong> dipakai sebagai zat kontras rontgen saluran cerna.
-            Barium beracun, tetapi Ksp BaSO₄ sangat kecil sehingga ion Ba²⁺ yang terlarut
-            dapat diabaikan.</li>
-        <li><strong>CaCO₃</strong> membentuk kerak pada pipa air sadah dan stalaktit di gua.</li>
-        <li><strong>Pelunakan air</strong> dilakukan dengan mengendapkan Ca²⁺ dan Mg²⁺.</li>
-      </ul>
-
-      <div class="callout" data-tone="tip">
-        <strong>Ksp sangat peka terhadap pangkat</strong>
-        Perhatikan AgI dengan Ksp 8,5 × 10⁻¹⁷ dibanding AgCl dengan 1,8 × 10⁻¹⁰.
-        Selisihnya tujuh orde — AgI lebih dari sejuta kali lebih sukar larut.
-      </div>
-    `,
-
-    explore: [
-      'Campurkan AgNO₃ dan NaCl, keduanya 1×10⁻³ M. Apakah terbentuk endapan? Bandingkan Qc dengan Ksp.',
-      'Turunkan kedua konsentrasi menjadi 1×10⁻⁵ M. Pada titik mana endapan berhenti terbentuk?',
-      'Ganti ke <strong>AgI</strong> dengan konsentrasi yang sama. Mengapa jauh lebih mudah mengendap?',
-      'Perhatikan <strong>PbI₂</strong>. Rumus kelarutannya berbeda karena perbandingan ionnya 1 : 2. Mengapa?'
-    ],
-
-    quiz: [
-      {
-        q: 'Kelarutan AgCl dalam air adalah s mol/L. Ungkapan Ksp yang benar adalah…',
-        options: ['Ksp = s', 'Ksp = s²', 'Ksp = 4s³', 'Ksp = 2s²'],
-        answer: 1,
-        explain: 'AgCl(s) ⇌ Ag⁺ + Cl⁻ menghasilkan s mol/L masing-masing ion. Jadi Ksp = [Ag⁺][Cl⁻] = s × s = s².'
-      },
-      {
-        q: 'Untuk senyawa PbI₂ dengan kelarutan s, ungkapan Ksp-nya adalah…',
-        options: ['s²', '2s²', '4s³', 's³'],
-        answer: 2,
-        explain: 'PbI₂(s) ⇌ Pb²⁺ + 2I⁻ menghasilkan s mol/L Pb²⁺ dan 2s mol/L I⁻. Maka Ksp = (s)(2s)² = 4s³.'
-      },
-      {
-        q: 'Dua larutan dicampur dan diperoleh Qc = 2 × 10⁻¹² sedangkan Ksp senyawanya 1,8 × 10⁻¹⁰. Apa yang terjadi?',
-        options: [
-          'Terbentuk endapan',
-          'Larutan tepat jenuh',
-          'Tidak terbentuk endapan, semua larut',
-          'Tidak dapat ditentukan'
-        ],
-        answer: 2,
-        explain: 'Qc lebih kecil daripada Ksp, berarti larutan belum jenuh. Seluruh ion tetap larut dan tidak ada endapan yang terbentuk.'
-      },
-      {
-        q: 'Kelarutan AgCl dalam larutan NaCl 0,1 M dibandingkan dalam air murni akan…',
-        options: [
-          'Lebih besar',
-          'Lebih kecil, karena pengaruh ion senama',
-          'Sama saja',
-          'Menjadi nol'
-        ],
-        answer: 1,
-        explain: 'Ion Cl⁻ dari NaCl menggeser kesetimbangan AgCl(s) ⇌ Ag⁺ + Cl⁻ ke arah kiri sesuai asas Le Châtelier. Akibatnya kelarutan AgCl berkurang. Inilah pengaruh ion senama.'
-      }
-    ]
-  });
-})();
+    s.data.lblK.userData.ganti(z.kat + '  ' + S.fmtRapi(s.get('ck')) + ' M');
+    s.data.lblA.userData.ganti(z.ani + '  ' + S.fmtRapi(s.get('ca')) + ' M');
+    s.data.g1.visible = s.get('grafik');
+    s.data.lbl.userData.ganti(z.n + '   Ksp = ' + S.fmtRapi(z.ksp));
+    gambar(s);
+  }
+})());

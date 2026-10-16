@@ -1,441 +1,419 @@
-/* Titrasi Asam-Basa dan Kurva Titrasi — Fase F
-   Teteskan titran dari buret, amati kurva pH terbentuk, dan tentukan
-   titik ekuivalen beserta konsentrasi larutan yang dititrasi. */
+/* Titrasi Asam–Basa — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('titrasi', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  const KW = 1e-14;
 
-  const W = 800, H = 600;
-
-  const PASANGAN = [
-    { id: 'kk', n: 'Asam kuat dititrasi basa kuat', analit: 'HCl', titran: 'NaOH',
-      analitKuat: true, titranKuat: true, Ka: Infinity, pHEkiv: 7.0,
-      indikator: ['fenolftalein', 'bromtimol', 'metil-jingga'] },
-    { id: 'lk', n: 'Asam lemah dititrasi basa kuat', analit: 'CH₃COOH', titran: 'NaOH',
-      analitKuat: false, titranKuat: true, Ka: 1.8e-5, pHEkiv: 8.7,
-      indikator: ['fenolftalein'] },
-    { id: 'kl', n: 'Basa kuat dititrasi asam kuat', analit: 'NaOH', titran: 'HCl',
-      analitKuat: true, titranKuat: true, basa: true, pHEkiv: 7.0,
-      indikator: ['fenolftalein', 'bromtimol', 'metil-jingga'] },
-    { id: 'll', n: 'Basa lemah dititrasi asam kuat', analit: 'NH₃', titran: 'HCl',
-      analitKuat: false, titranKuat: true, basa: true, Kb: 1.8e-5, pHEkiv: 5.3,
-      indikator: ['metil-jingga'] }
+  const ANALIT = [
+    { n: 'HCl (asam kuat)', jenis: 'ak', nama: 'HCl' },
+    { n: 'CH₃COOH (asam lemah)', jenis: 'al', ka: 1.8e-5, nama: 'CH₃COOH' },
+    { n: 'HF (asam lemah)', jenis: 'al', ka: 6.8e-4, nama: 'HF' },
+    { n: 'HCN (asam sangat lemah)', jenis: 'al', ka: 6.2e-10, nama: 'HCN' },
+    { n: 'NaOH (basa kuat)', jenis: 'bk', nama: 'NaOH' },
+    { n: 'NH₃ (basa lemah)', jenis: 'bl', kb: 1.8e-5, nama: 'NH₃' }
   ];
 
-  function pasanganAktif(sim) {
-    return PASANGAN.find(function (p) { return p.id === sim.get('pasangan'); }) || PASANGAN[0];
-  }
+  const INDIKATOR = [
+    { n: 'Fenolftalein', lo: 8.2, hi: 10.0, wLo: null, wHi: 0xe0409a, nLo: 'tak berwarna', nHi: 'merah muda' },
+    { n: 'Metil merah', lo: 4.2, hi: 6.3, wLo: 0xd03020, wHi: 0xf0d040, nLo: 'merah', nHi: 'kuning' },
+    { n: 'Metil jingga', lo: 3.1, hi: 4.4, wLo: 0xe04010, wHi: 0xf0b030, nLo: 'merah', nHi: 'jingga-kuning' },
+    { n: 'Bromtimol biru', lo: 6.0, hi: 7.6, wLo: 0xd8d040, wHi: 0x2a6ad0, nLo: 'kuning', nHi: 'biru' },
+    { n: 'Indikator universal', lo: 0, hi: 14, wLo: 0xd02020, wHi: 0x30107a, nLo: 'merah', nHi: 'ungu' }
+  ];
 
-  /** pH larutan setelah volume titran tertentu ditambahkan. */
-  function pHpada(sim, V) {
-    const Pg = pasanganAktif(sim);
-    const Ma = sim.get('Ma'), Va = sim.get('Va'), Mt = sim.get('Mt');
-    const molA = Ma * Va / 1000;
-    const molT = Mt * V / 1000;
-    const Vtot = (Va + V) / 1000;
-    if (Vtot <= 0) return 7;
+  function analit(s) { return ANALIT[parseInt(s.get('a'), 10) || 0]; }
+  function indikator(s) { return INDIKATOR[parseInt(s.get('ind'), 10) || 0]; }
+  function asamDiLabu(s) { const j = analit(s).jenis; return j === 'ak' || j === 'al'; }
 
-    if (!Pg.basa) {
-      // asam dititrasi basa
-      if (Pg.analitKuat) {
-        if (molT < molA) return -Math.log10(Math.max((molA - molT) / Vtot, 1e-14));
-        if (Math.abs(molT - molA) < 1e-12) return 7;
-        return 14 + Math.log10(Math.max((molT - molA) / Vtot, 1e-14));
+  /* pH larutan setelah Vb mL titran ditambahkan */
+  function pH(s, Vt) {
+    const a = analit(s);
+    const Ca = s.get('ca'), Va = s.get('va');
+    const Ct = s.get('ct');
+    const na = Ca * Va / 1000;
+    const nt = Ct * Vt / 1000;
+    const V = (Va + Vt) / 1000;
+    let H;
+
+    if (asamDiLabu(s)) {
+      // asam dalam labu, titran basa kuat
+      if (a.jenis === 'ak') {
+        if (na > nt) H = (na - nt) / V;
+        else if (nt > na) H = KW / ((nt - na) / V);
+        else H = 1e-7;
+      } else {
+        if (nt <= 1e-12) {
+          H = (-a.ka + Math.sqrt(a.ka * a.ka + 4 * a.ka * (na / V))) / 2;
+        } else if (nt < na * 0.9999) {
+          H = a.ka * (na - nt) / nt;
+        } else if (Math.abs(nt - na) / na < 0.0001) {
+          const cs = na / V;
+          const OH = Math.sqrt(KW / a.ka * cs);
+          H = KW / OH;
+        } else {
+          H = KW / ((nt - na) / V);
+        }
       }
-      // asam lemah
-      if (molT <= 1e-12) return C.pHAsam(molA / Vtot, Pg.Ka, 1);
-      if (molT < molA) {
-        return C.pHBuffer((molA - molT) / Vtot, molT / Vtot, Pg.Ka);
+    } else {
+      // basa dalam labu, titran asam kuat
+      let OH;
+      if (a.jenis === 'bk') {
+        if (na > nt) OH = (na - nt) / V;
+        else if (nt > na) OH = KW / ((nt - na) / V);
+        else OH = 1e-7;
+      } else {
+        if (nt <= 1e-12) {
+          OH = (-a.kb + Math.sqrt(a.kb * a.kb + 4 * a.kb * (na / V))) / 2;
+        } else if (nt < na * 0.9999) {
+          OH = a.kb * (na - nt) / nt;
+        } else if (Math.abs(nt - na) / na < 0.0001) {
+          const cs = na / V;
+          OH = KW / Math.sqrt(KW / a.kb * cs);
+        } else {
+          OH = KW / ((nt - na) / V);
+        }
       }
-      if (Math.abs(molT - molA) < 1e-9) {
-        // hidrolisis garam basa konjugasi
-        const Kb = C.Kw / Pg.Ka;
-        const Cg = molA / Vtot;
-        return 14 + Math.log10(Math.max(Math.sqrt(Kb * Cg), 1e-14));
+      H = KW / Math.max(1e-15, OH);
+    }
+    return S.clamp(-Math.log10(S.clamp(H, 1e-15, 10)), 0, 14);
+  }
+
+  function volumeEkuivalen(s) {
+    return s.get('ca') * s.get('va') / Math.max(0.0001, s.get('ct'));
+  }
+
+  /* warna larutan menurut indikator pada pH tertentu */
+  function warnaLarutan(s, p) {
+    const ind = indikator(s);
+    if (ind.n === 'Indikator universal') {
+      const titik = [
+        [0, 0xd02020], [2, 0xe85a20], [4, 0xf0a030], [6, 0xd8d040],
+        [7, 0x60c860], [8, 0x40b8a0], [10, 0x3878d0], [12, 0x5030b0], [14, 0x30107a]
+      ];
+      for (let i = 0; i < titik.length - 1; i++) {
+        if (p <= titik[i + 1][0]) {
+          const u = (p - titik[i][0]) / (titik[i + 1][0] - titik[i][0]);
+          return { warna: new T.Color(titik[i][1]).lerp(new T.Color(titik[i + 1][1]), u), jernih: 0 };
+        }
       }
-      return 14 + Math.log10(Math.max((molT - molA) / Vtot, 1e-14));
+      return { warna: new T.Color(0x30107a), jernih: 0 };
     }
-
-    // basa dititrasi asam
-    if (Pg.analitKuat) {
-      if (molT < molA) return 14 + Math.log10(Math.max((molA - molT) / Vtot, 1e-14));
-      if (Math.abs(molT - molA) < 1e-12) return 7;
-      return -Math.log10(Math.max((molT - molA) / Vtot, 1e-14));
+    const u = S.clamp((p - ind.lo) / (ind.hi - ind.lo), 0, 1);
+    if (ind.wLo === null) {
+      // tak berwarna → berwarna: pudarkan sekaligus warnanya, bukan hanya kepekatannya,
+      // supaya bentuk asamnya benar-benar terlihat bening
+      return {
+        warna: new T.Color(0xeaf2f6).lerp(new T.Color(ind.wHi), u),
+        jernih: 1 - u
+      };
     }
-    if (molT <= 1e-12) return C.pHBasa(molA / Vtot, Pg.Kb, 1);
-    if (molT < molA) {
-      const pOH = C.pHBuffer((molA - molT) / Vtot, molT / Vtot, Pg.Kb);
-      return 14 - pOH;
-    }
-    if (Math.abs(molT - molA) < 1e-9) {
-      const Ka = C.Kw / Pg.Kb;
-      const Cg = molA / Vtot;
-      return -Math.log10(Math.max(Math.sqrt(Ka * Cg), 1e-14));
-    }
-    return -Math.log10(Math.max((molT - molA) / Vtot, 1e-14));
+    return { warna: new T.Color(ind.wLo).lerp(new T.Color(ind.wHi), u), jernih: 0 };
   }
 
-  function Vekiv(sim) {
-    return sim.get('Ma') * sim.get('Va') / sim.get('Mt');
+  /* Rentang lonjakan pH di sekitar titik ekuivalen (±0,1 % dari V ekuivalen).
+     Indikator dinilai cocok bila rentang peralihannya memotong lonjakan ini. */
+  function lonjakan(s) {
+    const Vek = volumeEkuivalen(s);
+    const a = pH(s, Vek * 0.999);
+    const b = pH(s, Vek * 1.001);
+    return { bawah: Math.min(a, b), atas: Math.max(a, b) };
   }
 
-  function siapkan(sim) {
-    sim.data.V = 0;
-    sim.data.mengalir = false;
-    sim.data.kurva = [];
-    sim.data.tetes = [];
-    rekam(sim);
-  }
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 11.5, phi: 1.0, theta: 0.58, targetY: 2.2, lajuPutar: 0.08 },
 
-  function rekam(sim) {
-    sim.data.kurva.push([sim.data.V, pHpada(sim, sim.data.V)]);
-  }
-
-  Sim.create({
-    title: 'Titrasi Asam-Basa dan Kurva Titrasi',
-    subtitle: 'Titrasi menentukan konsentrasi larutan yang tidak diketahui. Kurvanya mendatar di awal, melonjak tajam di titik ekuivalen, lalu mendatar lagi.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Titrasi', 'Stoikiometri', 'Indikator'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Rancangan titrasi',
-        items: [
-          { type: 'select', id: 'pasangan', value: 'kk', label: 'Jenis titrasi',
-            options: PASANGAN.map(function (p) { return { value: p.id, label: p.n }; }) },
-          { type: 'slider', id: 'Ma', value: 0.1, min: 0.02, max: 0.5, step: 0.01,
-            label: 'Konsentrasi analit', unit: 'M', dec: 2 },
-          { type: 'slider', id: 'Va', value: 25, min: 10, max: 50, step: 5,
-            label: 'Volume analit', unit: 'mL', dec: 0 },
-          { type: 'slider', id: 'Mt', value: 0.1, min: 0.02, max: 0.5, step: 0.01,
-            label: 'Konsentrasi titran', unit: 'M', dec: 2 }
-        ]
-      },
-      {
-        title: 'Jalankan titrasi',
-        items: [
-          { type: 'buttons', label: '', items: [
-            { label: '▼ Alirkan titran', primary: true, onClick: function (sim) {
-              sim.data.mengalir = true;
-            } },
-            { label: '■ Hentikan', onClick: function (sim) { sim.data.mengalir = false; } },
-            { label: '↺ Ulangi', onClick: function (sim) { siapkan(sim); } }
-          ] },
-          { type: 'slider', id: 'kecepatan', value: 1, min: 0.2, max: 4, step: 0.2,
-            label: 'Kecepatan penetesan', unit: '×', dec: 1 }
-        ]
-      },
-      {
-        title: 'Indikator',
-        items: [
-          { type: 'select', id: 'indikator', value: 'fenolftalein', label: 'Pilih indikator',
-            options: ['fenolftalein', 'bromtimol', 'metil-jingga', 'lakmus'].map(function (k) {
-              return { value: k, label: C.INDIKATOR[k].nama }; }) },
-          { type: 'toggle', id: 'trayek', value: true, label: 'Tampilkan trayek indikator' }
-        ]
-      }
+    kendali: [
+      { judul: 'Larutan dalam labu', isi: [
+        { type: 'select', id: 'a', value: 0, label: 'Zat yang dititrasi',
+          options: ANALIT.map(function (a, i) { return { value: i, label: a.n }; }) },
+        { type: 'slider', id: 'ca', value: 0.1, min: 0.01, max: 1, step: 0.01,
+          label: 'Konsentrasi analit', unit: ' M', dec: 2 },
+        { type: 'slider', id: 'va', value: 25, min: 10, max: 50, step: 1,
+          label: 'Volume analit', unit: ' mL', dec: 0 }
+      ]},
+      { judul: 'Titran di buret', isi: [
+        { type: 'slider', id: 'ct', value: 0.1, min: 0.01, max: 1, step: 0.01,
+          label: 'Konsentrasi titran', unit: ' M', dec: 2 },
+        { type: 'slider', id: 'v', value: 0, min: 0, max: 60, step: 0.05,
+          label: 'Volume titran yang keluar', unit: ' mL', dec: 2 },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Teteskan', utama: true, klik: function (s) { s.data.tetes = 1; } },
+          { label: '≫ Alirkan cepat', klik: function (s) { s.data.tetes = 4; } },
+          { label: '⏸ Tutup keran', klik: function (s) { s.data.tetes = 0; } },
+          { label: '↺ Ulangi', klik: function (s) { s.set('v', 0); s.data.tetes = 0; } }
+        ]}
+      ]},
+      { judul: 'Indikator & panel', isi: [
+        { type: 'select', id: 'ind', value: 0, label: 'Indikator',
+          options: INDIKATOR.map(function (i, k) { return { value: k, label: i.n }; }) },
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan kurva titrasi' },
+        { type: 'toggle', id: 'aduk', value: true, label: 'Pengaduk magnet berputar' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'volume', label: 'Volume titran', tone: 'accent' },
-      { id: 'ph', label: 'pH larutan' },
-      { id: 'ekiv', label: 'Titik ekuivalen' },
-      { id: 'hasil', label: 'Konsentrasi terhitung' }
+    baca: [
+      { id: 'ph', label: 'pH sekarang', tone: 'aksen' },
+      { id: 'vol', label: 'Volume titran' },
+      { id: 'ek', label: 'Volume ekuivalen' },
+      { id: 'phek', label: 'pH titik ekuivalen' },
+      { id: 'warna', label: 'Warna larutan' },
+      { id: 'saran', label: 'Kecocokan indikator' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) {
-      if (id !== 'indikator' && id !== 'trayek' && id !== 'kecepatan') siapkan(sim);
-    },
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9, warna: 0x0b1118 }));
 
-    update: function (sim, dt) {
-      const Ve = Vekiv(sim);
-      if (sim.data.mengalir) {
-        // melambat drastis di sekitar titik ekuivalen agar lonjakan terlihat
-        const dekat = Math.abs(sim.data.V - Ve) < Ve * 0.08;
-        const laju = sim.get('kecepatan') * (dekat ? 0.9 : 6);
-        sim.data.V += laju * dt;
-        if (sim.data.V > Ve * 2.2) { sim.data.V = Ve * 2.2; sim.data.mengalir = false; }
-        rekam(sim);
-        if (Math.random() < dt * 14) sim.data.tetes.push({ y: 0, v: 0 });
-      }
-      sim.data.tetes.forEach(function (t) { t.v += 520 * dt; t.y += t.v * dt; });
-      sim.data.tetes = sim.data.tetes.filter(function (t) { return t.y < 150; });
-    },
-
-    draw: function (c, sim) {
-      const Pg = pasanganAktif(sim);
-      const V = sim.data.V;
-      const pH = pHpada(sim, V);
-      const Ve = Vekiv(sim);
-      const ind = sim.get('indikator');
-      const warnaL = C.warnaIndikator(ind, pH);
+      /* ---------- statif ---------- */
+      const kaki = new T.Mesh(new T.BoxGeometry(2.2, 0.2, 1.4),
+        new T.MeshStandardMaterial({ color: 0x222b33, roughness: 0.6, metalness: 0.3 }));
+      kaki.position.set(-1.6, 0.1, -0.4);
+      kaki.receiveShadow = true;
+      s.tambah(kaki);
+      const tiang = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 7.0, 18), S.matLogam(0x98a4b0));
+      tiang.position.set(-2.4, 3.6, -0.4);
+      s.tambah(tiang);
+      const lengan = new T.Mesh(new T.BoxGeometry(1.6, 0.1, 0.14), S.matLogam(0x98a4b0));
+      lengan.position.set(-1.7, 5.4, -0.4);
+      s.tambah(lengan);
 
       /* ---------- buret ---------- */
-      const BX = 110, BY = 60, BH = 190;
-      const isiBuret = Sim.clamp(1 - V / (Ve * 2.4), 0, 1);
-      D.roundRect(c, BX - 11, BY, 22, BH, 4, 'rgba(255,255,255,.05)', 'rgba(255,255,255,.3)', 1.6);
-      D.roundRect(c, BX - 9, BY + BH - BH * isiBuret, 18, BH * isiBuret, 3,
-        D.alpha('#8fd0ff', 0.6));
+      const bur = S.buret({ r: 0.2, h: 3.6, level: 0.9, warna: 0xeaf2f6 });
+      bur.position.set(-1.0, 2.1, 0);
+      s.data.bur = bur;
+      s.tambah(bur);
       // skala buret
-      for (let i = 0; i <= 10; i++) {
-        const y = BY + BH * i / 10;
-        D.line(c, BX + 11, y, BX + (i % 5 === 0 ? 20 : 16), y, 'rgba(255,255,255,.3)', 1.1);
+      for (let i = 0; i <= 12; i++) {
+        const g = new T.Mesh(new T.BoxGeometry(0.1, 0.012, 0.012),
+          new T.MeshBasicMaterial({ color: 0x8d97a1 }));
+        g.position.set(-0.78, 2.6 + i * 0.26, 0.1);
+        s.tambah(g);
       }
-      D.roundRect(c, BX - 5, BY + BH, 10, 18, 2, '#6b7580', 'rgba(255,255,255,.3)', 1.2);
-      D.text(c, Pg.titran, BX, BY - 16,
-        { size: 13, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, Sim.fmt(sim.get('Mt'), 2) + ' M', BX, BY - 34,
-        { size: 11, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-      D.text(c, Sim.fmt(V, 2) + ' mL', BX + 30, BY + BH / 2,
-        { size: 14, weight: 700, color: P.accent2, base: 'middle', mono: true });
-
-      // tetesan
-      sim.data.tetes.forEach(function (t) {
-        D.circle(c, BX, BY + BH + 22 + t.y * 0.45, 3.4, D.alpha('#8fd0ff', 0.9));
-      });
+      const lblB = S.teks('0,00 mL', { skala: 0.26, lebar: 12, warna: '#bfe8ff' });
+      lblB.position.set(-2.0, 4.4, 0.3);
+      s.data.lblB = lblB;
+      s.tambah(lblB);
 
       /* ---------- labu erlenmeyer ---------- */
-      const EX = BX, EY = BY + BH + 86, EW = 108, EH = 92;
-      const isi = Sim.clamp(0.5 + V / 120, 0.4, 0.92);
-      c.save();
-      c.beginPath();
-      c.moveTo(EX - 14, EY - 36); c.lineTo(EX + 14, EY - 36);
-      c.lineTo(EX + EW / 2, EY + EH); c.lineTo(EX - EW / 2, EY + EH);
-      c.closePath();
-      c.clip();
-      c.fillStyle = D.alpha(warnaL, 0.85);
-      c.fillRect(EX - EW / 2, EY + EH - EH * isi, EW, EH * isi);
-      c.restore();
-      c.beginPath();
-      c.moveTo(EX - 14, EY - 36); c.lineTo(EX + 14, EY - 36);
-      c.lineTo(EX + EW / 2, EY + EH); c.lineTo(EX - EW / 2, EY + EH);
-      c.closePath();
-      c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 2.2; c.stroke();
+      const labu = S.labu({ r: 1.3, h: 2.3, level: 0.42, warna: 0xeaf2f6 });
+      labu.position.set(-1.0, 0.42, 0);
+      s.data.labu = labu;
+      s.tambah(labu);
 
-      D.text(c, Pg.analit, EX, EY + EH + 22,
-        { size: 13, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, Sim.fmt(sim.get('Va'), 0) + ' mL  ·  pH ' + Sim.fmt(pH, 2), EX, EY + EH + 40,
-        { size: 11.5, weight: 600, color: P.dim, align: 'c', base: 'middle' });
+      // alas pengaduk magnet
+      const alas = new T.Mesh(new T.BoxGeometry(2.4, 0.42, 2.0),
+        new T.MeshStandardMaterial({ color: 0x252f38, roughness: 0.5, metalness: 0.3 }));
+      alas.position.set(-1.0, 0.21, 0);
+      alas.receiveShadow = true;
+      s.tambah(alas);
+      const lampu = new T.Mesh(S.geoBola(14),
+        new T.MeshStandardMaterial({ color: 0x9fe8ad, emissive: 0x9fe8ad, emissiveIntensity: 1 }));
+      lampu.scale.setScalar(0.06);
+      lampu.position.set(-0.1, 0.44, 0.9);
+      s.tambah(lampu);
 
-      // penanda titik akhir
-      const indInfo = C.INDIKATOR[ind];
-      const berubah = pH >= indInfo.lo && pH <= indInfo.hi;
-      if (berubah || (pH > indInfo.hi && V > 0)) {
-        D.roundRect(c, EX - 62, EY + EH + 52, 124, 24, 12,
-          'rgba(240,169,74,.18)', P.amber, 1.4);
-        D.text(c, berubah ? 'perubahan warna!' : 'titik akhir terlewati',
-          EX, EY + EH + 64,
-          { size: 11.5, weight: 700, color: P.amber, align: 'c', base: 'middle' });
+      // batang magnet berputar
+      const magnet = new T.Mesh(new T.BoxGeometry(0.42, 0.08, 0.1),
+        new T.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.3 }));
+      magnet.position.set(-1.0, 0.5, 0);
+      s.data.magnet = magnet;
+      s.tambah(magnet);
+
+      // pusaran cairan
+      const pusar = S.partikel(60, { r: 0.055, warna: 0xffffff, kotak: { x: 1, y: 0.3, z: 1 } });
+      pusar.material.transparent = true;
+      pusar.material.opacity = 0.3;
+      pusar.position.set(-1.0, 0.85, 0);
+      s.data.pusar = pusar;
+      s.tambah(pusar);
+      s.data.sudut = [];
+      for (let i = 0; i < 60; i++) {
+        s.data.sudut.push({ a: Math.random() * Math.PI * 2, r: 0.2 + Math.random() * 0.75,
+          y: S.acak(-0.25, 0.25), v: 1 + Math.random() });
       }
 
-      /* ---------- kurva titrasi ---------- */
-      const g = { x: 300, y: 80, w: 460, h: 300 };
-      const map = Plot.axes(c, {
-        x: g.x, y: g.y, w: g.w, h: g.h,
-        xmin: 0, xmax: Math.max(Ve * 2.2, 5), ymin: 0, ymax: 14,
-        xlabel: 'volume titran (mL)', ylabel: 'pH',
-        judul: 'Kurva titrasi', yticks: 7, xticks: 6
-      });
-
-      // trayek indikator
-      if (sim.get('trayek')) {
-        map.clip(c);
-        c.fillStyle = D.alpha(P.amber, 0.12);
-        c.fillRect(map.x, map.sy(indInfo.hi), map.w, map.sy(indInfo.lo) - map.sy(indInfo.hi));
-        map.unclip(c);
-        D.text(c, indInfo.nama + '  ' + Sim.fmt(indInfo.lo, 1) + '–' + Sim.fmt(indInfo.hi, 1),
-          map.x + 8, map.sy((indInfo.lo + indInfo.hi) / 2),
-          { size: 10.5, weight: 700, color: P.amber, base: 'middle' });
+      /* ---------- tetesan dari buret ---------- */
+      const tetes = [];
+      for (let i = 0; i < 6; i++) {
+        const m = new T.Mesh(S.geoBola(12),
+          new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, transmission: 0.8,
+            transparent: true, opacity: 0.8, thickness: 0.1 }));
+        m.scale.set(0.07, 0.1, 0.07);
+        m.visible = false;
+        s.tambah(m);
+        tetes.push({ m: m, y: 9 });
       }
+      s.data.tetesan = tetes;
 
-      // kurva teoretis penuh (samar)
-      const penuh = [];
-      for (let v = 0; v <= Ve * 2.2; v += Ve * 2.2 / 300) {
-        penuh.push([v, pHpada(sim, v)]);
-      }
-      Plot.line(c, map, penuh, { color: 'rgba(255,255,255,.18)', lw: 1.4, dash: [4, 4] });
+      /* ---------- panel kurva ---------- */
+      const g1 = S.panelGrafik({ w: 4.6, px: 760, py: 470 });
+      g1.position.set(3.0, 3.4, -1.3);
+      s.data.g1 = g1;
+      s.tambah(g1);
 
-      // kurva yang sudah dilalui
-      Plot.line(c, map, sim.data.kurva, { color: P.accent, lw: 2.6 });
+      const lbl = S.teks('', { skala: 0.38, lebar: 38, warna: '#d8e4ec' });
+      lbl.position.set(-1.0, 5.1, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
 
-      // titik ekuivalen
-      Plot.acuan(c, map, { x: Ve, color: P.rose, label: 'V ekuivalen' });
-      Plot.titik(c, map, Ve, Pg.pHEkiv, { r: 5, color: P.rose, halo: true,
-        label: 'pH ' + Sim.fmt(Pg.pHEkiv, 1) });
-
-      // posisi sekarang
-      if (V > 0) {
-        Plot.titik(c, map, V, pH, { r: 5, color: '#ffffff', halo: true });
-      }
-
-      /* ---------- perhitungan ---------- */
-      const HX = 300, HY = 420;
-      D.roundRect(c, HX, HY, 230, 152, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PERHITUNGAN TITRASI', HX + 16, HY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, 'Ma × Va × va = Mb × Vb × vb', HX + 16, HY + 44,
-        { size: 12.5, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      const rows = [
-        ['Volume analit (Va)', Sim.fmt(sim.get('Va'), 0) + ' mL'],
-        ['Konsentrasi titran', Sim.fmt(sim.get('Mt'), 2) + ' M'],
-        ['Volume ekuivalen', Sim.fmt(Ve, 2) + ' mL'],
-        ['Mol analit', Sim.sci(sim.get('Ma') * sim.get('Va') / 1000, 2) + ' mol']
-      ];
-      rows.forEach(function (r, i) {
-        const y = HY + 70 + i * 20;
-        D.text(c, r[0], HX + 16, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        D.text(c, r[1], HX + 214, y,
-          { size: 11, weight: 650, color: P.dim, align: 'r', base: 'middle', mono: true });
-      });
-      D.line(c, HX + 16, HY + 154 - 18, HX + 214, HY + 154 - 18, 'rgba(255,255,255,.14)', 1);
-      D.text(c, 'Ma = ' + Sim.fmt(sim.get('Mt') * Ve / sim.get('Va'), 3) + ' M',
-        HX + 16, HY + 146, { size: 13, weight: 700, color: P.accent2, base: 'middle', mono: true });
-
-      /* ---------- empat tahap kurva ---------- */
-      const TX = 548, TW = 212;
-      D.roundRect(c, TX, HY, TW, 152, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'EMPAT TAHAP KURVA', TX + 16, HY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      const tahap = [
-        ['Awal', 'pH ditentukan analit saja'],
-        ['Sebelum ekuivalen', Pg.analitKuat ? 'sisa analit menentukan pH' : 'terbentuk larutan penyangga'],
-        ['Titik ekuivalen', 'mol asam = mol basa, lonjakan tajam'],
-        ['Setelah ekuivalen', 'kelebihan titran menentukan pH']
-      ];
-      const tahapAktif = V < 0.02 ? 0 : V < Ve * 0.97 ? 1 : V < Ve * 1.03 ? 2 : 3;
-      tahap.forEach(function (t, i) {
-        const y = HY + 44 + i * 28;
-        const aktif = i === tahapAktif;
-        if (aktif) D.roundRect(c, TX + 10, y - 12, TW - 20, 26, 5, 'rgba(79,209,192,.12)');
-        D.text(c, (i + 1) + '. ' + t[0], TX + 18, y - 3,
-          { size: 11, weight: 700, color: aktif ? P.accent2 : P.dim, base: 'middle' });
-        D.text(c, t[1], TX + 18, y + 10,
-          { size: 10, weight: 500, color: P.faint, base: 'middle' });
-      });
-
-      /* ---------- indikator yang sesuai ---------- */
-      const cocok = Pg.indikator.indexOf(ind) >= 0;
-      D.roundRect(c, 40, 560, 240, 28, 8,
-        cocok ? 'rgba(111,207,127,.14)' : 'rgba(239,106,82,.14)',
-        cocok ? P.green : P.red, 1.3);
-      D.text(c, cocok ? '✓ Indikator ini sesuai' : '✗ Indikator kurang sesuai',
-        56, 574, { size: 11.5, weight: 700, color: cocok ? P.green : P.red, base: 'middle' });
+      s.data.tetes = 0;
+      s.data.jejak = [];
+      pasang(s);
     },
 
-    readoutsUpdate: function (sim) {
-      const V = sim.data.V;
-      const Ve = Vekiv(sim);
-      sim.readout('volume', Sim.fmt(V, 2) + '<span class="unit"> mL</span>');
-      sim.readout('ph', Sim.fmt(pHpada(sim, V), 2));
-      sim.readout('ekiv', Sim.fmt(Ve, 2) + '<span class="unit"> mL</span>');
-      sim.readout('hasil', Sim.fmt(sim.get('Mt') * Ve / sim.get('Va'), 3) + '<span class="unit"> M</span>');
+    ubah: function (s, id) {
+      if (id === 'a' || id === 'ca' || id === 'va' || id === 'ct') { s.set('v', 0); pasang(s); }
+      if (id === 'ind') pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'v') rekam(s);
+      perbaruiWarna(s);
+      gambar(s);
     },
 
-    notes: `
-      <p>Titrasi adalah cara menentukan konsentrasi larutan yang tidak diketahui
-      (<strong>analit</strong>) dengan menambahkan larutan yang konsentrasinya sudah
-      diketahui (<strong>titran</strong>) sedikit demi sedikit sampai tepat habis bereaksi.</p>
-
-      <h3>Dasar perhitungan</h3>
-      <span class="formula">mol H⁺ = mol OH⁻
-Ma × Va × va = Mb × Vb × vb
-<span class="cmt">// va dan vb adalah valensi asam dan basa</span></span>
-
-      <h3>Dua titik yang sering tertukar</h3>
-      <ul>
-        <li><strong>Titik ekuivalen</strong> — titik teoretis saat mol asam tepat sama
-            dengan mol basa.</li>
-        <li><strong>Titik akhir titrasi</strong> — titik saat indikator berubah warna,
-            yaitu yang benar-benar kita amati.</li>
-      </ul>
-      <p>Indikator yang tepat adalah indikator yang titik akhirnya <strong>sedekat mungkin
-      dengan titik ekuivalen</strong>, sehingga kesalahan titrasi menjadi kecil.</p>
-
-      <h3>Empat tahap kurva titrasi</h3>
-      <ol>
-        <li><strong>Sebelum penambahan</strong> — pH ditentukan oleh analit saja.</li>
-        <li><strong>Menuju ekuivalen</strong> — pH naik perlahan. Pada asam lemah, daerah
-            ini membentuk <strong>larutan penyangga</strong> sehingga kurvanya sangat landai.</li>
-        <li><strong>Titik ekuivalen</strong> — pH melonjak tajam hanya dengan satu-dua tetes.</li>
-        <li><strong>Setelah ekuivalen</strong> — pH ditentukan kelebihan titran, kurva
-            mendatar lagi.</li>
-      </ol>
-
-      <h3>pH di titik ekuivalen tidak selalu 7</h3>
-      <table>
-        <thead><tr><th>Jenis titrasi</th><th>pH ekuivalen</th><th>Indikator yang cocok</th></tr></thead>
-        <tbody>
-          <tr><td>Asam kuat + basa kuat</td><td>7 (netral)</td><td>PP, BTB, MO</td></tr>
-          <tr><td>Asam lemah + basa kuat</td><td>&gt; 7 (basa)</td><td>fenolftalein</td></tr>
-          <tr><td>Basa lemah + asam kuat</td><td>&lt; 7 (asam)</td><td>metil jingga</td></tr>
-        </tbody>
-      </table>
-
-      <p>Penyebabnya adalah <strong>hidrolisis garam</strong> yang terbentuk. Titrasi
-      asam asetat dengan NaOH menghasilkan natrium asetat, yaitu garam dari asam lemah
-      dan basa kuat, yang terhidrolisis menghasilkan larutan bersifat basa.</p>
-
-      <h3>Mengapa fenolftalein tidak cocok untuk basa lemah?</h3>
-      <p>Trayek fenolftalein adalah pH 8,3–10,0. Pada titrasi NH₃ dengan HCl, titik
-      ekuivalennya berada di sekitar pH 5,3. Fenolftalein sudah berubah warna jauh
-      sebelum titik ekuivalen tercapai, sehingga hasil titrasinya salah besar.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Mengapa lonjakannya begitu tajam?</strong>
-        Di dekat titik ekuivalen hampir semua asam sudah habis. Satu tetes titran
-        berikutnya tidak lagi dinetralkan oleh apa pun, sehingga langsung mengubah
-        konsentrasi H⁺ ribuan kali lipat.
-      </div>
-    `,
-
-    explore: [
-      'Jalankan titrasi <strong>asam kuat–basa kuat</strong>. Pada volume berapa kurvanya melonjak? Bandingkan dengan V ekuivalen.',
-      'Ganti ke <strong>asam lemah–basa kuat</strong>. Perhatikan daerah landai di awal — itulah daerah penyangga.',
-      'Pada titrasi basa lemah, pilih indikator <strong>fenolftalein</strong>. Perhatikan peringatan yang muncul. Mengapa tidak sesuai?',
-      'Ubah konsentrasi titran dari 0,1 M ke 0,2 M. Bagaimana volume ekuivalennya berubah?'
-    ],
-
-    quiz: [
-      {
-        q: 'Sebanyak 25 mL larutan HCl dititrasi dengan NaOH 0,1 M dan memerlukan 20 mL untuk mencapai titik ekuivalen. Konsentrasi HCl adalah…',
-        options: ['0,08 M', '0,10 M', '0,125 M', '0,20 M'],
-        answer: 0,
-        explain: 'Ma × Va = Mb × Vb → Ma × 25 = 0,1 × 20 → Ma = 2/25 = 0,08 M.'
-      },
-      {
-        q: 'Mengapa pH titik ekuivalen titrasi asam lemah dengan basa kuat lebih besar dari 7?',
-        options: [
-          'Karena basa kuat berlebih',
-          'Karena garam yang terbentuk terhidrolisis menghasilkan ion OH⁻',
-          'Karena asam lemah tidak habis bereaksi',
-          'Karena indikatornya salah'
-        ],
-        answer: 1,
-        explain: 'Garam yang terbentuk berasal dari asam lemah dan basa kuat. Anion sisa asam lemah bereaksi dengan air (hidrolisis) menghasilkan OH⁻, sehingga larutan bersifat basa.'
-      },
-      {
-        q: 'Perbedaan antara titik ekuivalen dan titik akhir titrasi adalah…',
-        options: [
-          'Keduanya sama persis',
-          'Titik ekuivalen adalah titik teoretis, titik akhir adalah saat indikator berubah warna',
-          'Titik akhir selalu lebih dulu tercapai',
-          'Titik ekuivalen hanya ada pada asam kuat'
-        ],
-        answer: 1,
-        explain: 'Titik ekuivalen adalah keadaan mol asam tepat sama dengan mol basa. Titik akhir adalah yang teramati lewat perubahan warna indikator. Pemilihan indikator yang tepat membuat keduanya hampir berimpit.'
-      },
-      {
-        q: 'Pada titrasi NH₃ dengan HCl, indikator yang paling sesuai adalah…',
-        options: ['Fenolftalein (8,3–10,0)', 'Metil jingga (3,1–4,4)', 'Lakmus (5,0–8,0)', 'Semua sama baiknya'],
-        answer: 1,
-        explain: 'Titik ekuivalen titrasi basa lemah dengan asam kuat berada di daerah asam, sekitar pH 5. Metil jingga dengan trayek 3,1–4,4 paling mendekati, sedangkan fenolftalein akan berubah jauh terlalu awal.'
+    langkah: function (s, dt) {
+      // keran mengalirkan titran
+      if (s.data.tetes > 0) {
+        const v = Math.min(60, s.get('v') + dt * s.data.tetes * 0.9);
+        s.setDiam('v', v);
+        rekam(s);
+        perbaruiWarna(s);
+        gambar(s);
+        if (v >= 60) s.data.tetes = 0;
       }
-    ]
-  });
-})();
+      const V = s.get('v');
+
+      // sisa titran di buret
+      s.data.bur.userData.setLevel(S.clamp(0.9 - V / 60 * 0.85, 0.02, 0.9));
+      s.data.bur.userData.keranPeg.rotation.x = s.data.tetes > 0 ? 1.2 : 0;
+      s.data.lblB.userData.ganti(S.fmt(V, 2) + ' mL');
+
+      // tinggi larutan di labu bertambah
+      const lv = S.clamp(0.42 + V / 60 * 0.3, 0.42, 0.78);
+      const w = warnaLarutan(s, pH(s, V));
+      s.data.labu.userData.setLevel(lv, w.warna.getHex());
+
+      // tetesan jatuh
+      s.data.tetesan.forEach(function (t, i) {
+        if (s.data.tetes > 0 && t.y > 8) {
+          if (Math.random() < dt * s.data.tetes * 2.2) t.y = 2.1;
+        }
+        if (t.y < 8) {
+          t.y -= dt * 4.2;
+          t.m.visible = true;
+          t.m.position.set(-1.0, t.y, 0);
+          if (t.y < 0.95) { t.y = 9; t.m.visible = false; }
+        } else t.m.visible = false;
+      });
+
+      // pengaduk magnet
+      if (s.get('aduk')) {
+        s.data.magnet.rotation.y += dt * 14;
+        const d = s.data.pusar.userData.p;
+        for (let i = 0; i < d.length; i++) {
+          const q = s.data.sudut[i];
+          q.a += dt * (2.4 / (0.3 + q.r)) * q.v;
+          d[i].pos.set(Math.cos(q.a) * q.r, q.y, Math.sin(q.a) * q.r);
+          d[i].aktif = true;
+        }
+        s.data.pusar.userData.tulis();
+        s.data.pusar.position.y = 0.42 + lv * 0.8;
+      }
+      s.data.pusar.visible = s.get('aduk');
+    },
+
+    bacaUbah: function (s) {
+      const V = s.get('v');
+      const p = pH(s, V);
+      const Vek = volumeEkuivalen(s);
+      const pek = pH(s, Vek);
+      const ind = indikator(s);
+      const w = warnaLarutan(s, p);
+      const u = S.clamp((p - ind.lo) / (ind.hi - ind.lo), 0, 1);
+
+      s.baca('ph', S.fmt(p, 2), p < 6 ? 'danger' : p > 8 ? 'biru' : 'aksen');
+      s.baca('vol', S.fmt(V, 2) + ' mL' + (s.data.tetes > 0 ? ' — keran terbuka' : ''));
+      s.baca('ek', S.fmt(Vek, 2) + ' mL'
+        + (Math.abs(V - Vek) < 0.1 ? '  ← tercapai!' : ''),
+        Math.abs(V - Vek) < 0.1 ? 'aksen' : undefined);
+      s.baca('phek', S.fmt(pek, 2) + '  (' + (pek > 7.5 ? 'basa' : pek < 6.5 ? 'asam' : 'netral') + ')');
+      s.baca('warna', ind.wLo === null
+        ? (u < 0.15 ? ind.nLo : u > 0.85 ? ind.nHi : 'mulai ' + ind.nHi)
+        : (u < 0.15 ? ind.nLo : u > 0.85 ? ind.nHi : 'peralihan ' + ind.nLo + ' → ' + ind.nHi));
+      // indikator cocok bila rentang peralihannya jatuh di dalam lonjakan pH
+      const lj = lonjakan(s);
+      const cocok = ind.hi >= lj.bawah && ind.lo <= lj.atas;
+      s.baca('saran', ind.n === 'Indikator universal'
+        ? 'Dipakai untuk memperkirakan pH, bukan titik akhir yang tajam'
+        : cocok
+          ? 'Cocok — rentang ' + ind.lo + '–' + ind.hi + ' jatuh di dalam lonjakan pH '
+            + S.fmt(lj.bawah, 1) + '–' + S.fmt(lj.atas, 1)
+          : 'Kurang cocok — rentang ' + ind.lo + '–' + ind.hi + ' di luar lonjakan pH '
+            + S.fmt(lj.bawah, 1) + '–' + S.fmt(lj.atas, 1),
+        ind.n === 'Indikator universal' ? undefined : cocok ? 'aksen' : 'danger');
+      gambar(s);
+    }
+  };
+
+  function perbaruiWarna(s) {
+    const p = pH(s, s.get('v'));
+    const w = warnaLarutan(s, p);
+    s.data.labu.userData.cair.material.color.copy(w.warna);
+    s.data.labu.userData.cair.material.opacity = S.lerp(0.9, 0.18, w.jernih);
+  }
+
+  function rekam(s) {
+    const V = s.get('v');
+    const j = s.data.jejak;
+    if (!j.length || V > j[j.length - 1][0]) j.push([V, pH(s, V)]);
+    if (j.length > 600) j.shift();
+  }
+
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const Vek = volumeEkuivalen(s);
+    const ind = indikator(s);
+    const maksX = Math.max(10, Math.min(60, Vek * 2));
+
+    // kurva teoretis penuh
+    const teori = [];
+    for (let i = 0; i <= 240; i++) {
+      const V = i / 240 * maksX;
+      teori.push([V, pH(s, V)]);
+    }
+    const V = s.get('v');
+
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Kurva titrasi — pH terhadap volume titran',
+      xMin: 0, xMax: maksX, yMin: 0, yMax: 14,
+      xLabel: 'volume titran (mL)', yLabel: 'pH',
+      seri: [
+        { titik: teori, warna: 'rgba(120,140,160,.55)', tebal: 2, putus: true, nama: 'kurva teoretis' },
+        { titik: s.data.jejak.length > 1 ? s.data.jejak : [[0, teori[0][1]], [0.001, teori[0][1]]],
+          warna: '#4fd1c0', tebal: 3.4, nama: 'yang sudah dilalui' }
+      ],
+      garisX: [{ v: Vek, warna: 'rgba(240,208,64,.8)',
+        label: 'V ekuivalen ' + S.fmt(Vek, 1) + ' mL' }],
+      garisY: ind.n === 'Indikator universal' ? [] : [
+        { v: ind.lo, warna: 'rgba(224,64,154,.55)', label: 'rentang ' + ind.n },
+        { v: ind.hi, warna: 'rgba(224,64,154,.55)' }
+      ],
+      titikTebal: [{ x: V, y: pH(s, V), warna: '#ffffff', r: 7 }]
+    });
+  }
+
+  function pasang(s) {
+    const a = analit(s);
+    s.data.jejak = [[0, pH(s, 0)]];
+    s.data.tetes = 0;
+    s.data.bur.userData.setLevel(0.9,
+      asamDiLabu(s) ? 0xdfe8ee : 0xf0e4d8);
+    s.data.labu.userData.setLevel(0.42);
+    perbaruiWarna(s);
+    s.data.g1.visible = s.get('grafik');
+    s.data.lbl.userData.ganti(a.nama + ' dititrasi dengan '
+      + (asamDiLabu(s) ? 'NaOH 0,1 M' : 'HCl 0,1 M').replace('0,1 M', S.fmt(s.get('ct'), 2) + ' M'));
+    gambar(s);
+  }
+})());

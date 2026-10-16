@@ -1,7 +1,12 @@
-# SimKimia
+# SimKimia 3D
 
-Kumpulan **39 simulasi kimia interaktif berbahasa Indonesia** untuk Kurikulum Merdeka,
+**39 simulasi kimia 3D interaktif berbahasa Indonesia** untuk Kurikulum Merdeka,
 dari Fase A (SD kelas 1–2) sampai Fase F (SMA kelas 11–12).
+
+Seluruhnya berjalan di dalam **satu halaman** dengan WebGL (three.js). Tidak ada
+teks penjelasan maupun soal di dalamnya — murni simulasi: panggung 3D, panel kontrol,
+dan angka hasil pengukuran. Berpindah simulasi **tidak keluar dari mode layar penuh**,
+sehingga nyaman dipakai untuk mengajar di depan kelas.
 
 Terinspirasi pendekatan [PhET Interactive Simulations](https://phet.colorado.edu),
 tetapi ditulis dari nol dalam bahasa Indonesia dan dipetakan ke capaian pembelajaran
@@ -11,240 +16,158 @@ Kurikulum Merdeka. SimKimia adalah karya mandiri dan tidak berafiliasi dengan Ph
 
 ## Sorotan
 
-- **39 simulasi** menyeluruh dari Fase A sampai F
-- **Tanpa pemasangan, tanpa akun, tanpa pelacakan** — HTML, CSS, dan JavaScript murni
+- **39 simulasi 3D** menyeluruh dari Fase A sampai F
+- **Mode layar penuh** sejati, dan pemilih simulasi yang bekerja **di dalam** mode itu
+- **Satu halaman (SPA)** — modul simulasi dimuat sesuai kebutuhan, tanpa pindah halaman
+- **Tanpa pemasangan, tanpa akun, tanpa pelacakan** — HTML, CSS, JavaScript murni
 - **Tanpa proses build** — unggah apa adanya ke GitHub Pages, selesai
-- **Berjalan luring** setelah berkasnya ada di komputer, bahkan lewat `file://`
-- **Mode terang dan gelap** mengikuti pengaturan sistem
-- **Dapat dipakai di ponsel** — tata letaknya menyesuaikan lebar layar
-- Setiap halaman memuat panggung interaktif, panel kontrol, penjelasan konsep,
-  ajakan bereksperimen, dan latihan berpembahasan
+- **Berjalan luring**, bahkan ketika dibuka langsung lewat `file://`
+- **three.js disertakan** di `assets/vendor/` — tidak ada permintaan ke internet
+- Kamera orbit penuh: putar, geser, dan zum pada setiap adegan
+- Beberapa simulasi menyertakan panel grafik 3D (kurva titrasi, diagram fase,
+  tingkat energi, kurva peluruhan, dan lainnya)
 
 ---
 
 ## Mencoba secara lokal
 
-Cara tercepat — cukup buka berkasnya:
+Cukup buka berkasnya:
 
 ```bash
-# buka index.html dengan klik ganda, atau:
+# klik ganda index.html, atau:
 open index.html        # macOS
 xdg-open index.html    # Linux
 start index.html       # Windows
 ```
 
-Disarankan memakai server lokal agar perilakunya sama persis dengan di GitHub Pages:
+Boleh juga memakai server lokal agar perilakunya sama persis dengan di GitHub Pages:
 
 ```bash
 python3 -m http.server 8000
 # lalu buka http://localhost:8000
 ```
 
+Perangkat yang dipakai perlu mendukung **WebGL2** — semua peramban modern
+(Chrome, Edge, Firefox, Safari) sudah mendukungnya.
+
 ---
 
 ## Memasang di GitHub Pages
 
 1. Buat repositori baru di GitHub, misalnya `simkimia`.
-2. Unggah seluruh berkas proyek ini:
+2. Unggah seluruh isi folder ini ke cabang `main` (boleh lewat tombol
+   *Add file → Upload files*, atau lewat `git push`).
+3. Buka **Settings → Pages**.
+4. Pada *Source* pilih **Deploy from a branch**, cabang `main`, folder `/ (root)`.
+5. Simpan. Beberapa menit kemudian situsnya hidup di
+   `https://<nama-pengguna>.github.io/simkimia/`.
 
-   ```bash
-   git init
-   git add .
-   git commit -m "SimKimia: 39 simulasi kimia Fase A-F"
-   git branch -M main
-   git remote add origin https://github.com/<nama-pengguna>/simkimia.git
-   git push -u origin main
-   ```
+Tidak ada langkah build, tidak ada dependensi yang perlu dipasang, dan
+`node_modules/` tidak perlu diunggah (hanya dipakai untuk pengujian).
 
-3. Buka **Settings → Pages** pada repositori tersebut.
-4. Pada bagian *Source*, pilih **Deploy from a branch**, cabang `main`, folder `/ (root)`.
-5. Tekan **Save**. Setelah satu sampai dua menit situs tersedia di:
+---
 
-   ```
-   https://<nama-pengguna>.github.io/simkimia/
-   ```
+## Cara memakai
 
-> **Penting:** jangan hapus berkas `.nojekyll` di akar proyek. Berkas kosong itu
-> memberi tahu GitHub Pages agar menyajikan berkas apa adanya tanpa diproses Jekyll.
+**Tetikus / papan sentuh**
 
-Seluruh tautan di dalam proyek bersifat relatif, sehingga situs berjalan baik di
-subfolder (`/simkimia/`) maupun di akar domain.
+| Tindakan | Hasil |
+| --- | --- |
+| Seret | memutar kamera |
+| Roda tetikus | mendekat / menjauh |
+| Shift + seret, atau seret kanan | menggeser titik pandang |
+| Dua jari (sentuh) | zum dan geser |
+
+**Papan tuan (pintasan)**
+
+| Tombol | Fungsi |
+| --- | --- |
+| `F` | masuk / keluar layar penuh |
+| `S` atau `O` | buka pemilih simulasi (tetap di layar penuh) |
+| `←` `→` | simulasi sebelumnya / berikutnya |
+| `Spasi` | jalan / jeda animasi |
+| `C` | sembunyikan panel kontrol |
+| `H` | sembunyikan seluruh antarmuka (tampilan bersih untuk proyektor) |
+| `R` | kembalikan kamera ke posisi awal |
+| `P` | putar kamera otomatis |
+| `Esc` | tutup pemilih (atau buka pemilih bila sedang tertutup) |
+| `Enter` | pilih hasil pencarian pertama di pemilih |
+
+Tautan langsung ke satu simulasi memakai tanda pagar, misalnya
+`index.html#titrasi` atau `.../simkimia/#tabel-periodik`.
 
 ---
 
 ## Daftar simulasi
 
-### Fase A — SD kelas 1–2
-| Simulasi | Topik |
-|---|---|
-| Wujud Benda di Sekitar Kita | Wujud zat, pengamatan |
-| Mengenal Sifat Benda | Sifat materi, massa jenis |
-
-### Fase B — SD kelas 3–4
-| Simulasi | Topik |
-|---|---|
-| Perubahan Wujud Benda | Wujud zat, kalor laten |
-| Larut atau Tidak Larut? | Larutan, kelarutan, kejenuhan |
-| Memilih Bahan yang Tepat | Konduktor, isolator, daya serap |
-
-### Fase C — SD kelas 5–6
-| Simulasi | Topik |
-|---|---|
-| Campuran dan Cara Memisahkannya | Filtrasi, penguapan, magnet |
-| Perubahan Fisika atau Kimia? | Perubahan materi |
-| Asam, Basa, dan Indikator Alami | Asam-basa, indikator |
-
-### Fase D — SMP kelas 7–9
-| Simulasi | Topik |
-|---|---|
-| Partikel Materi: Atom, Molekul, Ion | Partikel penyusun materi |
-| Teori Kinetik: Gerak Partikel dan Suhu | Teori kinetik, tekanan, difusi |
-| Unsur, Senyawa, dan Campuran | Klasifikasi materi |
-| Teknik Pemisahan Campuran | Destilasi, kromatografi, sublimasi |
-| Reaksi Kimia dan Hukum Kekekalan Massa | Hukum Lavoisier |
-| Skala pH dan Kekuatan Asam-Basa | pH, indikator, ion H⁺ |
-
-### Fase E — SMA kelas 10
-| Simulasi | Topik |
-|---|---|
-| Perkembangan Model Atom | Dalton sampai mekanika kuantum |
-| Struktur Atom, Isotop, dan Ion | Proton, neutron, elektron |
-| Konfigurasi Elektron dan Aturan Pengisian | Aufbau, Hund, Pauli |
-| Tabel Periodik dan Keperiodikan Sifat | 118 unsur, peta panas sifat |
-| Ikatan Ion dan Ikatan Kovalen | Struktur Lewis, keelektronegatifan |
-| Bentuk Molekul (VSEPR) dan Kepolaran | Domain elektron, momen dipol |
-| Hukum-Hukum Dasar Kimia | Lavoisier, Proust, Dalton, Gay-Lussac |
-| Konsep Mol dan Stoikiometri | Mol, pereaksi pembatas, tabel MRS |
-| Larutan Elektrolit dan Nonelektrolit | Derajat ionisasi, daya hantar |
-| Reaksi Redoks dan Bilangan Oksidasi | Oksidator, reduktor |
-| Hidrokarbon dan Minyak Bumi | Deret homolog, isomer, distilasi |
-| Kimia Hijau dan Jejak Karbon | Ekonomi atom, keberlanjutan |
-
-### Fase F — SMA kelas 11–12
-| Simulasi | Topik |
-|---|---|
-| Termokimia: Entalpi dan Kalorimetri | ΔH, kalorimeter, hukum Hess |
-| Laju Reaksi dan Faktor-Faktornya | Teori tumbukan, energi aktivasi, orde |
-| Kesetimbangan Kimia dan Le Châtelier | Kc, pergeseran kesetimbangan |
-| Asam-Basa: Teori dan Perhitungan pH | Arrhenius, Brønsted, Lewis, Ka, Kb |
-| Titrasi Asam-Basa dan Kurva Titrasi | Titik ekuivalen, pemilihan indikator |
-| Larutan Penyangga (Buffer) | Henderson-Hasselbalch, kapasitas |
-| Hidrolisis Garam | Empat jenis garam, Kh |
-| Kelarutan dan Hasil Kali Kelarutan | Ksp, Qc, pengendapan |
-| Sifat Koligatif Larutan | ΔTb, ΔTf, osmosis, faktor van 't Hoff |
-| Sistem Koloid | Efek Tyndall, gerak Brown, koagulasi |
-| Sel Volta dan Sel Elektrolisis | E°sel, Nernst, hukum Faraday |
-| Polimer dan Biomolekul | Adisi, kondensasi, uji biomolekul |
-| Kimia Inti dan Peluruhan Radioaktif | Alfa, beta, gama, waktu paruh |
+| Fase | Jenjang | Simulasi |
+| --- | --- | --- |
+| **A** | SD 1–2 | Wujud Benda di Sekitar Kita · Mengenal Sifat Benda |
+| **B** | SD 3–4 | Perubahan Wujud Zat · Larut dan Tak Larut · Sifat Bahan · Campuran dan Pemisahan |
+| **C** | SD 5–6 | Perubahan Fisika dan Kimia · Indikator Alami Asam Basa · Partikel Materi · Teori Kinetik Sederhana |
+| **D** | SMP 7–9 | Unsur, Senyawa, dan Campuran · Pemisahan Campuran Lanjut · Hukum Kekekalan Massa · Skala pH · Model Atom · Struktur Atom |
+| **E** | SMA 10 | Konfigurasi Elektron · Tabel Periodik · Ikatan Kimia · Bentuk Molekul · Hukum Dasar Kimia · Stoikiometri · Larutan Elektrolit · Reaksi Redoks · Hidrokarbon dan Minyak Bumi · Kimia Hijau |
+| **F** | SMA 11–12 | Termokimia · Laju Reaksi · Kesetimbangan Kimia · Teori Asam–Basa · Titrasi · Larutan Penyangga · Hidrolisis Garam · Kelarutan dan Ksp · Sifat Koligatif · Sistem Koloid · Sel Volta dan Elektrolisis · Makromolekul · Kimia Inti |
 
 ---
 
 ## Susunan berkas
 
 ```
-simkimia/
-├── index.html              Halaman katalog dengan penyaring fase, topik, pencarian
-├── panduan.html            Panduan guru dan pemetaan capaian pembelajaran
-├── .nojekyll               Wajib ada untuk GitHub Pages
-├── assets/
-│   ├── css/
-│   │   ├── base.css        Token warna, tipografi, komponen bersama
-│   │   ├── beranda.css     Tata letak halaman katalog
-│   │   └── sim.css         Tata letak halaman simulasi
-│   └── js/
-│       ├── core.js         Kerangka kerja simulasi (kontrol, kanvas, gelung animasi)
-│       ├── chem.js         Data kimia: 118 unsur, Ka, Ksp, E°, entalpi, VSEPR
-│       ├── plot.js         Pustaka grafik di atas kanvas
-│       ├── particles.js    Sistem partikel untuk teori kinetik
-│       ├── katalog.js      Daftar seluruh simulasi
-│       └── beranda.js      Logika penyaring dan kartu katalog
-├── sims/
-│   └── <slug>/
-│       ├── index.html      Kerangka halaman (dihasilkan otomatis)
-│       └── sim.js          Logika simulasi
-└── tools/
-    ├── buat-shell.js       Menghasilkan kerangka HTML dari katalog
-    └── uji.js              Penguji seluruh simulasi tanpa peramban
+index.html                 satu-satunya halaman — kerangka aplikasi
+assets/
+  css/app.css              gaya antarmuka melayang di atas kanvas
+  js/
+    katalog.js             daftar 39 simulasi (berkas .js agar jalan dari file://)
+    sim3d.js               mesin 3D: materi, alat laboratorium, partikel,
+                           teks, grafik, pencahayaan, kamera orbit
+    aplikasi.js            kerangka SPA: pemuat modul, kontrol, layar penuh,
+                           pemilih, pintasan papan tuan
+  vendor/
+    three.min.js           three.js r160 (UMD) — MIT
+    three.LICENSE
+sims/<slug>/sim.js         satu berkas per simulasi
+tools/uji3d.mjs            pengujian otomatis (Playwright + Chromium)
 ```
+
+### Menambah simulasi baru
+
+1. Tambahkan satu entri pada `assets/js/katalog.js`
+   (`slug`, `judul`, `fase`, `jenjang`, `ringkas`, `topik`, `cp`, `warna`).
+2. Buat `sims/<slug>/sim.js` yang memanggil `Sim3D.daftar('<slug>', { … })`
+   dengan kunci: `latar`, `kamera`, `kendali`, `baca`, lalu fungsi
+   `bangun(s)`, `ubah(s, id)`, `langkah(s, dt)`, `bacaUbah(s)`, dan `bersih(s)`.
+3. Semua pembantu 3D tersedia lewat `S3` (singkatan `window.S3`), misalnya
+   `S3.gelas()`, `S3.molekul()`, `S3.partikel()`, `S3.gambarGrafik()`.
+
+> Catatan: seluruh `const`/`let` tingkat modul harus ditulis **di atas**
+> `return { … }` di dalam IIFE simulasi. Yang ditulis setelah `return`
+> tidak pernah dijalankan dan akan melempar `ReferenceError`.
+> `tools/uji3d.mjs` memeriksa hal ini sebelum membuka peramban.
 
 ---
 
-## Pengembangan
-
-Tidak ada dependensi dan tidak ada proses build. Hanya Node.js yang diperlukan untuk
-menjalankan dua alat bantu di folder `tools/`.
-
-**Menambah simulasi baru:**
+## Pengujian
 
 ```bash
-# 1. tambahkan entri baru ke assets/js/katalog.js
-# 2. hasilkan kerangka HTML-nya
-node tools/buat-shell.js
-# 3. tulis logikanya di sims/<slug>/sim.js
-# 4. uji
-node tools/uji.js
+npm run uji                 # jalankan seluruh 39 simulasi
+node tools/uji3d.mjs titrasi redoks     # hanya beberapa
+npm run foto                # jalankan + simpan tangkapan layar ke tools/foto/
 ```
 
-**Menguji seluruh simulasi:**
-
-```bash
-node tools/uji.js              # semua simulasi
-node tools/uji.js laju-reaksi  # satu simulasi saja
-RINCI=1 node tools/uji.js      # tampilkan jejak galat lengkap
-```
-
-Alat uji menyediakan DOM dan kanvas tiruan, lalu benar-benar menjalankan setiap
-simulasi: membangun panel kontrol, menjalankan 40 bingkai animasi, menggeser setiap
-kontrol ke nilai ekstremnya, menekan setiap tombol, mengklik 35 titik di seluruh
-panggung, dan mengulang setelah atur ulang. Nilai `NaN` yang masuk ke kanvas akan
-terdeteksi sebagai kegagalan.
-
----
-
-## Membuat simulasi
-
-Setiap `sim.js` memanggil `Sim.create()` dengan sebuah objek konfigurasi:
-
-```js
-Sim.create({
-  title: 'Judul Simulasi',
-  subtitle: 'Satu kalimat pengantar.',
-  fase: 'E', jenjang: 'SMA Kelas 10',
-  topik: ['Topik Satu', 'Topik Dua'],
-  stage: { w: 790, h: 540 },
-
-  controls: [
-    { title: 'Kelompok kontrol', items: [
-      { type: 'slider',  id: 'suhu', value: 25, min: 0, max: 100, step: 1,
-        label: 'Suhu', unit: '°C' },
-      { type: 'toggle',  id: 'tampil', value: true, label: 'Tampilkan partikel' },
-      { type: 'segment', id: 'mode', value: 'a', options: [...] },
-      { type: 'buttons', items: [{ label: 'Jalankan', onClick: fn }] }
-    ]}
-  ],
-
-  readouts: [{ id: 'hasil', label: 'Hasil' }],
-
-  setup(sim)  { /* keadaan awal */ },
-  update(sim, dt) { /* satu langkah waktu */ },
-  draw(ctx, sim)  { /* menggambar panggung */ },
-  readoutsUpdate(sim) { sim.readout('hasil', '…'); },
-
-  notes: `<p>Penjelasan konsep…</p>`,
-  explore: ['Kegiatan satu…'],
-  quiz: [{ q: 'Pertanyaan?', options: [...], answer: 1, explain: '…' }]
-});
-```
-
-Seluruh pembangunan halaman, panel kontrol, penskalaan kanvas untuk layar beresolusi
-tinggi, gelung animasi, penanganan sentuh, dan panel belajar ditangani oleh `core.js`.
+Pengujian menyapu **setiap** kontrol di setiap simulasi (geser ke nilai minimum,
+maksimum, tengah, lalu kembali; setiap sakelar dua kali; setiap pilihan dan segmen;
+setiap tombol), menyeret dan menzum kanvas, memastikan konteks WebGL tetap hidup,
+dan menangkap setiap `pageerror` maupun `console.error`. Ditambah pemeriksaan
+kerangka aplikasi: jumlah kartu pemilih, penyaringan pencarian, berpindah simulasi
+tanpa memuat ulang halaman, dan setiap pintasan papan tuan.
 
 ---
 
 ## Lisensi
 
-Dilepas ke domain publik dengan [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.id).
-Silakan dipakai, diubah, diterjemahkan, dan dibagikan ulang untuk keperluan apa pun,
-termasuk komersial, tanpa perlu meminta izin.
+Kode dan materi SimKimia dilisensikan **MIT** — lihat [LICENSE](LICENSE).
+Bebas dipakai, diubah, dan disebarkan, termasuk untuk keperluan sekolah.
 
-Jika bermanfaat di kelas Anda, membagikan tautannya kepada guru lain sudah lebih dari cukup.
+three.js disertakan di `assets/vendor/` dengan lisensi MIT miliknya sendiri
+(lihat `assets/vendor/three.LICENSE`).

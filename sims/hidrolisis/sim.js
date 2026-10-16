@@ -1,415 +1,355 @@
-/* Hidrolisis Garam — Fase F
-   Larutkan dua belas garam dan telusuri mengapa sebagiannya bersifat asam,
-   basa, atau netral, lengkap dengan perhitungan pH-nya. */
+/* Hidrolisis Garam — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('hidrolisis', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  const KW = 1e-14;
 
-  const W = 800, H = 590;
-
-  // tipe: kk (kuat-kuat), lk (asam lemah + basa kuat), kl (asam kuat + basa lemah), ll
+  /* jenis: 'kk' kuat-kuat (netral), 'kl' asam kuat + basa lemah (asam),
+     'lk' asam lemah + basa kuat (basa), 'll' lemah-lemah (bergantung Ka/Kb) */
   const GARAM = [
-    { r: 'NaCl', kation: 'Na⁺', anion: 'Cl⁻', asam: 'HCl', basa: 'NaOH',
-      tipe: 'kk', sifat: 'netral', hid: 'tidak terhidrolisis' },
-    { r: 'KNO3', kation: 'K⁺', anion: 'NO₃⁻', asam: 'HNO₃', basa: 'KOH',
-      tipe: 'kk', sifat: 'netral', hid: 'tidak terhidrolisis' },
-    { r: 'Na2SO4', kation: 'Na⁺', anion: 'SO₄²⁻', asam: 'H₂SO₄', basa: 'NaOH',
-      tipe: 'kk', sifat: 'netral', hid: 'tidak terhidrolisis' },
-    { r: 'CH3COONa', kation: 'Na⁺', anion: 'CH₃COO⁻', asam: 'CH₃COOH', basa: 'NaOH',
-      tipe: 'lk', sifat: 'basa', hid: 'hidrolisis sebagian (anion)', Ka: 1.8e-5 },
-    { r: 'NaHCO3', kation: 'Na⁺', anion: 'HCO₃⁻', asam: 'H₂CO₃', basa: 'NaOH',
-      tipe: 'lk', sifat: 'basa', hid: 'hidrolisis sebagian (anion)', Ka: 4.3e-7 },
-    { r: 'KCN', kation: 'K⁺', anion: 'CN⁻', asam: 'HCN', basa: 'KOH',
-      tipe: 'lk', sifat: 'basa', hid: 'hidrolisis sebagian (anion)', Ka: 6.2e-10 },
-    { r: 'NaF', kation: 'Na⁺', anion: 'F⁻', asam: 'HF', basa: 'NaOH',
-      tipe: 'lk', sifat: 'basa', hid: 'hidrolisis sebagian (anion)', Ka: 6.8e-4 },
-    { r: 'NH4Cl', kation: 'NH₄⁺', anion: 'Cl⁻', asam: 'HCl', basa: 'NH₃',
-      tipe: 'kl', sifat: 'asam', hid: 'hidrolisis sebagian (kation)', Kb: 1.8e-5 },
-    { r: 'NH4NO3', kation: 'NH₄⁺', anion: 'NO₃⁻', asam: 'HNO₃', basa: 'NH₃',
-      tipe: 'kl', sifat: 'asam', hid: 'hidrolisis sebagian (kation)', Kb: 1.8e-5 },
-    { r: '(NH4)2SO4', kation: 'NH₄⁺', anion: 'SO₄²⁻', asam: 'H₂SO₄', basa: 'NH₃',
-      tipe: 'kl', sifat: 'asam', hid: 'hidrolisis sebagian (kation)', Kb: 1.8e-5 },
-    { r: 'CH3COONH4', kation: 'NH₄⁺', anion: 'CH₃COO⁻', asam: 'CH₃COOH', basa: 'NH₃',
-      tipe: 'll', sifat: 'netral', hid: 'hidrolisis total', Ka: 1.8e-5, Kb: 1.8e-5 },
-    { r: 'NH4CN', kation: 'NH₄⁺', anion: 'CN⁻', asam: 'HCN', basa: 'NH₃',
-      tipe: 'll', sifat: 'basa', hid: 'hidrolisis total', Ka: 6.2e-10, Kb: 1.8e-5 }
+    { n: 'NaCl', jenis: 'kk', kation: 'Na⁺', anion: 'Cl⁻', warna: 0xdfe8ee,
+      asal: 'HCl (kuat) + NaOH (kuat)' },
+    { n: 'KNO₃', jenis: 'kk', kation: 'K⁺', anion: 'NO₃⁻', warna: 0xe4eef4,
+      asal: 'HNO₃ (kuat) + KOH (kuat)' },
+    { n: 'Na₂SO₄', jenis: 'kk', kation: 'Na⁺', anion: 'SO₄²⁻', warna: 0xeaf2f6,
+      asal: 'H₂SO₄ (kuat) + NaOH (kuat)' },
+    { n: 'CH₃COONa', jenis: 'lk', ka: 1.8e-5, kation: 'Na⁺', anion: 'CH₃COO⁻', warna: 0xdff0e4,
+      asal: 'CH₃COOH (lemah) + NaOH (kuat)' },
+    { n: 'NaHCO₃ (soda kue)', jenis: 'lk', ka: 4.3e-7, kation: 'Na⁺', anion: 'HCO₃⁻', warna: 0xdcf0ea,
+      asal: 'H₂CO₃ (lemah) + NaOH (kuat)' },
+    { n: 'KCN', jenis: 'lk', ka: 6.2e-10, kation: 'K⁺', anion: 'CN⁻', warna: 0xd8f0f0,
+      asal: 'HCN (lemah) + KOH (kuat)' },
+    { n: 'NaF', jenis: 'lk', ka: 6.8e-4, kation: 'Na⁺', anion: 'F⁻', warna: 0xe2f0e8,
+      asal: 'HF (lemah) + NaOH (kuat)' },
+    { n: 'NH₄Cl', jenis: 'kl', kb: 1.8e-5, kation: 'NH₄⁺', anion: 'Cl⁻', warna: 0xf0e8dc,
+      asal: 'HCl (kuat) + NH₃ (lemah)' },
+    { n: '(NH₄)₂SO₄ (pupuk ZA)', jenis: 'kl', kb: 1.8e-5, kation: 'NH₄⁺', anion: 'SO₄²⁻', warna: 0xf0ead8,
+      asal: 'H₂SO₄ (kuat) + NH₃ (lemah)' },
+    { n: 'AlCl₃', jenis: 'kl', kb: 1.3e-9, kation: 'Al³⁺', anion: 'Cl⁻', warna: 0xf4e4d4,
+      asal: 'HCl (kuat) + Al(OH)₃ (lemah)' },
+    { n: 'CH₃COONH₄', jenis: 'll', ka: 1.8e-5, kb: 1.8e-5, kation: 'NH₄⁺', anion: 'CH₃COO⁻',
+      warna: 0xe8eee8, asal: 'CH₃COOH (lemah) + NH₃ (lemah)' },
+    { n: 'NH₄CN', jenis: 'll', ka: 6.2e-10, kb: 1.8e-5, kation: 'NH₄⁺', anion: 'CN⁻',
+      warna: 0xe0eef0, asal: 'HCN (lemah) + NH₃ (lemah)' }
   ];
 
-  function garamAktif(sim) { return GARAM[parseInt(sim.get('garam'), 10) || 0]; }
+  function garam(s) { return GARAM[parseInt(s.get('g'), 10) || 0]; }
 
-  function hitung(sim) {
-    const g = garamAktif(sim);
-    const Cm = sim.get('konsentrasi');
-    let pH = 7, Kh = null, rumus = '';
-
-    if (g.tipe === 'kk') {
-      pH = 7; rumus = 'tidak ada hidrolisis → pH = 7';
-    } else if (g.tipe === 'lk') {
-      Kh = C.Kw / g.Ka;
-      const OH = Math.sqrt(Kh * Cm);
-      pH = 14 + Math.log10(Math.max(OH, 1e-14));
-      rumus = '[OH⁻] = √(Kw/Ka × M)';
-    } else if (g.tipe === 'kl') {
-      Kh = C.Kw / g.Kb;
-      const Hp = Math.sqrt(Kh * Cm);
-      pH = -Math.log10(Math.max(Hp, 1e-14));
-      rumus = '[H⁺] = √(Kw/Kb × M)';
+  function hitung(s) {
+    const g = garam(s);
+    const c = s.get('c');
+    let pH = 7, jenisH = 'tidak terhidrolisis', ion = 'tidak ada';
+    if (g.jenis === 'kk') {
+      pH = 7; jenisH = 'tidak terhidrolisis'; ion = 'tidak ada ion yang bereaksi dengan air';
+    } else if (g.jenis === 'lk') {
+      const kb = KW / g.ka;
+      const OH = Math.sqrt(kb * c);
+      pH = S.clamp(14 + Math.log10(OH), 0, 14);
+      jenisH = 'hidrolisis sebagian (anion)';
+      ion = g.anion + ' + H₂O ⇌ asam lemah + OH⁻';
+    } else if (g.jenis === 'kl') {
+      const ka = KW / g.kb;
+      const H = Math.sqrt(ka * c);
+      pH = S.clamp(-Math.log10(H), 0, 14);
+      jenisH = 'hidrolisis sebagian (kation)';
+      ion = g.kation + ' + H₂O ⇌ basa lemah + H₃O⁺';
     } else {
-      Kh = C.Kw / (g.Ka * g.Kb);
-      const Hp = Math.sqrt(C.Kw * g.Ka / g.Kb);
-      pH = -Math.log10(Math.max(Hp, 1e-14));
-      rumus = '[H⁺] = √(Kw × Ka / Kb)';
+      const H = Math.sqrt(KW * g.ka / g.kb);
+      pH = S.clamp(-Math.log10(H), 0, 14);
+      jenisH = 'hidrolisis total (kedua ion)';
+      ion = 'kation dan anion sama-sama bereaksi dengan air';
     }
-    return { pH: Sim.clamp(pH, 0, 14), Kh: Kh, rumus: rumus, g: g, Cm: Cm };
+    return { g: g, c: c, pH: pH, jenisH: jenisH, ion: ion };
   }
 
-  function siapkan(sim) { sim.data.a = 0; sim.data.jalan = false; }
-
-  Sim.create({
-    title: 'Hidrolisis Garam',
-    subtitle: 'Garam tidak selalu netral. Yang menentukan adalah asal-usulnya: ion dari zat lemah akan bereaksi dengan air dan menggeser pH larutan.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Hidrolisis', 'Garam', 'pH'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Garam yang dilarutkan',
-        items: [
-          { type: 'select', id: 'garam', value: 0, label: 'Pilih garam',
-            options: GARAM.map(function (g, i) {
-              return { value: i, label: Sim.formula(g.r) }; }) },
-          { type: 'slider', id: 'konsentrasi', value: 0.1, min: 0.01, max: 1, step: 0.01,
-            label: 'Konsentrasi', unit: 'M', dec: 2 },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Larutkan', primary: true, onClick: function (sim) {
-              sim.data.jalan = true; sim.data.a = 0;
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'asal', value: true, label: 'Tampilkan asal-usul garam' },
-          { type: 'toggle', id: 'hitung', value: true, label: 'Tampilkan perhitungan' },
-          { type: 'toggle', id: 'tabel', value: true, label: 'Tabel empat jenis garam' }
-        ]
+  function warnaPH(p) {
+    const titik = [
+      [0, 0xd02020], [2, 0xe85a20], [4, 0xf0a030], [6, 0xd8d040],
+      [7, 0x60c860], [8, 0x40b8a0], [10, 0x3878d0], [12, 0x5030b0], [14, 0x30107a]
+    ];
+    for (let i = 0; i < titik.length - 1; i++) {
+      if (p <= titik[i + 1][0]) {
+        const u = (p - titik[i][0]) / (titik[i + 1][0] - titik[i][0]);
+        return new T.Color(titik[i][1]).lerp(new T.Color(titik[i + 1][1]), u);
       }
+    }
+    return new T.Color(0x30107a);
+  }
+
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 12, phi: 1.02, theta: 0.6, targetY: 1.3, lajuPutar: 0.1 },
+
+    kendali: [
+      { judul: 'Garam', isi: [
+        { type: 'select', id: 'g', value: 0, label: 'Garam yang dilarutkan',
+          options: GARAM.map(function (g, i) { return { value: i, label: g.n }; }) },
+        { type: 'slider', id: 'c', value: 0.1, min: 0.001, max: 1, step: 0.001,
+          label: 'Konsentrasi', unit: ' M', dec: 3,
+          format: function (v) { return S.fmtRapi(v) + ' M'; } },
+        { type: 'buttons', label: '', items: [
+          { label: '▶ Larutkan', utama: true, klik: function (s) { s.data.jalan = true; } },
+          { label: '↺ Ulangi', klik: function (s) { s.data.t = 0; s.data.jalan = false; } }
+        ]}
+      ]},
+      { judul: 'Rak uji', isi: [
+        { type: 'toggle', id: 'rak', value: true, label: 'Tampilkan rak 12 garam' },
+        { type: 'segment', id: 'kelompok', value: 'semua', label: 'Kelompok yang disorot', options: [
+          { value: 'semua', label: 'Semua' },
+          { value: 'kk', label: 'Netral' },
+          { value: 'lk', label: 'Basa' },
+          { value: 'kl', label: 'Asam' }
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'ion', value: true, label: 'Tampilkan ion dan molekul air' },
+        { type: 'toggle', id: 'putar', value: false, label: 'Putar kamera otomatis' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'sifat', label: 'Sifat larutan', tone: 'accent' },
-      { id: 'ph', label: 'pH' },
+    baca: [
+      { id: 'ph', label: 'pH larutan', tone: 'aksen' },
+      { id: 'sifat', label: 'Sifat larutan' },
       { id: 'jenis', label: 'Jenis hidrolisis' },
-      { id: 'kh', label: 'Tetapan Kh' }
+      { id: 'reaksi', label: 'Ion yang bereaksi' },
+      { id: 'asal', label: 'Berasal dari' },
+      { id: 'tetapan', label: 'Tetapan hidrolisis' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) { if (id === 'garam') { sim.data.a = 0; sim.data.jalan = false; } },
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 10, warna: 0x0b1118 }));
 
-    update: function (sim, dt) {
-      if (sim.data.jalan) {
-        sim.data.a += dt * 0.6;
-        if (sim.data.a >= 1) { sim.data.a = 1; sim.data.jalan = false; }
+      /* ---------- gelas utama ---------- */
+      const gls = S.gelas({ r: 1.4, h: 2.0, level: 0.7, warna: 0x60c860, opacity: 0.6 });
+      gls.position.set(-3.0, 0.05, 0);
+      s.data.gls = gls;
+      s.tambah(gls);
+
+      // kristal garam yang belum larut
+      const kristal = new T.Group();
+      for (let i = 0; i < 16; i++) {
+        const k = new T.Mesh(new T.BoxGeometry(1, 1, 1),
+          new T.MeshPhysicalMaterial({ color: 0xf0f4f8, roughness: 0.25, clearcoat: 0.8,
+            transparent: true, opacity: 0.95 }));
+        const sk = S.acak(0.1, 0.19);
+        k.scale.setScalar(sk);
+        k.userData.sk = sk;
+        const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+        k.position.set(Math.cos(a) * rr, 0.1 + Math.random() * 0.15, Math.sin(a) * rr);
+        k.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        kristal.add(k);
       }
+      kristal.position.set(-3.0, 0.05, 0);
+      s.data.kristal = kristal;
+      s.tambah(kristal);
+
+      // ion & molekul air di dalam gelas
+      function awan(warna, n, r) {
+        const p = S.partikel(n, { r: r, warna: warna, kotak: { x: 1.1, y: 0.55, z: 1.1 } });
+        p.position.set(-3.0, 0.75, 0);
+        p.material.transparent = true;
+        p.material.opacity = 0.92;
+        s.tambah(p);
+        return p;
+      }
+      s.data.pKat = awan(0xef6a52, 60, 0.085);
+      s.data.pAni = awan(0x6fb6ff, 60, 0.1);
+      s.data.pAir = awan(0xcfe6f2, 50, 0.06);
+      s.data.pH3O = awan(0xf0a94a, 40, 0.075);
+      s.data.pOH = awan(0x8ad0f0, 40, 0.075);
+
+      /* ---------- pH meter ---------- */
+      const badan = new T.Mesh(new T.BoxGeometry(1.4, 0.9, 0.45),
+        new T.MeshStandardMaterial({ color: 0x232d36, roughness: 0.5, metalness: 0.3 }));
+      badan.position.set(-3.0, 3.6, 0);
+      s.tambah(badan);
+      const layar = new T.Mesh(new T.BoxGeometry(1.1, 0.5, 0.05),
+        new T.MeshStandardMaterial({ color: 0x08181a, emissive: 0x0a2a2c, emissiveIntensity: 0.6 }));
+      layar.position.set(-3.0, 3.68, 0.25);
+      s.tambah(layar);
+      const angka = S.teks('7,00', { skala: 0.34, lebar: 8, latar: false, warna: '#4fd1c0' });
+      angka.position.set(-3.0, 3.68, 0.31);
+      s.data.angka = angka;
+      s.tambah(angka);
+      const probe = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 1.9, 18),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.1, transparent: true,
+          opacity: 0.4, side: T.DoubleSide }));
+      probe.position.set(-2.6, 2.1, 0.2);
+      s.tambah(probe);
+
+      /* ---------- rak 12 tabung ---------- */
+      const rak = new T.Group();
+      const papan = new T.Mesh(new T.BoxGeometry(7.0, 0.16, 1.5),
+        new T.MeshStandardMaterial({ color: 0x3a2f26, roughness: 0.8 }));
+      papan.position.set(0, 0.1, 0);
+      rak.add(papan);
+      const papanAtas = new T.Mesh(new T.BoxGeometry(7.0, 0.1, 1.5),
+        new T.MeshStandardMaterial({ color: 0x4a3c30, roughness: 0.8, transparent: true,
+          opacity: 0.55 }));
+      papanAtas.position.set(0, 1.5, 0);
+      rak.add(papanAtas);
+
+      s.data.tabung = [];
+      s.data.lblTab = [];
+      GARAM.forEach(function (g, i) {
+        const kol = i % 6, bar = Math.floor(i / 6);
+        const x = -2.9 + kol * 1.16;
+        const z = bar === 0 ? -0.38 : 0.42;
+        const tb = S.tabung({ r: 0.27, h: 1.7, level: 0.6, warna: 0x60c860 });
+        tb.position.set(x, 0.2, z);
+        rak.add(tb);
+        s.data.tabung.push(tb);
+        const l = S.teks(g.n, { skala: 0.17, lebar: 14, warna: '#aebbc6' });
+        l.position.set(x, 2.15 + (bar === 0 ? 0.3 : 0), z);
+        rak.add(l);
+        s.data.lblTab.push(l);
+      });
+      rak.position.set(1.9, 0, 0);
+      s.data.rak = rak;
+      s.tambah(rak);
+
+      // sorotan tabung terpilih
+      const sorot = new T.Mesh(new T.TorusGeometry(0.36, 0.035, 10, 40),
+        new T.MeshStandardMaterial({ color: 0xf0d040, emissive: 0xf0d040, emissiveIntensity: 1 }));
+      sorot.rotation.x = Math.PI / 2;
+      s.data.sorot = sorot;
+      s.tambah(sorot);
+
+      const lbl = S.teks('', { skala: 0.38, lebar: 40, warna: '#d8e4ec' });
+      lbl.position.set(0, 4.8, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.t = 0;
+      s.data.jalan = false;
+      pasang(s);
+      isiRak(s);
     },
 
-    draw: function (c, sim) {
-      const h = hitung(sim);
-      const g = h.g;
-      const a = sim.data.a;
-      const warnaSifat = g.sifat === 'asam' ? '#ef6a52' : g.sifat === 'basa' ? '#5b9bf5' : '#6fcf7f';
-
-      /* ---------- gelas ---------- */
-      const GX = 70, GY = 150, GW = 140, GH = 150;
-      const pHTampil = Sim.lerp(7, h.pH, a);
-      D.beaker(c, GX, GY, GW, GH, 0.74, D.alpha(C.warnaPH(pHTampil), 0.85));
-
-      D.text(c, Sim.formula(g.r), GX + GW / 2, GY - 48,
-        { size: 24, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, Sim.fmt(h.Cm, 2) + ' M dalam air', GX + GW / 2, GY - 24,
-        { size: 11.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-
-      // ion terlarut
-      if (a > 0.1) {
-        const n = 14;
-        for (let i = 0; i < n; i++) {
-          const seed = i * 93.1;
-          const x = GX + 16 + ((seed * 5.3) % (GW - 32));
-          const y = GY + 48 + ((seed * 3.9) % (GH - 62));
-          const kation = i % 2 === 0;
-          c.globalAlpha = Math.min(1, a * 1.5);
-          D.circle(c, x + Math.sin(sim.t + i) * 3, y + Math.cos(sim.t * 1.2 + i) * 3,
-            7, kation ? '#ef6a52' : '#5b9bf5');
-          D.text(c, kation ? '+' : '−', x + Math.sin(sim.t + i) * 3,
-            y + Math.cos(sim.t * 1.2 + i) * 3,
-            { size: 9, weight: 800, color: '#fff', align: 'c', base: 'middle' });
-          c.globalAlpha = 1;
-        }
-      } else {
-        // kristal belum larut
-        for (let i = 0; i < 9; i++) {
-          D.roundRect(c, GX + 26 + (i % 3) * 32, GY + GH - 30 - Math.floor(i / 3) * 12,
-            10, 10, 1.5, '#f0f0ea', 'rgba(255,255,255,.4)', 0.8);
-        }
+    ubah: function (s, id) {
+      if (id === 'g' || id === 'c') pasang(s);
+      if (id === 'rak') {
+        s.data.rak.visible = s.get('rak');
+        s.data.sorot.visible = s.get('rak');
       }
-
-      D.text(c, 'pH ' + Sim.fmt(pHTampil, 2), GX + GW / 2, GY + GH + 32,
-        { size: 28, weight: 700, color: C.warnaPH(pHTampil), align: 'c', base: 'middle', mono: true });
-      D.roundRect(c, GX + 8, GY + GH + 48, GW - 16, 26, 13,
-        D.alpha(warnaSifat, a * 0.2), a > 0.4 ? warnaSifat : 'transparent', 1.4);
-      if (a > 0.4) {
-        D.text(c, g.sifat.toUpperCase(), GX + GW / 2, GY + GH + 61,
-          { size: 13, weight: 800, color: warnaSifat, align: 'c', base: 'middle' });
+      if (id === 'kelompok') isiRak(s);
+      if (id === 'ion') {
+        [s.data.pKat, s.data.pAni, s.data.pAir, s.data.pH3O, s.data.pOH]
+          .forEach(function (p) { p.visible = s.get('ion'); });
       }
+      if (id === 'putar' && s.orbit) s.orbit.set({ putarOtomatis: s.get('putar') });
+    },
 
-      /* ---------- asal-usul garam ---------- */
-      if (sim.get('asal')) {
-        const AX = 262, AW = 300;
-        D.roundRect(c, AX, 108, AW, 150, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'ASAL-USUL GARAM', AX + 16, 128,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
+    langkah: function (s, dt) {
+      const h = hitung(s);
+      if (s.data.jalan) s.data.t = Math.min(1, s.data.t + dt * 0.5);
+      const t = s.data.t;
 
-        const asamKuat = g.tipe === 'kk' || g.tipe === 'kl';
-        const basaKuat = g.tipe === 'kk' || g.tipe === 'lk';
-
-        [[g.asam, asamKuat, 'ASAM ASAL', AX + 16],
-         [g.basa, basaKuat, 'BASA ASAL', AX + 160]].forEach(function (q) {
-          D.text(c, q[2], q[3], 152, { size: 9.5, weight: 700, color: P.faint, base: 'middle' });
-          D.text(c, Sim.formula(q[0]), q[3], 176,
-            { size: 17, weight: 700, color: P.text, base: 'middle' });
-          D.roundRect(c, q[3], 188, 108, 22, 11,
-            q[1] ? 'rgba(111,207,127,.16)' : 'rgba(240,169,74,.16)',
-            q[1] ? P.green : P.amber, 1.3);
-          D.text(c, q[1] ? 'KUAT' : 'LEMAH', q[3] + 54, 199,
-            { size: 11, weight: 800, color: q[1] ? P.green : P.amber, align: 'c', base: 'middle' });
-        });
-
-        D.line(c, AX + 16, 222, AX + AW - 16, 222, 'rgba(255,255,255,.1)', 1);
-        D.text(c, 'Ion yang terhidrolisis:', AX + 16, 238,
-          { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        const ionHid = g.tipe === 'kk' ? 'tidak ada'
-          : g.tipe === 'lk' ? g.anion + ' (dari asam lemah)'
-          : g.tipe === 'kl' ? g.kation + ' (dari basa lemah)'
-          : g.kation + ' dan ' + g.anion;
-        D.text(c, ionHid, AX + 150, 238,
-          { size: 11.5, weight: 700, color: P.accent2, base: 'middle' });
-      }
-
-      /* ---------- reaksi hidrolisis ---------- */
-      const RX = 584, RW = 186;
-      D.roundRect(c, RX, 108, RW, 150, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'REAKSI DENGAN AIR', RX + 14, 128,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-
-      let reaksi;
-      if (g.tipe === 'kk') {
-        reaksi = ['Kation dan anion berasal', 'dari zat kuat.', '', 'Keduanya tidak bereaksi', 'dengan air.', '', 'pH tetap 7.'];
-      } else if (g.tipe === 'lk') {
-        reaksi = [g.anion + ' + H₂O ⇌', '  ' + g.asam + ' + OH⁻', '', 'Terbentuk OH⁻', '→ larutan basa'];
-      } else if (g.tipe === 'kl') {
-        reaksi = [g.kation + ' + H₂O ⇌', '  ' + g.basa + ' + H₃O⁺', '', 'Terbentuk H₃O⁺', '→ larutan asam'];
-      } else {
-        reaksi = ['Kedua ion bereaksi', 'dengan air.', '', 'Sifat ditentukan', 'perbandingan Ka dan Kb.'];
-      }
-      reaksi.forEach(function (s, i) {
-        D.text(c, s, RX + 14, 152 + i * 18, {
-          size: 11, weight: i < 2 ? 700 : 500,
-          color: i < 2 ? P.accent2 : P.dim, base: 'middle', mono: i < 2
-        });
+      // kristal mengecil saat larut
+      s.data.kristal.children.forEach(function (k) {
+        k.scale.setScalar(k.userData.sk * Math.max(0.001, 1 - t));
+        k.rotation.y += dt * 0.6;
+        k.visible = t < 0.99;
       });
 
-      /* ---------- perhitungan ---------- */
-      if (sim.get('hitung')) {
-        const HX = 262, HW2 = 508;
-        D.roundRect(c, HX, 272, HW2, 96, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'PERHITUNGAN pH', HX + 16, 292,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, h.rumus, HX + 16, 316,
-          { size: 14, weight: 700, color: P.accent2, base: 'middle', mono: true });
+      // ion muncul setelah larut
+      const nIon = Math.round(S.clamp(s.get('c') / 1, 0.08, 1) * 60 * t);
+      atur(s.data.pKat, nIon);
+      atur(s.data.pAni, nIon);
+      // ion hasil hidrolisis
+      const kuat = Math.abs(h.pH - 7) / 7;
+      atur(s.data.pH3O, h.pH < 7 ? Math.round(kuat * 40 * t) : 0);
+      atur(s.data.pOH, h.pH > 7 ? Math.round(kuat * 40 * t) : 0);
 
-        const rows = [];
-        if (g.tipe === 'lk') {
-          rows.push(['Ka asam asal', Sim.sci(g.Ka, 2)]);
-          rows.push(['Kh = Kw / Ka', Sim.sci(h.Kh, 2)]);
-          rows.push(['[OH⁻]', Sim.sci(Math.sqrt(h.Kh * h.Cm), 2) + ' M']);
-          rows.push(['pOH → pH', Sim.fmt(14 - h.pH, 2) + ' → ' + Sim.fmt(h.pH, 2)]);
-        } else if (g.tipe === 'kl') {
-          rows.push(['Kb basa asal', Sim.sci(g.Kb, 2)]);
-          rows.push(['Kh = Kw / Kb', Sim.sci(h.Kh, 2)]);
-          rows.push(['[H⁺]', Sim.sci(Math.sqrt(h.Kh * h.Cm), 2) + ' M']);
-          rows.push(['pH', Sim.fmt(h.pH, 2)]);
-        } else if (g.tipe === 'll') {
-          rows.push(['Ka', Sim.sci(g.Ka, 2)]);
-          rows.push(['Kb', Sim.sci(g.Kb, 2)]);
-          rows.push([g.Ka > g.Kb ? 'Ka > Kb → asam' : g.Ka < g.Kb ? 'Ka < Kb → basa' : 'Ka = Kb → netral',
-            'pH = ' + Sim.fmt(h.pH, 2)]);
-        } else {
-          rows.push(['Tidak ada ion yang terhidrolisis', 'pH = 7,00']);
-        }
-        rows.forEach(function (r, i) {
-          const x = HX + 16 + (i % 2) * 250;
-          const y = 338 + Math.floor(i / 2) * 18;
-          D.text(c, r[0], x, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-          D.text(c, r[1], x + 230, y,
-            { size: 10.5, weight: 650, color: P.dim, align: 'r', base: 'middle', mono: true });
-        });
-      }
+      s.data.pKat.userData.gerak(dt, 1.0);
+      s.data.pAni.userData.gerak(dt, 0.9);
+      s.data.pAir.userData.gerak(dt, 0.7);
+      s.data.pH3O.userData.gerak(dt, 1.2);
+      s.data.pOH.userData.gerak(dt, 1.1);
 
-      /* ---------- tabel empat jenis ---------- */
-      if (sim.get('tabel')) {
-        const TY = 384;
-        D.roundRect(c, 40, TY, W - 80, 172, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'EMPAT JENIS GARAM DAN SIFATNYA', 58, TY + 20,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
+      // pH meter & warna larutan menuju nilai akhir
+      const pNow = S.lerp(7, h.pH, t);
+      const c = warnaPH(pNow);
+      s.data.gls.userData.setLevel(0.7, c.getHex());
+      s.data.angka.userData.ganti(S.fmt(pNow, 2), '#' + c.getHexString());
 
-        const kol = ['Jenis garam', 'Hidrolisis', 'Sifat', 'pH', 'Contoh'];
-        const lebar = [200, 180, 100, 90, 140];
-        let x0 = 58;
-        kol.forEach(function (k, i) {
-          D.text(c, k, x0, TY + 42, { size: 10, weight: 700, color: P.faint, base: 'middle' });
-          x0 += lebar[i];
-        });
-        D.line(c, 56, TY + 52, W - 56, TY + 52, 'rgba(255,255,255,.14)', 1);
-
-        const isi = [
-          { t: 'kk', a: 'Asam kuat + basa kuat', b: 'tidak terhidrolisis', c: 'netral', d: '= 7', e: 'NaCl, KNO₃', w: P.green },
-          { t: 'lk', a: 'Asam lemah + basa kuat', b: 'sebagian (anion)', c: 'basa', d: '> 7', e: 'CH₃COONa', w: P.blue },
-          { t: 'kl', a: 'Asam kuat + basa lemah', b: 'sebagian (kation)', c: 'asam', d: '< 7', e: 'NH₄Cl', w: P.rose },
-          { t: 'll', a: 'Asam lemah + basa lemah', b: 'total (keduanya)', c: 'lihat Ka & Kb', d: 'bergantung', e: 'CH₃COONH₄', w: P.amber }
-        ];
-        isi.forEach(function (r, i) {
-          const y = TY + 74 + i * 24;
-          const aktif = r.t === g.tipe;
-          if (aktif) D.roundRect(c, 50, y - 12, W - 100, 23, 5, 'rgba(79,209,192,.12)');
-          let x = 58;
-          [r.a, r.b, r.c, r.d, r.e].forEach(function (s, k) {
-            D.text(c, s, x, y, {
-              size: 11, weight: aktif ? 650 : 500,
-              color: k === 2 ? r.w : (aktif ? P.accent2 : P.dim), base: 'middle'
-            });
-            x += lebar[k];
-          });
-        });
-
-        D.text(c, 'Kaidah pokok: sifat larutan ditentukan oleh komponen yang LEBIH KUAT.',
-          58, TY + 178 - 8, { size: 11.5, weight: 600, color: P.accent2, base: 'middle' });
-      }
+      // sorotan tabung
+      const i = parseInt(s.get('g'), 10) || 0;
+      const kol = i % 6, bar = Math.floor(i / 6);
+      s.data.sorot.position.set(1.9 - 2.9 + kol * 1.16, 0.26, bar === 0 ? -0.38 : 0.42);
+      s.data.sorot.material.emissiveIntensity = 0.7 + Math.sin(s.waktu * 3) * 0.3;
     },
 
-    readoutsUpdate: function (sim) {
-      const h = hitung(sim);
-      const g = h.g;
-      sim.readout('sifat', g.sifat.charAt(0).toUpperCase() + g.sifat.slice(1),
-        g.sifat === 'asam' ? 'danger' : g.sifat === 'basa' ? 'accent' : null);
-      sim.readout('ph', Sim.fmt(h.pH, 2));
-      sim.readout('jenis', g.hid);
-      sim.readout('kh', h.Kh ? Sim.sci(h.Kh, 2) : '—');
-    },
+    bacaUbah: function (s) {
+      const h = hitung(s);
+      const t = s.data.t || 0;
+      const p = S.lerp(7, h.pH, t);
+      s.baca('ph', S.fmt(p, 2) + (t < 0.98 ? '  (sedang melarut…)' : ''),
+        h.pH < 6.5 ? 'danger' : h.pH > 7.5 ? 'biru' : 'aksen');
+      s.baca('sifat', h.pH < 6.5 ? 'Asam' : h.pH > 7.5 ? 'Basa' : 'Netral',
+        h.pH < 6.5 ? 'danger' : h.pH > 7.5 ? 'biru' : 'aksen');
+      s.baca('jenis', h.jenisH);
+      s.baca('reaksi', h.ion);
+      s.baca('asal', h.g.asal);
+      s.baca('tetapan', h.g.jenis === 'kk' ? 'Tidak ada — kedua ion berasal dari elektrolit kuat'
+        : h.g.jenis === 'lk' ? 'Kb = Kw/Ka = ' + S.fmtRapi(KW / h.g.ka)
+          : h.g.jenis === 'kl' ? 'Ka = Kw/Kb = ' + S.fmtRapi(KW / h.g.kb)
+            : 'Kh = Kw/(Ka·Kb) = ' + S.fmtRapi(KW / (h.g.ka * h.g.kb)));
+    }
+  };
 
-    notes: `
-      <p>Garam terbentuk dari reaksi asam dengan basa. Banyak orang mengira semua garam
-      bersifat netral, padahal <strong>hanya sebagian</strong> yang demikian. Yang
-      menentukan adalah <strong>kekuatan asam dan basa asalnya</strong>.</p>
+  function atur(p, n) {
+    const d = p.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      if (!d[i].aktif && i < n) d[i].pos.set(S.acak(-1, 1), S.acak(-0.45, 0.45), S.acak(-1, 1));
+      d[i].aktif = i < n;
+    }
+    p.userData.tulis();
+  }
 
-      <h3>Kaidah pokok</h3>
-      <p>Sifat larutan garam ditentukan oleh komponen yang <strong>lebih kuat</strong>.
-      Ion yang berasal dari zat <strong>lemah</strong> akan bereaksi dengan air
-      (terhidrolisis), sedangkan ion dari zat kuat tidak.</p>
+  function isiRak(s) {
+    const kel = s.get('kelompok');
+    GARAM.forEach(function (g, i) {
+      const c = s.get('c');
+      // hitung pH tiap garam pada konsentrasi sekarang
+      let pH = 7;
+      if (g.jenis === 'lk') pH = S.clamp(14 + Math.log10(Math.sqrt(KW / g.ka * c)), 0, 14);
+      else if (g.jenis === 'kl') pH = S.clamp(-Math.log10(Math.sqrt(KW / g.kb * c)), 0, 14);
+      else if (g.jenis === 'll') pH = S.clamp(-Math.log10(Math.sqrt(KW * g.ka / g.kb)), 0, 14);
+      const w = warnaPH(pH);
+      const tb = s.data.tabung[i];
+      tb.userData.setLevel(0.6, w.getHex());
+      const sorot = kel === 'semua' || kel === g.jenis
+        || (kel === 'lk' && g.jenis === 'lk') || (kel === 'kl' && g.jenis === 'kl');
+      tb.userData.cair.material.opacity = sorot ? 0.92 : 0.25;
+      s.data.lblTab[i].material.opacity = sorot ? 1 : 0.3;
+      s.data.lblTab[i].material.transparent = true;
+    });
+  }
 
-      <table>
-        <thead><tr><th>Asal garam</th><th>Hidrolisis</th><th>Sifat</th><th>Contoh</th></tr></thead>
-        <tbody>
-          <tr><td>Asam kuat + basa kuat</td><td>tidak ada</td><td>netral (pH = 7)</td><td>NaCl, KNO₃</td></tr>
-          <tr><td>Asam lemah + basa kuat</td><td>sebagian (anion)</td><td>basa (pH &gt; 7)</td><td>CH₃COONa</td></tr>
-          <tr><td>Asam kuat + basa lemah</td><td>sebagian (kation)</td><td>asam (pH &lt; 7)</td><td>NH₄Cl</td></tr>
-          <tr><td>Asam lemah + basa lemah</td><td>total</td><td>bergantung Ka dan Kb</td><td>CH₃COONH₄</td></tr>
-        </tbody>
-      </table>
+  function pasang(s) {
+    const h = hitung(s);
+    s.data.t = 0;
+    s.data.jalan = false;
 
-      <h3>Mengapa CH₃COONa bersifat basa?</h3>
-      <p>Garam ini terurai menjadi Na⁺ dan CH₃COO⁻. Ion Na⁺ berasal dari NaOH yang kuat,
-      sehingga tidak bereaksi dengan air. Namun CH₃COO⁻ berasal dari asam asetat yang
-      lemah, dan ia cukup kuat menarik proton dari air:</p>
-      <span class="formula">CH₃COO⁻ + H₂O ⇌ CH₃COOH + OH⁻</span>
-      <p>Terbentuknya OH⁻ inilah yang membuat larutan bersifat basa.</p>
+    s.data.kristal.children.forEach(function (k) {
+      k.scale.setScalar(k.userData.sk);
+      k.visible = true;
+      k.material.color.setHex(h.g.warna);
+    });
+    s.data.gls.userData.setLevel(0.7, 0x60c860);
 
-      <h3>Rumus perhitungan</h3>
-      <span class="formula">Garam asam lemah + basa kuat:
-  Kh = Kw / Ka      [OH⁻] = √(Kh × M)
+    atur(s.data.pKat, 0); atur(s.data.pAni, 0);
+    atur(s.data.pH3O, 0); atur(s.data.pOH, 0);
+    atur(s.data.pAir, 40);
+    [s.data.pKat, s.data.pAni, s.data.pAir, s.data.pH3O, s.data.pOH]
+      .forEach(function (p) { p.visible = s.get('ion'); });
 
-Garam asam kuat + basa lemah:
-  Kh = Kw / Kb      [H⁺] = √(Kh × M)
-
-Garam asam lemah + basa lemah:
-  [H⁺] = √(Kw × Ka / Kb)</span>
-
-      <p>Perhatikan hal menarik pada garam dari asam lemah dan basa lemah: pH-nya
-      <strong>tidak bergantung pada konsentrasi</strong>, hanya pada perbandingan Ka dan
-      Kb. Bila Ka = Kb larutannya netral, bila Ka &gt; Kb bersifat asam, dan bila
-      Ka &lt; Kb bersifat basa.</p>
-
-      <h3>Makin lemah asamnya, makin basa garamnya</h3>
-      <p>Bandingkan tiga garam natrium pada konsentrasi sama: NaF (dari HF, Ka 6,8×10⁻⁴),
-      CH₃COONa (Ka 1,8×10⁻⁵), dan KCN (dari HCN, Ka 6,2×10⁻¹⁰). Makin kecil Ka asam
-      asalnya, makin kuat basa konjugasinya menarik proton, sehingga pH larutannya makin
-      tinggi.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Penerapan sehari-hari</strong>
-        Soda kue (NaHCO₃) bersifat sedikit basa karena berasal dari asam karbonat yang
-        lemah. Inilah sebabnya soda kue dapat menetralkan asam lambung dan mengembangkan
-        adonan kue saat bereaksi dengan bahan asam.
-      </div>
-    `,
-
-    explore: [
-      'Larutkan <strong>NaCl</strong>. Mengapa pH-nya tepat 7?',
-      'Bandingkan <strong>CH₃COONa</strong> dan <strong>NH₄Cl</strong> pada konsentrasi sama. Mengapa arahnya berlawanan?',
-      'Urutkan <strong>NaF</strong>, <strong>CH₃COONa</strong>, dan <strong>KCN</strong> menurut pH-nya. Hubungkan dengan nilai Ka asam asalnya.',
-      'Ubah konsentrasi <strong>CH₃COONH₄</strong>. Mengapa pH-nya tidak ikut berubah?'
-    ],
-
-    quiz: [
-      {
-        q: 'Larutan NH₄Cl bersifat asam. Hal ini disebabkan oleh…',
-        options: [
-          'Ion Cl⁻ bereaksi dengan air menghasilkan H⁺',
-          'Ion NH₄⁺ bereaksi dengan air menghasilkan H₃O⁺',
-          'Kedua ionnya bereaksi dengan air',
-          'NH₄Cl adalah asam kuat'
-        ],
-        answer: 1,
-        explain: 'NH₄⁺ berasal dari basa lemah NH₃, sehingga ia terhidrolisis: NH₄⁺ + H₂O ⇌ NH₃ + H₃O⁺. Ion Cl⁻ berasal dari HCl yang kuat sehingga tidak bereaksi dengan air.'
-      },
-      {
-        q: 'Manakah garam yang larutannya bersifat netral?',
-        options: ['CH₃COONa', 'NH₄Cl', 'K₂SO₄', 'NaF'],
-        answer: 2,
-        explain: 'K₂SO₄ berasal dari KOH (basa kuat) dan H₂SO₄ (asam kuat). Tidak ada ion yang terhidrolisis, sehingga larutannya netral dengan pH 7.'
-      },
-      {
-        q: 'Tiga garam natrium berikut punya konsentrasi sama. Manakah yang pH-nya paling tinggi?',
-        options: ['NaF (Ka HF = 6,8×10⁻⁴)', 'CH₃COONa (Ka = 1,8×10⁻⁵)', 'KCN (Ka HCN = 6,2×10⁻¹⁰)', 'NaCl'],
-        answer: 2,
-        explain: 'Makin kecil Ka asam asalnya, makin kuat basa konjugasinya. HCN adalah asam paling lemah di antara ketiganya, sehingga CN⁻ paling kuat menarik proton dari air dan menghasilkan pH tertinggi.'
-      },
-      {
-        q: 'Mengapa pH larutan CH₃COONH₄ tidak bergantung pada konsentrasinya?',
-        options: [
-          'Karena garam ini tidak terhidrolisis',
-          'Karena rumus [H⁺] = √(Kw × Ka / Kb) tidak memuat konsentrasi',
-          'Karena konsentrasinya selalu sama',
-          'Karena garam ini adalah penyangga'
-        ],
-        answer: 1,
-        explain: 'Pada hidrolisis total, kation dan anion sama-sama terhidrolisis. Faktor konsentrasi saling meniadakan, sehingga pH hanya ditentukan oleh perbandingan Ka dan Kb.'
-      }
-    ]
-  });
-})();
+    s.data.rak.visible = s.get('rak');
+    s.data.sorot.visible = s.get('rak');
+    s.data.lbl.userData.ganti(h.g.n + '  —  ' + h.g.kation + ' + ' + h.g.anion);
+    isiRak(s);
+  }
+})());

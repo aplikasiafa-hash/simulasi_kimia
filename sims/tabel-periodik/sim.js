@@ -1,418 +1,250 @@
-/* Tabel Periodik dan Keperiodikan Sifat — Fase E
-   Tabel 118 unsur yang dapat diklik, dengan pewarnaan menurut kategori atau
-   peta panas sifat, plus grafik kecenderungan sepanjang periode dan golongan. */
+/* Tabel Periodik dan Keperiodikan Sifat — Fase E — tabel 3D */
 
-(function () {
+Sim3D.daftar('tabel-periodik', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  /* Z, lambang, nama, golongan(1-18), periode, kategori,
+     jari-jari (pm), energi ionisasi (kJ/mol), keelektronegatifan */
+  const U = [
+    [1,'H','Hidrogen',1,1,'nonlogam',53,1312,2.20],
+    [2,'He','Helium',18,1,'mulia',31,2372,0],
+    [3,'Li','Litium',1,2,'alkali',167,520,0.98],
+    [4,'Be','Berilium',2,2,'alkalitanah',112,899,1.57],
+    [5,'B','Boron',13,2,'metaloid',87,801,2.04],
+    [6,'C','Karbon',14,2,'nonlogam',67,1086,2.55],
+    [7,'N','Nitrogen',15,2,'nonlogam',56,1402,3.04],
+    [8,'O','Oksigen',16,2,'nonlogam',48,1314,3.44],
+    [9,'F','Fluor',17,2,'halogen',42,1681,3.98],
+    [10,'Ne','Neon',18,2,'mulia',38,2081,0],
+    [11,'Na','Natrium',1,3,'alkali',190,496,0.93],
+    [12,'Mg','Magnesium',2,3,'alkalitanah',145,738,1.31],
+    [13,'Al','Aluminium',13,3,'logam',118,578,1.61],
+    [14,'Si','Silikon',14,3,'metaloid',111,787,1.90],
+    [15,'P','Fosforus',15,3,'nonlogam',98,1012,2.19],
+    [16,'S','Belerang',16,3,'nonlogam',88,1000,2.58],
+    [17,'Cl','Klorin',17,3,'halogen',79,1251,3.16],
+    [18,'Ar','Argon',18,3,'mulia',71,1521,0],
+    [19,'K','Kalium',1,4,'alkali',243,419,0.82],
+    [20,'Ca','Kalsium',2,4,'alkalitanah',194,590,1.00],
+    [21,'Sc','Skandium',3,4,'transisi',184,633,1.36],
+    [22,'Ti','Titanium',4,4,'transisi',176,659,1.54],
+    [23,'V','Vanadium',5,4,'transisi',171,651,1.63],
+    [24,'Cr','Kromium',6,4,'transisi',166,653,1.66],
+    [25,'Mn','Mangan',7,4,'transisi',161,717,1.55],
+    [26,'Fe','Besi',8,4,'transisi',156,763,1.83],
+    [27,'Co','Kobalt',9,4,'transisi',152,760,1.88],
+    [28,'Ni','Nikel',10,4,'transisi',149,737,1.91],
+    [29,'Cu','Tembaga',11,4,'transisi',145,746,1.90],
+    [30,'Zn','Seng',12,4,'transisi',142,906,1.65],
+    [31,'Ga','Galium',13,4,'logam',136,579,1.81],
+    [32,'Ge','Germanium',14,4,'metaloid',125,762,2.01],
+    [33,'As','Arsen',15,4,'metaloid',114,947,2.18],
+    [34,'Se','Selenium',16,4,'nonlogam',103,941,2.55],
+    [35,'Br','Brom',17,4,'halogen',94,1140,2.96],
+    [36,'Kr','Kripton',18,4,'mulia',88,1351,3.00],
+    [37,'Rb','Rubidium',1,5,'alkali',265,403,0.82],
+    [38,'Sr','Stronsium',2,5,'alkalitanah',219,550,0.95],
+    [47,'Ag','Perak',11,5,'transisi',165,731,1.93],
+    [53,'I','Iodin',17,5,'halogen',115,1008,2.66],
+    [54,'Xe','Xenon',18,5,'mulia',108,1170,2.60],
+    [55,'Cs','Sesium',1,6,'alkali',298,376,0.79],
+    [56,'Ba','Barium',2,6,'alkalitanah',253,503,0.89],
+    [79,'Au','Emas',11,6,'transisi',174,890,2.54],
+    [80,'Hg','Raksa',12,6,'transisi',171,1007,2.00],
+    [82,'Pb','Timbal',14,6,'logam',154,716,2.33]
+  ];
 
-  const W = 800, H = 580;
-
-  /* --- data sifat periodik (nilai perkiraan untuk pengajaran) --- */
-  // jari-jari atom (pm)
-  const JARI_ATOM = {};
-  C.ELEMENTS.forEach(function (e) {
-    // model sederhana: naik dalam golongan, turun dalam periode
-    const dasar = 40 + e.periode * 46;
-    const gol = e.gol || 3;
-    JARI_ATOM[e.Z] = Math.max(28, dasar - (gol <= 2 ? gol * 4 : (gol - 2) * 5.2));
-  });
-  // energi ionisasi pertama (kJ/mol), perkiraan
-  const EI = {};
-  C.ELEMENTS.forEach(function (e) {
-    const gol = e.gol || 3;
-    EI[e.Z] = Math.round(Math.max(370, 1400 - e.periode * 125 + (gol <= 2 ? gol * 50 : (gol - 2) * 95)));
-  });
-
-  const SIFAT = {
-    kategori: { nama: 'Kategori unsur', satuan: '', nilai: null },
-    jari:     { nama: 'Jari-jari atom', satuan: 'pm', nilai: function (e) { return JARI_ATOM[e.Z]; }, balik: true },
-    en:       { nama: 'Keelektronegatifan', satuan: '', nilai: function (e) { return e.en; } },
-    ei:       { nama: 'Energi ionisasi', satuan: 'kJ/mol', nilai: function (e) { return EI[e.Z]; } },
-    massa:    { nama: 'Massa atom', satuan: 'g/mol', nilai: function (e) { return e.massa; } }
+  const KATEGORI = {
+    alkali:       { n: 'Logam alkali', w: 0xef6a52 },
+    alkalitanah:  { n: 'Logam alkali tanah', w: 0xf0a94a },
+    transisi:     { n: 'Logam transisi', w: 0xf0c04a },
+    logam:        { n: 'Logam lain', w: 0x9aa4ae },
+    metaloid:     { n: 'Metaloid', w: 0x6fcf7f },
+    nonlogam:     { n: 'Nonlogam', w: 0x4fd1c0 },
+    halogen:      { n: 'Halogen', w: 0x5b9bf5 },
+    mulia:        { n: 'Gas mulia', w: 0xb795f0 }
   };
 
-  const SEL = 38, CELAH = 2;
-  const TX = 24, TY = 96;
+  const SIFAT = [
+    { id: 'kategori', n: 'Kategori (tanpa tinggi)', satuan: '' },
+    { id: 'jari', n: 'Jari-jari atom', satuan: ' pm', i: 6, naikKanan: false },
+    { id: 'ionisasi', n: 'Energi ionisasi', satuan: ' kJ/mol', i: 7, naikKanan: true },
+    { id: 'eneg', n: 'Keelektronegatifan', satuan: '', i: 8, naikKanan: true }
+  ];
 
-  function siapkan(sim) {
-    sim.data.pilih = 17;
-    sim.data.sorot = null;
+  function sifat(s) {
+    const id = s.get('sifat');
+    for (let i = 0; i < SIFAT.length; i++) if (SIFAT[i].id === id) return SIFAT[i];
+    return SIFAT[0];
   }
 
-  function kotakSel(e) {
-    const g = C.gridPos(e);
-    if (!g.col) return null;
-    let row = g.row;
-    if (row >= 8) row += 0.5;   // beri jarak untuk lantanida/aktinida
-    return {
-      x: TX + (g.col - 1) * (SEL + CELAH),
-      y: TY + (row - 1) * (SEL + CELAH),
-      w: SEL, h: SEL
-    };
-  }
+  const SK = 0.62;   // jarak antar ubin
 
-  function warnaSel(sim, e) {
-    const s = sim.get('sifat');
-    if (s === 'kategori') return C.KATEGORI_WARNA[e.kategori];
-    const f = SIFAT[s].nilai;
-    const v = f(e);
-    if (v === null || v === undefined) return '#3a4248';
-    let lo = Infinity, hi = -Infinity;
-    C.ELEMENTS.forEach(function (q) {
-      const x = f(q);
-      if (x === null || x === undefined) return;
-      if (x < lo) lo = x; if (x > hi) hi = x;
-    });
-    let t = (v - lo) / (hi - lo);
-    if (SIFAT[s].balik) t = 1 - t;
-    return D.ramp(['#1d3f6e', '#2f7fa8', '#4fd1c0', '#f0d04a', '#ef6a52'], t);
-  }
+  return {
+    latar: 0x070d13,
+    kamera: { jarak: 15, phi: 0.78, theta: 0.1, targetY: 0.4, lajuPutar: 0.06 },
 
-  Sim.create({
-    title: 'Tabel Periodik dan Keperiodikan Sifat',
-    subtitle: 'Tabel periodik bukan sekadar daftar. Letak setiap unsur meramalkan sifatnya — dan sifat itu berubah dengan pola yang teratur.',
-    fase: 'E', jenjang: 'SMA Kelas 10',
-    topik: ['Tabel Periodik', 'Sifat Periodik'],
-    stage: { w: W, h: H },
-    showPlay: false,
-    stageNote: 'Klik unsur mana pun untuk melihat rinciannya',
-
-    controls: [
-      {
-        title: 'Pewarnaan tabel',
-        items: [
-          { type: 'select', id: 'sifat', value: 'kategori', label: 'Warnai menurut',
-            options: Object.keys(SIFAT).map(function (k) {
-              return { value: k, label: SIFAT[k].nama }; }),
-            hint: 'Peta panas memperlihatkan pola perubahan sifat di seluruh tabel.' }
-        ]
-      },
-      {
-        title: 'Sorot kelompok',
-        items: [
-          { type: 'segment', id: 'sorot', value: 'tidak', label: '',
-            options: [
-              { value: 'tidak', label: 'Tidak' },
-              { value: 'golongan', label: 'Golongan' },
-              { value: 'periode', label: 'Periode' }
-            ],
-            hint: 'Menyorot golongan atau periode dari unsur yang sedang dipilih.' },
-          { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan grafik kecenderungan' },
-          { type: 'toggle', id: 'panah', value: true, label: 'Tampilkan arah kecenderungan' }
-        ]
-      },
-      {
-        title: 'Lompat ke unsur',
-        items: [
-          { type: 'slider', id: 'Z', value: 17, min: 1, max: 118, step: 1,
-            label: 'Nomor atom', dec: 0,
-            format: function (v) {
-              const e = C.byZ[Math.round(v)];
-              return e ? e.sym : String(Math.round(v));
-            } }
-        ]
-      }
+    kendali: [
+      { judul: 'Sifat yang ditampilkan', isi: [
+        { type: 'select', id: 'sifat', value: 'jari', label: 'Tinggi ubin menyatakan',
+          options: SIFAT.map(function (x) { return { value: x.id, label: x.n }; }) },
+        { type: 'slider', id: 'tinggi', value: 1, min: 0.2, max: 2.5, step: 0.05,
+          label: 'Lebihkan tinggi', unit: '×', dec: 2 }
+      ]},
+      { judul: 'Soroti', isi: [
+        { type: 'select', id: 'kat', value: 'semua', label: 'Kategori unsur',
+          options: [{ value: 'semua', label: 'Semua kategori' }].concat(
+            Object.keys(KATEGORI).map(function (k) { return { value: k, label: KATEGORI[k].n }; })) },
+        { type: 'slider', id: 'pilih', value: 6, min: 1, max: 46, step: 1,
+          label: 'Unsur yang diamati', unit: '', dec: 0,
+          format: function (v) { const u = U[Math.round(v) - 1]; return u ? u[1] + ' — ' + u[2] : ''; } }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'lambang', value: true, label: 'Tampilkan lambang unsur' },
+        { type: 'toggle', id: 'nomor', value: false, label: 'Tampilkan nomor atom' },
+        { type: 'toggle', id: 'panah', value: true, label: 'Tampilkan panah kecenderungan' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'unsur', label: 'Unsur', tone: 'accent' },
-      { id: 'konf', label: 'Konfigurasi' },
-      { id: 'gol', label: 'Golongan' },
-      { id: 'periode', label: 'Periode' }
+    baca: [
+      { id: 'unsur', label: 'Unsur', tone: 'aksen' },
+      { id: 'posisi', label: 'Golongan / periode' },
+      { id: 'kategori', label: 'Kategori' },
+      { id: 'nilai', label: 'Nilai sifat' },
+      { id: 'tren', label: 'Kecenderungan' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) {
-      if (id === 'Z') sim.data.pilih = Math.round(sim.get('Z'));
-    },
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 14, y: -0.02, warna: 0x0c1319, kisiN: 30 }));
+      s.data.ubin = [];
+      s.data.wadah = new T.Group();
+      s.tambah(s.data.wadah);
 
-    onPointerMove: function (sim, x, y) {
-      sim.data.sorotSel = null;
-      for (let i = 0; i < C.ELEMENTS.length; i++) {
-        const k = kotakSel(C.ELEMENTS[i]);
-        if (!k) continue;
-        if (x >= k.x && x <= k.x + k.w && y >= k.y && y <= k.y + k.h) {
-          sim.data.sorotSel = C.ELEMENTS[i].Z;
-          return;
-        }
-      }
-    },
+      U.forEach(function (u, i) {
+        const g = new T.Group();
+        const x = (u[3] - 9.5) * SK;
+        const z = (u[4] - 3.5) * SK;
+        g.position.set(x, 0, z);
 
-    onPointerDown: function (sim, x, y) {
-      for (let i = 0; i < C.ELEMENTS.length; i++) {
-        const k = kotakSel(C.ELEMENTS[i]);
-        if (!k) continue;
-        if (x >= k.x && x <= k.x + k.w && y >= k.y && y <= k.y + k.h) {
-          sim.data.pilih = C.ELEMENTS[i].Z;
-          sim.set('Z', C.ELEMENTS[i].Z);
-          return;
-        }
-      }
-    },
+        const kotak = new T.Mesh(new T.BoxGeometry(SK * 0.88, 1, SK * 0.88),
+          new T.MeshPhysicalMaterial({
+            color: KATEGORI[u[5]].w, roughness: 0.35, metalness: 0.1,
+            clearcoat: 0.6, envMapIntensity: 0.8,
+            emissive: KATEGORI[u[5]].w, emissiveIntensity: 0.08
+          }));
+        kotak.castShadow = true; kotak.receiveShadow = true;
+        g.add(kotak);
 
-    draw: function (c, sim) {
-      const pilihZ = sim.data.pilih;
-      const dipilih = C.byZ[pilihZ];
-      const sorotMode = sim.get('sorot');
-      const sifatKunci = sim.get('sifat');
+        const lam = S.teks(u[1], { skala: 0.3, latar: false, warna: '#ffffff', tebal: 800 });
+        lam.position.y = 0.1;
+        g.add(lam);
+        const nom = S.teks(String(u[0]), { skala: 0.18, latar: false, warna: '#d8e4ec' });
+        nom.position.y = 0.1;
+        nom.visible = false;
+        g.add(nom);
 
-      /* ---------- tabel ---------- */
-      C.ELEMENTS.forEach(function (e) {
-        const k = kotakSel(e);
-        if (!k) return;
-
-        let redup = false;
-        if (sorotMode === 'golongan' && dipilih) {
-          redup = !(e.gol && dipilih.gol && e.gol === dipilih.gol);
-        } else if (sorotMode === 'periode' && dipilih) {
-          redup = e.periode !== dipilih.periode;
-        }
-
-        const warna = warnaSel(sim, e);
-        c.globalAlpha = redup ? 0.2 : 1;
-        D.roundRect(c, k.x, k.y, k.w, k.h, 3, warna, null, 0);
-        D.text(c, e.sym, k.x + k.w / 2, k.y + k.h / 2 + 1,
-          { size: 12.5, weight: 700, color: D.readable(warna), align: 'c', base: 'middle' });
-        D.text(c, String(e.Z), k.x + 3, k.y + 8,
-          { size: 7.5, weight: 600, color: D.alpha(D.readable(warna), 0.75), base: 'middle' });
-        c.globalAlpha = 1;
-
-        if (e.Z === pilihZ) {
-          D.roundRect(c, k.x - 2, k.y - 2, k.w + 4, k.h + 4, 4, null, '#ffffff', 2.4);
-        } else if (e.Z === sim.data.sorotSel) {
-          D.roundRect(c, k.x - 1, k.y - 1, k.w + 2, k.h + 2, 4, null, 'rgba(255,255,255,.6)', 1.6);
-        }
+        s.data.wadah.add(g);
+        s.data.ubin.push({ g: g, kotak: kotak, lam: lam, nom: nom, u: u, tinggi: 0.2 });
       });
 
-      // nomor golongan di atas
-      for (let g = 1; g <= 18; g++) {
-        D.text(c, String(g), TX + (g - 1) * (SEL + CELAH) + SEL / 2, TY - 10,
-          { size: 9.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-      }
-      // nomor periode di kiri
-      for (let p = 1; p <= 7; p++) {
-        D.text(c, String(p), TX - 10, TY + (p - 1) * (SEL + CELAH) + SEL / 2,
-          { size: 9.5, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-      }
+      // panah kecenderungan
+      const panah = new T.Group();
+      const pKanan = S.panah([-6.2, 0.1, -2.6], [6.0, 0.1, -2.6], { warna: 0xf0c04a, tebal: 0.035 });
+      const pBawah = S.panah([-6.6, 0.1, -2.3], [-6.6, 0.1, 2.4], { warna: 0x7fe3d6, tebal: 0.035 });
+      panah.add(pKanan, pBawah);
+      const tk = S.teks('→ sepanjang periode', { skala: 0.26, lebar: 20, warna: '#f0c04a' });
+      tk.position.set(0, 0.3, -3.1);
+      const tb = S.teks('↓ menuruni golongan', { skala: 0.26, lebar: 20, warna: '#7fe3d6' });
+      tb.position.set(-7.6, 0.3, 0.2);
+      panah.add(tk, tb);
+      s.data.panah = panah;
+      s.tambah(panah);
 
-      /* ---------- panah kecenderungan ---------- */
-      if (sim.get('panah') && sifatKunci !== 'kategori') {
-        const naikKanan = sifatKunci === 'en' || sifatKunci === 'ei' || sifatKunci === 'massa';
-        const lebarTabel = 18 * (SEL + CELAH);
-        const bawah = TY + 7.5 * (SEL + CELAH) + 18;
-        D.arrow(c, TX + 10, bawah, TX + lebarTabel - 14, bawah,
-          naikKanan ? P.accent : P.amber, 2, 8);
-        D.text(c, (naikKanan ? 'makin besar →' : 'makin kecil →'),
-          TX + lebarTabel / 2, bawah - 12,
-          { size: 10.5, weight: 700, color: naikKanan ? P.accent : P.amber, align: 'c', base: 'middle' });
+      // sorotan
+      const cincin = new T.Mesh(new T.TorusGeometry(SK * 0.62, 0.028, 10, 36),
+        new T.MeshBasicMaterial({ color: 0xffffff }));
+      cincin.rotation.x = Math.PI / 2;
+      s.data.cincin = cincin;
+      s.tambah(cincin);
 
-        const kananX = TX + lebarTabel + 16;
-        D.arrow(c, kananX, TY + 6, kananX, TY + 7 * (SEL + CELAH),
-          naikKanan ? P.amber : P.accent, 2, 8);
-      }
+      const lbl = S.teks('', { skala: 0.4, lebar: 22, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.4, -2.6);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
 
-      /* ---------- kartu unsur ---------- */
-      const KX = 24, KY = 404, KW = 268;
-      if (dipilih) {
-        const warna = C.KATEGORI_WARNA[dipilih.kategori];
-        D.roundRect(c, KX, KY, KW, 150, 12, 'rgba(255,255,255,.04)', warna, 1.8);
-        D.roundRect(c, KX + 16, KY + 16, 62, 62, 7, warna);
-        D.text(c, dipilih.sym, KX + 47, KY + 44,
-          { size: 26, weight: 700, color: D.readable(warna), align: 'c', base: 'middle' });
-        D.text(c, String(dipilih.Z), KX + 22, KY + 26,
-          { size: 10, weight: 700, color: D.alpha(D.readable(warna), 0.8), base: 'middle' });
+      pasang(s);
+    },
 
-        D.text(c, dipilih.nama, KX + 90, KY + 32,
-          { size: 18, weight: 700, color: P.text, base: 'middle' });
-        D.text(c, C.KATEGORI_NAMA[dipilih.kategori], KX + 90, KY + 54,
-          { size: 11.5, weight: 600, color: warna, base: 'middle' });
-        D.text(c, 'Ar = ' + Sim.fmt(dipilih.massa, 3), KX + 90, KY + 72,
-          { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
+    ubah: function (s) { pasang(s); },
 
-        const info = [
-          ['Konfigurasi', C.intiGasMulia(dipilih.Z) + ' ' +
-            C.konfigurasi(dipilih.Z).filter(function (p, i) {
-              const inti = C.intiGasMulia(dipilih.Z);
-              if (!inti) return true;
-              const Zi = C.bySym[inti.slice(1, -1)].Z;
-              let tot = 0;
-              for (let k = 0; k <= i; k++) tot += C.konfigurasi(dipilih.Z)[k][1];
-              return tot > Zi;
-            }).map(function (p) { return p[0] + Sim.sup(p[1]); }).join(' ')],
-          ['Elektron valensi', String(C.valensi(dipilih.Z))],
-          ['Keelektronegatifan', dipilih.en !== null ? Sim.fmt(dipilih.en, 2) : 'tidak lazim'],
-          ['Jari-jari atom', Math.round(JARI_ATOM[dipilih.Z]) + ' pm']
-        ];
-        info.forEach(function (b, i) {
-          const y = KY + 96 + i * 15;
-          D.text(c, b[0], KX + 16, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-          D.text(c, b[1], KX + KW - 16, y,
-            { size: 10.5, weight: 650, color: P.dim, align: 'r', base: 'middle', mono: true });
-        });
-      }
-
-      /* ---------- grafik kecenderungan ---------- */
-      if (sim.get('grafik') && dipilih) {
-        const GX = 320, GY = 420, GW = 450, GH = 120;
-        const sifat = SIFAT[sifatKunci === 'kategori' ? 'en' : sifatKunci];
-        const f = sifat.nilai;
-
-        // data sepanjang periode unsur terpilih
-        const periode = C.ELEMENTS.filter(function (e) {
-          return e.periode === dipilih.periode && e.gol;
-        }).sort(function (a, b) { return a.gol - b.gol; });
-
-        const nilai = periode.map(function (e) { return f(e); })
-          .filter(function (v) { return v !== null && v !== undefined; });
-        if (nilai.length > 1) {
-          const lo = Math.min.apply(null, nilai), hi = Math.max.apply(null, nilai);
-          const map = Plot.axes(c, {
-            x: GX, y: GY, w: GW, h: GH,
-            xmin: 0.5, xmax: 18.5, ymin: lo - (hi - lo) * 0.14, ymax: hi + (hi - lo) * 0.14,
-            xlabel: 'golongan', ylabel: sifat.satuan || sifat.nama,
-            judul: sifat.nama + ' sepanjang periode ' + dipilih.periode,
-            xticks: 9, yticks: 3
-          });
-          const titik = periode.map(function (e) { return [e.gol, f(e)]; })
-            .filter(function (t) { return t[1] !== null && t[1] !== undefined; });
-          Plot.line(c, map, titik, { color: P.accent, lw: 2.2 });
-          titik.forEach(function (t) {
-            const e = periode.find(function (q) { return q.gol === t[0]; });
-            Plot.titik(c, map, t[0], t[1], {
-              r: e && e.Z === dipilih.Z ? 5.5 : 3,
-              color: e && e.Z === dipilih.Z ? '#ffffff' : P.accent,
-              halo: e && e.Z === dipilih.Z,
-              label: e && e.Z === dipilih.Z ? e.sym : null
-            });
-          });
-        }
-      }
-
-      /* ---------- keterangan warna ---------- */
-      if (sifatKunci === 'kategori') {
-        const LX = 320, LY = 424;
-        D.text(c, 'KATEGORI UNSUR', LX, LY - 8,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        const kat = Object.keys(C.KATEGORI_NAMA);
-        kat.forEach(function (k, i) {
-          const x = LX + (i % 2) * 230;
-          const y = LY + 14 + Math.floor(i / 2) * 23;
-          D.roundRect(c, x, y - 6, 13, 13, 3, C.KATEGORI_WARNA[k]);
-          D.text(c, C.KATEGORI_NAMA[k], x + 20, y,
-            { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-        });
+    langkah: function (s, dt) {
+      s.data.ubin.forEach(function (x) {
+        x.kotak.scale.y = S.lerp(x.kotak.scale.y, x.tinggi, dt * 5);
+        x.kotak.position.y = x.kotak.scale.y / 2;
+        x.lam.position.y = x.kotak.scale.y + 0.16;
+        x.nom.position.y = x.kotak.scale.y + 0.16;
+      });
+      const i = Math.round(s.get('pilih')) - 1;
+      const t = s.data.ubin[i];
+      if (t) {
+        s.data.cincin.position.set(t.g.position.x,
+          t.kotak.scale.y + 0.05 + Math.sin(s.waktu * 3) * 0.03, t.g.position.z);
+        s.data.cincin.material.color.setHSL((s.waktu * 0.2) % 1, 0.1, 0.9);
       }
     },
 
-    readoutsUpdate: function (sim) {
-      const e = C.byZ[sim.data.pilih];
-      if (!e) return;
-      sim.readout('unsur', e.sym + ' — ' + e.nama);
-      sim.readout('konf', C.intiGasMulia(e.Z) + ' …');
-      const gol = e.gol;
-      sim.readout('gol', gol ? (gol <= 2 ? gol + 'A' : gol >= 13 ? (gol - 10) + 'A' : (gol - 2) + 'B')
-        : (e.kategori === 'lantanida' ? 'Lantanida' : 'Aktinida'));
-      sim.readout('periode', e.periode);
-    },
+    bacaUbah: function (s) {
+      const i = Math.round(s.get('pilih')) - 1;
+      const u = U[i];
+      if (!u) return;
+      const f = sifat(s);
+      s.baca('unsur', u[2] + ' (' + u[1] + ', Z=' + u[0] + ')');
+      s.baca('posisi', 'Golongan ' + u[3] + ' · Periode ' + u[4]);
+      s.baca('kategori', KATEGORI[u[5]].n);
+      s.baca('nilai', f.i ? S.fmt(u[f.i], f.id === 'eneg' ? 2 : 0) + f.satuan : '—');
+      s.baca('tren', f.id === 'kategori' ? 'pilih sifat untuk melihat kecenderungan'
+        : f.naikKanan ? 'naik ke kanan, turun ke bawah'
+        : 'turun ke kanan, naik ke bawah');
+    }
+  };
 
-    notes: `
-      <p>Tabel periodik disusun berdasarkan <strong>kenaikan nomor atom</strong>, dan
-      unsur dengan jumlah elektron valensi sama diletakkan dalam satu kolom. Karena
-      elektron valensi menentukan sifat kimia, unsur dalam satu golongan memiliki sifat
-      yang mirip.</p>
+  function pasang(s) {
+    const f = sifat(s);
+    const kat = s.get('kat');
+    const lebih = s.get('tinggi');
 
-      <h3>Membaca peta tabel</h3>
-      <ul>
-        <li><strong>Golongan</strong> (kolom, 1–18) — menunjukkan jumlah elektron valensi.</li>
-        <li><strong>Periode</strong> (baris, 1–7) — menunjukkan jumlah kulit elektron.</li>
-        <li><strong>Blok</strong> — s (golongan 1–2), p (13–18), d (3–12), f (lantanida & aktinida).</li>
-      </ul>
+    let min = Infinity, maks = -Infinity;
+    if (f.i) U.forEach(function (u) {
+      if (u[f.i] > 0) { min = Math.min(min, u[f.i]); maks = Math.max(maks, u[f.i]); }
+    });
 
-      <h3>Empat kecenderungan utama</h3>
-      <table>
-        <thead><tr><th>Sifat</th><th>Dalam satu periode (→)</th><th>Dalam satu golongan (↓)</th></tr></thead>
-        <tbody>
-          <tr><td>Jari-jari atom</td><td>makin kecil</td><td>makin besar</td></tr>
-          <tr><td>Energi ionisasi</td><td>makin besar</td><td>makin kecil</td></tr>
-          <tr><td>Keelektronegatifan</td><td>makin besar</td><td>makin kecil</td></tr>
-          <tr><td>Sifat logam</td><td>makin berkurang</td><td>makin bertambah</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Mengapa jari-jari mengecil ke kanan?</h3>
-      <p>Dalam satu periode, jumlah kulit tetap tetapi <strong>muatan inti bertambah</strong>.
-      Inti yang makin positif menarik elektron lebih kuat, sehingga awan elektron mengerut.
-      Perhatikan: natrium (Z = 11) jauh lebih besar daripada klorin (Z = 17) walaupun
-      keduanya berada di periode yang sama.</p>
-
-      <h3>Mengapa jari-jari membesar ke bawah?</h3>
-      <p>Setiap turun satu periode, <strong>bertambah satu kulit</strong>. Kulit baru ini
-      jauh lebih jauh dari inti, dan kulit dalam juga menghalangi tarikan inti
-      (efek perisai). Pertambahan ukuran ini mengalahkan pertambahan muatan inti.</p>
-
-      <h3>Energi ionisasi dan keelektronegatifan</h3>
-      <p><strong>Energi ionisasi</strong> adalah energi untuk melepaskan satu elektron.
-      Atom kecil dengan inti kuat sulit melepas elektron, jadi energi ionisasinya besar.
-      <strong>Keelektronegatifan</strong> adalah kecenderungan menarik elektron dalam
-      ikatan. Keduanya mengikuti pola yang sama.</p>
-
-      <p>Fluorin memiliki keelektronegatifan tertinggi (3,98) karena atomnya kecil dan
-      hanya butuh satu elektron untuk stabil. Fransium paling rendah (0,7).</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Gas mulia adalah pengecualian</strong>
-        Gas mulia sudah memiliki susunan elektron penuh, sehingga tidak tertarik menerima
-        atau melepas elektron. Sebagian besar tidak memiliki nilai keelektronegatifan
-        yang lazim.
-      </div>
-    `,
-
-    explore: [
-      'Warnai menurut <strong>Jari-jari atom</strong>. Ke arah mana warnanya berubah? Sesuai dugaanmu?',
-      'Klik natrium (Na), lalu sorot <strong>Periode</strong>. Baca grafiknya — apa yang terjadi dari Na ke Ar?',
-      'Klik fluorin (F), lalu sorot <strong>Golongan</strong>. Bandingkan keelektronegatifan F, Cl, Br, dan I.',
-      'Warnai menurut <strong>Energi ionisasi</strong>. Unsur mana yang paling sulit melepas elektron? Mengapa masuk akal?'
-    ],
-
-    quiz: [
-      {
-        q: 'Dari natrium (Na) ke klorin (Cl) dalam periode 3, jari-jari atomnya…',
-        options: [
-          'Bertambah, karena jumlah elektron bertambah',
-          'Berkurang, karena muatan inti bertambah sementara jumlah kulit tetap',
-          'Tetap, karena berada dalam periode yang sama',
-          'Bertambah, karena massa atom bertambah'
-        ],
-        answer: 1,
-        explain: 'Jumlah kulit tetap tiga, tetapi proton bertambah dari 11 menjadi 17. Tarikan inti yang makin kuat menarik awan elektron lebih dekat, sehingga atomnya mengecil.'
-      },
-      {
-        q: 'Unsur dengan keelektronegatifan tertinggi dalam tabel periodik adalah…',
-        options: ['Oksigen', 'Fluorin', 'Klorin', 'Helium'],
-        answer: 1,
-        explain: 'Fluorin memiliki keelektronegatifan 3,98 — tertinggi di antara semua unsur. Atomnya kecil dan hanya memerlukan satu elektron untuk mencapai susunan gas mulia.'
-      },
-      {
-        q: 'Mengapa jari-jari atom bertambah dari atas ke bawah dalam satu golongan?',
-        options: [
-          'Karena muatan inti berkurang',
-          'Karena jumlah kulit elektron bertambah',
-          'Karena keelektronegatifannya bertambah',
-          'Karena massanya berkurang'
-        ],
-        answer: 1,
-        explain: 'Setiap turun satu periode, atom memperoleh satu kulit elektron baru yang lebih jauh dari inti. Kulit dalam juga memerisai tarikan inti terhadap kulit terluar.'
-      },
-      {
-        q: 'Unsur X memiliki konfigurasi [Ne] 3s². Unsur ini terletak pada golongan dan periode…',
-        options: ['IIA, periode 3', 'IIIA, periode 2', 'IIA, periode 2', 'VIIIA, periode 3'],
-        answer: 0,
-        explain: 'Kulit terbesar adalah 3, sehingga periode 3. Elektron valensi berjumlah 2, sehingga golongan IIA. Unsur ini adalah magnesium.'
+    s.data.ubin.forEach(function (x) {
+      const u = x.u;
+      const cocok = kat === 'semua' || u[5] === kat;
+      if (f.i) {
+        const v = u[f.i] > 0 ? (u[f.i] - min) / (maks - min) : 0;
+        x.tinggi = 0.16 + v * 2.4 * lebih;
+      } else {
+        x.tinggi = 0.22;
       }
-    ]
-  });
-})();
+      const w = new T.Color(KATEGORI[u[5]].w);
+      if (f.i) {
+        // gradasi dingin→panas mengikuti nilai, tetap pakai rona kategori saat 'kategori'
+        const v = u[f.i] > 0 ? (u[f.i] - min) / (maks - min) : 0;
+        w.copy(new T.Color(0x2b63c9).lerp(new T.Color(0xef6a52), v));
+      }
+      x.kotak.material.color.copy(w);
+      x.kotak.material.emissive.copy(w);
+      x.kotak.material.emissiveIntensity = cocok ? 0.1 : 0.02;
+      x.kotak.material.opacity = cocok ? 1 : 0.25;
+      x.kotak.material.transparent = !cocok;
+      x.lam.visible = s.get('lambang') && !s.get('nomor') && cocok;
+      x.nom.visible = s.get('nomor') && cocok;
+      x.lam.material.opacity = cocok ? 1 : 0.2;
+    });
+
+    s.data.panah.visible = s.get('panah') && !!f.i;
+    s.data.lbl.userData.ganti(f.n);
+  }
+})());

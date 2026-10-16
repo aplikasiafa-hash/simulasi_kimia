@@ -1,343 +1,205 @@
-/* Larut atau Tidak Larut? — Fase B
-   Masukkan zat ke dalam air, atur suhu dan pengadukan, amati apa yang larut. */
+/* Larut atau Tidak Larut? — Fase B — adegan 3D */
 
-(function () {
+Sim3D.daftar('larut-tak-larut', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-
-  // kelarutan: gram zat per 100 mL air pada 20 °C (0 berarti tidak larut)
   const ZAT = [
-    { nama: 'Gula',    warna: '#f2ead8', s20: 203, naikSuhu: 2.4, larut: true,  butir: 'kristal' },
-    { nama: 'Garam',   warna: '#ffffff', s20: 36,  naikSuhu: 1.1, larut: true,  butir: 'kubus' },
-    { nama: 'Sirop',   warna: '#e0533d', s20: 400, naikSuhu: 1.5, larut: true,  butir: 'tetes' },
-    { nama: 'Kopi',    warna: '#6b4a32', s20: 30,  naikSuhu: 2.0, larut: true,  butir: 'bubuk' },
-    { nama: 'Pasir',   warna: '#d8c08a', s20: 0,   naikSuhu: 1,   larut: false, butir: 'bubuk' },
-    { nama: 'Minyak',  warna: '#e8c84a', s20: 0,   naikSuhu: 1,   larut: false, butir: 'tetes' },
-    { nama: 'Kapur',   warna: '#f0f0ea', s20: 0.17,naikSuhu: 0.6, larut: false, butir: 'bubuk' },
-    { nama: 'Tepung',  warna: '#f4ecd8', s20: 0,   naikSuhu: 1,   larut: false, butir: 'bubuk' }
+    { n: 'Gula pasir', larut: 1.0,  w: 0xf2f0ea, warnaLarutan: 0x4a9fd8, butir: 0.055 },
+    { n: 'Garam dapur', larut: 1.0, w: 0xffffff, warnaLarutan: 0x4a9fd8, butir: 0.05 },
+    { n: 'Sirup', larut: 1.0,      w: 0xe0405a, warnaLarutan: 0xd04a62, butir: 0.07 },
+    { n: 'Kopi bubuk', larut: 0.45, w: 0x5a3a24, warnaLarutan: 0x6b4630, butir: 0.055 },
+    { n: 'Pasir', larut: 0.0,      w: 0xc2a878, warnaLarutan: 0x4a9fd8, butir: 0.07 },
+    { n: 'Minyak goreng', larut: 0.0, w: 0xe8c54a, warnaLarutan: 0x4a9fd8, butir: 0.1, mengapung: true },
+    { n: 'Kapur tulis', larut: 0.08, w: 0xf0f2f4, warnaLarutan: 0x9ab8cc, butir: 0.06 },
+    { n: 'Serbuk besi', larut: 0.0, w: 0x6b747c, butir: 0.05, warnaLarutan: 0x4a9fd8 }
   ];
 
-  const W = 780, H = 500;
-  const GX = 230, GY = 130, GW = 210, GH = 230;
+  const N = 180;
 
-  function siapkan(sim) {
-    sim.data.butir = [];
-    sim.data.terlarut = 0;      // sendok yang sudah larut
-    sim.data.ditambah = 0;      // sendok yang dimasukkan
-    sim.data.aduk = 0;
-    sim.data.pesan = '';
-    sim.data.pesanWaktu = 0;
-  }
+  function zat(s) { return ZAT[parseInt(s.get('zat'), 10) || 0]; }
 
-  /** Kelarutan pada suhu terpilih, dinyatakan dalam "sendok per gelas". */
-  function batasSendok(sim) {
-    const z = ZAT[sim.get('zat')];
-    const T = sim.get('suhu');
-    const faktor = 1 + (T - 20) / 80 * (z.naikSuhu - 1);
-    const gramPer100 = z.s20 * Math.max(0.2, faktor);
-    // satu sendok dianggap 5 gram, gelas berisi 100 mL
-    return gramPer100 / 5;
-  }
+  return {
+    latar: 0x091014,
+    kamera: { jarak: 7.6, phi: 1.12, theta: 0.6, targetY: 1.2, lajuPutar: 0.12 },
 
-  function tambahSendok(sim) {
-    const z = ZAT[sim.get('zat')];
-    sim.data.ditambah++;
-    for (let i = 0; i < 16; i++) {
-      sim.data.butir.push({
-        x: GX + GW / 2 + Sim.rnd(-28, 28),
-        y: GY + 22 + Sim.rnd(-8, 8),
-        vx: Sim.rnd(-14, 14), vy: Sim.rnd(10, 40),
-        r: z.butir === 'tetes' ? Sim.rnd(4, 7) : Sim.rnd(2.4, 4.4),
-        hidup: 1, jatuh: true, sendok: sim.data.ditambah
-      });
-    }
-    const batas = batasSendok(sim);
-    if (!z.larut && z.s20 < 1) {
-      sim.data.pesan = z.nama + ' tidak larut dalam air — butirannya tetap terlihat.';
-    } else if (sim.data.ditambah > batas) {
-      sim.data.pesan = 'Larutan sudah jenuh. ' + z.nama + ' berlebih mengendap di dasar.';
-    } else {
-      sim.data.pesan = z.nama + ' larut. Larutan menjadi lebih pekat.';
-    }
-    sim.data.pesanWaktu = 3;
-  }
+    kendali: [
+      { judul: 'Bahan', isi: [
+        { type: 'select', id: 'zat', value: 0, label: 'Dimasukkan ke air',
+          options: ZAT.map(function (z, i) { return { value: i, label: z.n }; }) },
+        { type: 'slider', id: 'jumlah', value: 1, min: 0.2, max: 2, step: 0.1,
+          label: 'Banyak bahan', unit: ' sendok', dec: 1 }
+      ]},
+      { judul: 'Perlakuan', isi: [
+        { type: 'slider', id: 'aduk', value: 0, min: 0, max: 1, step: 0.05,
+          label: 'Kecepatan mengaduk', unit: '', dec: 2,
+          format: function (v) { return v < 0.05 ? 'diam' : v < 0.4 ? 'pelan' : v < 0.75 ? 'sedang' : 'cepat'; } },
+        { type: 'slider', id: 'suhu', value: 25, min: 5, max: 90, step: 1,
+          label: 'Suhu air', unit: ' °C', dec: 0 },
+        { type: 'buttons', label: '', items: [
+          { label: '↺ Masukkan ulang', utama: true, klik: function (s) { taburUlang(s); } }
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'sendok', value: true, label: 'Tampilkan pengaduk' }
+      ]}
+    ],
 
-  Sim.create({
-    title: 'Larut atau Tidak Larut?',
-    subtitle: 'Masukkan zat sesendok demi sesendok ke dalam air. Aduk, panaskan, dan temukan sendiri batas kemampuan air melarutkan sesuatu.',
-    fase: 'B', jenjang: 'SD Kelas 3–4',
-    topik: ['Larutan', 'Campuran'],
-    stage: { w: W, h: H },
-    stageNote: 'Tekan "Tambah sesendok" berkali-kali',
+    baca: [
+      { id: 'hasil', label: 'Hasil', tone: 'aksen' },
+      { id: 'larut', label: 'Bagian yang larut' },
+      { id: 'campuran', label: 'Jenis campuran' },
+      { id: 'waktu', label: 'Pengaruh mengaduk' }
+    ],
 
-    controls: [
-      {
-        title: 'Zat yang dimasukkan',
-        items: [
-          { type: 'select', id: 'zat', value: 0, label: 'Pilih zat',
-            options: ZAT.map(function (z, i) { return { value: i, label: z.nama }; }) },
-          { type: 'buttons', label: '', items: [
-            { label: '+ Tambah sesendok', primary: true, onClick: tambahSendok },
-            { label: 'Kosongkan gelas', onClick: function (sim) { siapkan(sim); } }
-          ] }
-        ]
-      },
-      {
-        title: 'Perlakuan',
-        items: [
-          { type: 'slider', id: 'suhu', value: 20, min: 5, max: 90, step: 1,
-            label: 'Suhu air', unit: '°C', dec: 0,
-            hint: 'Air panas umumnya melarutkan lebih banyak zat padat.' },
-          { type: 'toggle', id: 'diaduk', value: false, label: 'Diaduk',
-            hint: 'Mengaduk mempercepat pelarutan, tetapi tidak menambah batas kelarutan.' },
-          { type: 'toggle', id: 'halus', value: false, label: 'Butiran dihaluskan',
-            hint: 'Butiran halus punya permukaan sentuh lebih luas sehingga lebih cepat larut.' }
-        ]
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 6, warna: 0x0f161d }));
+
+      const gelas = S.gelas({ r: 1.25, h: 2.3, level: 0.68, warna: 0x4a9fd8 });
+      s.data.gelas = gelas;
+      s.tambah(gelas);
+
+      // butiran zat
+      const p = S.partikel(N, { r: 0.055, warna: 0xf2f0ea, kotak: { x: 1.1, y: 0.7, z: 1.1 } });
+      s.data.p = p;
+      s.tambah(p);
+
+      // lapisan minyak di permukaan
+      const minyak = new T.Mesh(new T.CylinderGeometry(1.22, 1.22, 0.16, 48),
+        S.matCairan(0xe8c54a, { opacity: 0.8, transmission: 0.3 }));
+      minyak.position.y = 1.64;
+      minyak.visible = false;
+      s.data.minyak = minyak;
+      s.tambah(minyak);
+
+      // sendok pengaduk
+      const sendok = new T.Group();
+      const batang = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 2.6, 16), S.matLogam(0xc8ced4));
+      batang.position.y = 1.5;
+      sendok.add(batang);
+      const kepala = new T.Mesh(new T.SphereGeometry(0.17, 24, 18), S.matLogam(0xc8ced4));
+      kepala.scale.set(1, 0.42, 1.3);
+      kepala.position.y = 0.3;
+      sendok.add(kepala);
+      sendok.position.set(0.45, 0, 0);
+      s.data.sendok = sendok;
+      s.tambah(sendok);
+
+      const lbl = S.teks('Gula pasir', { skala: 0.46, lebar: 18, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.25, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.sudut = 0;
+      taburUlang(s);
+    },
+
+    ubah: function (s, id) {
+      if (id === 'zat' || id === 'jumlah') taburUlang(s);
+      if (id === 'sendok') s.data.sendok.visible = s.get('sendok');
+    },
+
+    langkah: function (s, dt) {
+      const z = zat(s);
+      const aduk = s.get('aduk');
+      const suhu = s.get('suhu');
+      const p = s.data.p, d = p.userData.p;
+
+      // laju pelarutan naik oleh suhu dan pengadukan
+      const laju = z.larut * (0.25 + aduk * 1.5) * (0.4 + suhu / 70) * dt * 0.9;
+
+      s.data.sudut += dt * (1 + aduk * 7);
+      if (s.get('sendok')) {
+        s.data.sendok.position.set(Math.cos(s.data.sudut) * 0.5 * (0.2 + aduk), 0,
+          Math.sin(s.data.sudut) * 0.5 * (0.2 + aduk));
+        s.data.sendok.rotation.z = Math.sin(s.data.sudut) * 0.12 * aduk;
       }
-    ],
 
-    readouts: [
-      { id: 'status', label: 'Hasil', tone: 'accent' },
-      { id: 'masuk', label: 'Dimasukkan' },
-      { id: 'batas', label: 'Batas larut' },
-      { id: 'sisa', label: 'Butir tersisa' }
-    ],
+      let tersisa = 0;
+      for (let i = 0; i < d.length; i++) {
+        const q = d[i];
+        if (!q.aktif) continue;
+        // sebagian butiran larut (mengecil lalu hilang)
+        if (q.bisaLarut) {
+          q.sisa -= laju;
+          if (q.sisa <= 0) { q.aktif = false; continue; }
+          q.r = z.butir * q.sisa;
+        }
+        tersisa++;
 
-    setup: siapkan,
-    reset: siapkan,
+        // pusaran akibat mengaduk
+        const r = Math.hypot(q.pos.x, q.pos.z);
+        const a = Math.atan2(q.pos.z, q.pos.x) + dt * aduk * (2.6 - r * 0.8);
+        const rr = r + (aduk > 0.25 ? dt * 0.25 * (0.75 - r) : 0);
+        q.pos.x = Math.cos(a) * rr;
+        q.pos.z = Math.sin(a) * rr;
 
-    onChange: function (sim, id) { if (id === 'zat') siapkan(sim); },
-
-    update: function (sim, dt) {
-      const z = ZAT[sim.get('zat')];
-      const batas = batasSendok(sim);
-      const diaduk = sim.get('diaduk');
-      sim.data.aduk += dt * (diaduk ? 4.2 : 0);
-
-      // kecepatan larut dipengaruhi suhu, pengadukan, dan kehalusan butir
-      const cepat = 0.5 * (0.4 + sim.get('suhu') / 60) *
-        (diaduk ? 2.1 : 1) * (sim.get('halus') ? 1.7 : 1);
-
-      const dasar = GY + GH - 10;
-      sim.data.butir.forEach(function (b) {
-        if (b.hidup <= 0) return;
-        if (b.jatuh) {
-          b.vy += 170 * dt;
-          b.x += b.vx * dt; b.y += b.vy * dt;
-          if (b.y > dasar) { b.y = dasar; b.jatuh = false; b.vy = 0; }
-        } else if (diaduk) {
-          const cx = GX + GW / 2, cy = GY + GH * 0.6;
-          const a = Math.atan2(b.y - cy, b.x - cx) + dt * 3.2;
-          const r = Math.hypot(b.x - cx, b.y - cy) * (0.985) + 0.4;
-          b.x = cx + Math.cos(a) * Math.min(r, GW * 0.4);
-          b.y = cy + Math.sin(a) * Math.min(r, GH * 0.3);
+        // gerak acak + gravitasi
+        q.pos.y += (q.vy || 0) * dt;
+        if (z.mengapung) {
+          q.vy = S.lerp(q.vy || 0, 0.5, dt * 2);
+          if (q.pos.y > 1.52) { q.pos.y = 1.52; q.vy = 0; }
         } else {
-          b.y = Math.min(dasar, b.y + 24 * dt);
-          b.x += Math.sin(sim.t * 1.4 + b.r * 7) * 4 * dt;
+          q.vy = (q.vy || 0) - dt * (0.9 - aduk * 0.75);
+          if (q.pos.y < 0.09) { q.pos.y = 0.09; q.vy = Math.abs(q.vy) * 0.18 + aduk * 0.5; }
         }
-        // hanya butir di bawah batas kelarutan yang boleh larut
-        if (b.sendok <= batas && !b.jatuh) b.hidup -= cepat * dt;
-      });
+        if (q.pos.y > 1.5) { q.pos.y = 1.5; q.vy = -Math.abs(q.vy) * 0.4; }
+        q.pos.x += Math.sin(s.waktu * 3 + i) * dt * 0.05 * (0.2 + aduk);
+        const rb = Math.hypot(q.pos.x, q.pos.z);
+        if (rb > 1.14) { q.pos.x *= 1.14 / rb; q.pos.z *= 1.14 / rb; }
+      }
+      p.userData.tulis();
+      s.data.tersisa = tersisa;
 
-      sim.data.butir = sim.data.butir.filter(function (b) { return b.hidup > 0; });
-      sim.data.terlarut = Math.min(sim.data.ditambah, batas);
-      if (sim.data.pesanWaktu > 0) sim.data.pesanWaktu -= dt;
+      // warna larutan berubah saat zat larut
+      const sudahLarut = 1 - tersisa / Math.max(1, s.data.awal);
+      const dasar = new T.Color(0x4a9fd8);
+      const tujuan = new T.Color(z.warnaLarutan);
+      const c = dasar.clone().lerp(tujuan, z.larut * sudahLarut);
+      s.data.gelas.userData.cair.material.color.copy(c);
+      // sedikit keruh untuk zat yang tidak larut sempurna
+      s.data.gelas.userData.cair.material.transmission =
+        0.45 - 0.3 * (z.larut > 0 && z.larut < 0.7 ? sudahLarut : 0);
     },
 
-    draw: function (c, sim) {
-      const z = ZAT[sim.get('zat')];
-      const batas = batasSendok(sim);
-      const T = sim.get('suhu');
+    bacaUbah: function (s) {
+      const z = zat(s);
+      const sisa = s.data.tersisa || 0;
+      const larut = 1 - sisa / Math.max(1, s.data.awal);
+      s.baca('hasil', z.larut >= 0.9 ? 'Larut' : z.larut > 0.1 ? 'Larut sebagian' : 'Tidak larut',
+        z.larut >= 0.9 ? 'aksen' : z.larut > 0.1 ? 'warn' : 'danger');
+      s.baca('larut', Math.round(larut * 100) + '%');
+      s.baca('campuran', z.larut >= 0.9 ? 'Larutan (homogen)'
+        : z.mengapung ? 'Campuran tidak menyatu' : 'Suspensi (heterogen)');
+      const aduk = s.get('aduk');
+      s.baca('waktu', z.larut < 0.1 ? 'Tidak membantu'
+        : aduk < 0.05 ? 'Belum diaduk — lambat'
+        : aduk > 0.7 ? 'Jauh lebih cepat' : 'Mempercepat');
+    }
+  };
 
-      /* ----- gelas ----- */
-      const pekat = Math.min(1, sim.data.terlarut / Math.max(batas, 0.6));
-      const warnaAir = z.larut
-        ? D.mix('#2f6f9e', z.warna, pekat * 0.75)
-        : '#2f6f9e';
-      D.beaker(c, GX, GY, GW, GH, 0.78, D.alpha(warnaAir, 0.82));
-
-      // pusaran saat diaduk
-      if (sim.get('diaduk')) {
-        c.save();
-        c.beginPath(); c.rect(GX, GY + GH * 0.22, GW, GH * 0.78); c.clip();
-        for (let i = 0; i < 4; i++) {
-          c.beginPath();
-          c.ellipse(GX + GW / 2, GY + GH * 0.38 + i * 18, GW * 0.34 - i * 4, 8, 0, 0, Math.PI * 2);
-          c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 1.3; c.stroke();
-        }
-        c.restore();
-        // sendok pengaduk
-        const sa = sim.data.aduk;
-        const sx = GX + GW / 2 + Math.cos(sa) * GW * 0.2;
-        D.line(c, sx, GY - 14, sx + Math.cos(sa) * 10, GY + GH * 0.6, 'rgba(230,236,240,.8)', 4);
-      }
-
-      // butiran
-      sim.data.butir.forEach(function (b) {
-        const r = b.r * (sim.get('halus') ? 0.62 : 1) * (0.5 + b.hidup * 0.5);
-        c.save(); c.globalAlpha = Math.min(1, b.hidup * 1.3);
-        if (z.butir === 'tetes' && !z.larut) {
-          D.circle(c, b.x, Math.min(b.y, GY + GH * 0.24), r * 1.5, D.alpha(z.warna, 0.85));
-        } else if (z.butir === 'kubus') {
-          D.roundRect(c, b.x - r, b.y - r, r * 2, r * 2, 1, z.warna);
-        } else {
-          D.circle(c, b.x, b.y, r, z.warna);
-        }
-        c.restore();
-      });
-
-      // label gelas
-      D.text(c, 'Gelas berisi 100 mL air', GX + GW / 2, GY - 24,
-        { size: 12, weight: 600, color: P.dim, align: 'c', base: 'middle' });
-      D.text(c, Math.round(T) + ' °C', GX + GW / 2, GY - 44, {
-        size: 16, weight: 700, align: 'c', base: 'middle',
-        color: D.ramp(['#4a90d9', '#54b64c', '#f0a94a', '#ef6a52'], (T - 5) / 85)
-      });
-
-      /* ----- panel kiri: keterangan zat ----- */
-      D.roundRect(c, 24, GY - 56, 186, 240, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.2);
-      D.text(c, 'ZAT YANG DIUJI', 40, GY - 38,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, z.nama, 40, GY - 14, { size: 20, weight: 700, color: P.text, base: 'middle' });
-
-      const baris = [
-        ['Sifat', z.s20 > 1 ? 'Larut dalam air' : z.s20 > 0 ? 'Sukar larut' : 'Tidak larut'],
-        ['Kelarutan 20 °C', z.s20 > 0 ? Sim.fmt(z.s20, z.s20 < 1 ? 2 : 0) + ' g / 100 mL' : 'praktis nol'],
-        ['Pengaruh suhu', z.naikSuhu > 1.3 ? 'naik banyak' : z.naikSuhu > 1 ? 'naik sedikit' : 'hampir tetap'],
-        ['Batas di ' + Math.round(T) + ' °C', z.s20 > 0 ? Sim.fmt(batas, 1) + ' sendok' : '—']
-      ];
-      baris.forEach(function (b, i) {
-        const y = GY + 16 + i * 38;
-        D.text(c, b[0], 40, y, { size: 11, weight: 500, color: P.faint, base: 'middle' });
-        D.text(c, b[1], 40, y + 16, { size: 13, weight: 650, color: P.text, base: 'middle' });
-      });
-
-      /* ----- panel kanan: tumpukan sendok ----- */
-      const RX = 470;
-      D.roundRect(c, RX, GY - 56, 286, 240, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.2);
-      D.text(c, 'SENDOK YANG DIMASUKKAN', RX + 16, GY - 38,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      const n = Math.min(sim.data.ditambah, 24);
-      for (let i = 0; i < n; i++) {
-        const kol = 6;
-        const sx = RX + 26 + (i % kol) * 42;
-        const sy = GY - 8 + Math.floor(i / kol) * 42;
-        const larutDia = (i + 1) <= batas;
-        D.circle(c, sx, sy, 15, larutDia ? D.alpha(P.accent, 0.22) : D.alpha('#f0a94a', 0.22),
-          larutDia ? P.accent : P.amber, 1.6);
-        D.text(c, String(i + 1), sx, sy,
-          { size: 11, weight: 700, color: larutDia ? P.accent2 : P.amber, align: 'c', base: 'middle' });
-      }
-      if (sim.data.ditambah > 24) {
-        D.text(c, '+' + (sim.data.ditambah - 24) + ' lagi', RX + 26, GY + 160,
-          { size: 11, weight: 600, color: P.dim, base: 'middle' });
-      }
-      Plot.legenda(c, RX + 16, GY + 182, [
-        { label: 'larut', warna: P.accent },
-        { label: 'tidak larut / mengendap', warna: P.amber }
-      ]);
-
-      /* ----- pesan ----- */
-      if (sim.data.pesanWaktu > 0) {
-        c.save(); c.globalAlpha = Math.min(1, sim.data.pesanWaktu / 0.6);
-        const tw = D.measure(c, sim.data.pesan, { size: 13, weight: 600 }) + 34;
-        D.roundRect(c, W / 2 - tw / 2, H - 52, tw, 32, 16,
-          'rgba(79,209,192,.15)', P.accent, 1.4);
-        D.text(c, sim.data.pesan, W / 2, H - 36,
-          { size: 13, weight: 600, color: P.accent2, align: 'c', base: 'middle' });
-        c.restore();
-      }
-    },
-
-    readoutsUpdate: function (sim) {
-      const z = ZAT[sim.get('zat')];
-      const batas = batasSendok(sim);
-      sim.readout('status', z.s20 > 1 ? 'Larut' : z.s20 > 0 ? 'Sukar larut' : 'Tidak larut',
-        z.s20 > 1 ? 'accent' : 'warn');
-      sim.readout('masuk', sim.data.ditambah + '<span class="unit"> sdk</span>');
-      sim.readout('batas', z.s20 > 0 ? Sim.fmt(batas, 1) + '<span class="unit"> sdk</span>' : '—');
-      sim.readout('sisa', sim.data.butir.length);
-    },
-
-    notes: `
-      <p>Ketika gula dimasukkan ke air lalu menghilang, gula itu <strong>tidak lenyap</strong>.
-      Partikel gula hanya menyebar di antara partikel air sampai terlalu kecil untuk
-      dilihat. Campuran yang terbentuk disebut <strong>larutan</strong>.</p>
-
-      <h3>Tiga bagian larutan</h3>
-      <ul>
-        <li><strong>Zat terlarut</strong> — yang dilarutkan, misalnya gula.</li>
-        <li><strong>Pelarut</strong> — yang melarutkan, di sini air.</li>
-        <li><strong>Larutan</strong> — hasil campurannya, misalnya air gula.</li>
-      </ul>
-
-      <h3>Mengapa ada yang tidak larut?</h3>
-      <p>Air hanya mampu melarutkan zat yang partikelnya "cocok" dengan partikel air.
-      Gula dan garam cocok, sehingga larut. Pasir dan minyak tidak cocok, sehingga
-      tetap terpisah — pasir mengendap di dasar, minyak mengapung di permukaan.</p>
-
-      <h3>Larutan jenuh</h3>
-      <p>Air punya <strong>batas</strong>. Setelah batas tercapai, tambahan gula tidak
-      larut lagi dan menumpuk di dasar. Larutan seperti ini disebut <strong>jenuh</strong>.
-      Memanaskan air biasanya menaikkan batas tersebut — itulah sebabnya gula lebih
-      mudah larut di teh panas.</p>
-
-      <div class="callout" data-tone="warn">
-        <strong>Jangan tertukar</strong>
-        Mengaduk membuat zat larut <em>lebih cepat</em>, tetapi tidak membuat air mampu
-        melarutkan <em>lebih banyak</em>. Yang menambah batas kelarutan adalah suhu.
-      </div>
-    `,
-
-    explore: [
-      'Masukkan garam sesendok demi sesendok sampai muncul pesan "jenuh". Berapa sendok yang muat?',
-      'Naikkan suhu ke 90 °C lalu ulangi. Berapa sendok sekarang? Apa kesimpulanmu?',
-      'Bandingkan waktu larut dengan dan tanpa <strong>Diaduk</strong>. Apakah batasnya ikut berubah?',
-      'Coba <strong>Minyak</strong> dan <strong>Pasir</strong>. Keduanya tidak larut, tetapi letaknya di gelas berbeda — mengapa?'
-    ],
-
-    quiz: [
-      {
-        q: 'Dalam segelas air teh manis, yang berperan sebagai pelarut adalah…',
-        options: ['Gula', 'Air', 'Daun teh', 'Gelasnya'],
-        answer: 1,
-        explain: 'Pelarut adalah zat yang melarutkan, dan jumlahnya paling banyak. Di sini air melarutkan gula dan zat dari daun teh.'
-      },
-      {
-        q: 'Gula lebih cepat larut dalam air panas daripada air dingin. Alasannya adalah…',
-        options: [
-          'Air panas lebih berat',
-          'Partikel air panas bergerak lebih cepat sehingga lebih sering menumbuk butiran gula',
-          'Gula berubah menjadi zat lain saat panas',
-          'Air panas memiliki lebih sedikit partikel'
-        ],
-        answer: 1,
-        explain: 'Suhu tinggi berarti partikel air bergerak lebih cepat. Tumbukan yang lebih sering dan lebih kuat membuat butiran gula terlepas lebih cepat.'
-      },
-      {
-        q: 'Sebuah larutan disebut jenuh apabila…',
-        options: [
-          'Warnanya sudah sangat pekat',
-          'Sudah diaduk sangat lama',
-          'Zat terlarut tidak dapat larut lagi dan mulai mengendap',
-          'Suhunya mencapai 100 °C'
-        ],
-        answer: 2,
-        explain: 'Larutan jenuh berarti pelarut sudah melarutkan sebanyak-banyaknya pada suhu itu. Tambahan zat berikutnya akan mengendap di dasar.'
-      },
-      {
-        q: 'Minyak dituang ke air lalu diaduk kuat. Setelah didiamkan, apa yang terjadi?',
-        options: [
-          'Minyak larut sempurna',
-          'Minyak kembali terpisah dan mengapung di atas air',
-          'Minyak mengendap di dasar',
-          'Minyak berubah menjadi air'
-        ],
-        answer: 1,
-        explain: 'Minyak tidak larut dalam air dan massa jenisnya lebih kecil, sehingga setelah didiamkan minyak kembali naik ke permukaan sebagai lapisan terpisah.'
-      }
-    ]
-  });
-})();
+  function taburUlang(s) {
+    const z = zat(s);
+    const p = s.data.p, d = p.userData.p;
+    const n = Math.round(d.length * S.clamp(s.get('jumlah') / 2, 0.1, 1));
+    p.material.color.setHex(z.w);
+    p.material.emissive.setHex(z.w);
+    s.data.minyak.visible = false;
+    s.data.gelas.userData.cair.material.color.setHex(0x4a9fd8);
+    s.data.gelas.userData.cair.material.transmission = 0.45;
+    for (let i = 0; i < d.length; i++) {
+      const q = d[i];
+      q.aktif = i < n;
+      q.bisaLarut = z.larut > 0 && Math.random() < z.larut;
+      q.sisa = 1;
+      q.r = z.butir;
+      q.vy = 0;
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.95;
+      q.pos.set(Math.cos(a) * r, z.mengapung ? 1.45 : 1.2 + Math.random() * 0.3, Math.sin(a) * r);
+    }
+    p.userData.tulis();
+    s.data.awal = n;
+    s.data.tersisa = n;
+    s.data.lbl.userData.ganti(z.n + ' + air');
+  }
+})());

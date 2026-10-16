@@ -1,381 +1,298 @@
-/* Perubahan Wujud Benda — Fase B
-   Panaskan dan dinginkan zat; amati wujud, nama perubahan, gerak partikel,
-   dan grafik suhu terhadap kalor yang diberikan (lengkap dengan dataran). */
+/* Perubahan Wujud Benda — Fase B — adegan 3D */
 
-(function () {
+Sim3D.daftar('perubahan-wujud', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
+  const N = 220;
+  const ZAT = [
+    { n: 'Air', leleh: 0, didih: 100, wP: 0xaee0f0, wC: 0x3f8fd8, wG: 0xcfe8f4 },
+    { n: 'Cokelat', leleh: 34, didih: 240, wP: 0x6b4228, wC: 0x8a5634, wG: 0xc09a7a },
+    { n: 'Lilin', leleh: 58, didih: 320, wP: 0xf0e8d0, wC: 0xe8dcb8, wG: 0xf4eedc },
+    { n: 'Besi', leleh: 1538, didih: 2862, wP: 0x8a949e, wC: 0xe08040, wG: 0xf0c080 }
+  ];
 
-  const ZAT = {
-    air:    { nama: 'Air',    tl: 0,   td: 100, warna: '#4a9fd0', padat: 'Es',    gas: 'Uap air' },
-    etanol: { nama: 'Etanol', tl: -114, td: 78, warna: '#c0d8e8', padat: 'Etanol beku', gas: 'Uap etanol' },
-    besi:   { nama: 'Besi',   tl: 1538, td: 2862, warna: '#aab4bd', padat: 'Besi padat', gas: 'Uap besi' },
-    lilin:  { nama: 'Lilin',  tl: 58,  td: 370, warna: '#f2e8c8', padat: 'Lilin padat', gas: 'Uap lilin' }
-  };
+  function zat(s) { return ZAT[parseInt(s.get('zat'), 10) || 0]; }
+  function suhu(s) { return s.get('suhu'); }
 
-  const W = 790, H = 510;
-
-  function wujudPada(z, T) {
-    if (T < z.tl) return 'padat';
-    if (T < z.td) return 'cair';
+  function wujudDari(z, t) {
+    if (t < z.leleh) return 'padat';
+    if (t < z.didih) return 'cair';
     return 'gas';
   }
 
-  function siapkan(sim) {
-    const z = ZAT[sim.get('zat')];
-    sim.data.T = 25;
-    sim.data.wujudLalu = wujudPada(z, 25);
-    sim.data.pesan = '';
-    sim.data.pesanWaktu = 0;
-    sim.data.jejak = new Plot.Buffer(900);
-    sim.data.kalor = 0;
-    buatPartikel(sim);
-  }
+  return {
+    latar: 0x0a1016,
+    kamera: { jarak: 9.6, phi: 1.1, theta: 0.55, targetY: 1.5, lajuPutar: 0.1 },
 
-  function buatPartikel(sim) {
-    const z = ZAT[sim.get('zat')];
-    const sys = new SistemPartikel({ x: 452, y: 104, w: 300, h: 176, tumbukan: false });
-    sys.susunKisi(40, 7.5, z.warna, { kolom: 10 });
-    sim.data.sys = sys;
-  }
-
-  /** Suhu kesetimbangan sederhana: pemanas menaikkan, lingkungan menarik ke 25 °C. */
-  function targetSuhu(sim) {
-    const api = sim.get('api');       // -1 (pendingin) .. +1 (pemanas penuh)
-    const z = ZAT[sim.get('zat')];
-    const atas = z.td + (z.td - z.tl) * 0.35 + 60;
-    const bawah = z.tl - (z.td - z.tl) * 0.3 - 40;
-    if (api > 0) return 25 + (atas - 25) * api;
-    if (api < 0) return 25 + (25 - bawah) * api;
-    return 25;
-  }
-
-  const NAMA_UBAH = {
-    'padat>cair': ['Melebur', 'Zat padat menyerap kalor dan berubah menjadi cair.'],
-    'cair>padat': ['Membeku', 'Zat cair melepas kalor dan berubah menjadi padat.'],
-    'cair>gas':   ['Menguap', 'Zat cair menyerap kalor dan berubah menjadi gas.'],
-    'gas>cair':   ['Mengembun', 'Gas melepas kalor dan berubah menjadi cair.'],
-    'padat>gas':  ['Menyublim', 'Zat padat langsung menjadi gas tanpa mencair.'],
-    'gas>padat':  ['Mengkristal', 'Gas langsung menjadi padat tanpa mencair.']
-  };
-
-  Sim.create({
-    title: 'Perubahan Wujud Benda',
-    subtitle: 'Geser pemanas atau pendingin, lalu amati zat berpindah wujud. Perhatikan grafik suhu — ada bagian mendatar yang menarik di titik lebur dan titik didih.',
-    fase: 'B', jenjang: 'SD Kelas 3–4',
-    topik: ['Wujud Zat', 'Kalor'],
-    stage: { w: W, h: H },
-    stageNote: 'Grafik merekam suhu terhadap waktu',
-
-    controls: [
-      {
-        title: 'Zat yang dipanaskan',
-        items: [
-          { type: 'select', id: 'zat', value: 'air', label: 'Pilih zat',
-            options: Object.keys(ZAT).map(function (k) { return { value: k, label: ZAT[k].nama }; }),
-            hint: 'Tiap zat punya titik lebur dan titik didih sendiri.' }
-        ]
-      },
-      {
-        title: 'Pemanas dan pendingin',
-        items: [
-          { type: 'slider', id: 'api', value: 0, min: -1, max: 1, step: 0.05,
-            label: 'Nyala api / pendingin', dec: 2,
-            minLabel: '❄ dingin', maxLabel: 'panas 🔥',
-            format: function (v) {
-              return v > 0.02 ? 'panas ' + Math.round(v * 100) + '%'
-                : v < -0.02 ? 'dingin ' + Math.round(-v * 100) + '%' : 'mati';
-            },
-            hint: 'Ke kanan memanaskan, ke kiri mendinginkan, tengah berarti dibiarkan.' },
-          { type: 'slider', id: 'laju', value: 1, min: 0.25, max: 4, step: 0.25,
-            label: 'Kecepatan waktu', unit: '×', dec: 2 }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan partikel' },
-          { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan grafik suhu' },
-          { type: 'toggle', id: 'titik', value: true, label: 'Tandai titik lebur & didih' }
-        ]
-      }
+    kendali: [
+      { judul: 'Zat', isi: [
+        { type: 'select', id: 'zat', value: 0, label: 'Zat yang dipanaskan',
+          options: ZAT.map(function (z, i) { return { value: i, label: z.n }; }) }
+      ]},
+      { judul: 'Pemanas', isi: [
+        { type: 'slider', id: 'suhu', value: -20, min: -40, max: 160, step: 1,
+          label: 'Suhu', unit: ' °C', dec: 0 },
+        { type: 'toggle', id: 'api', value: true, label: 'Nyalakan pembakar' },
+        { type: 'buttons', label: '', items: [
+          { label: '❄ Bekukan', klik: function (s) { s.set('suhu', -30); } },
+          { label: '🔥 Didihkan', klik: function (s) { s.set('suhu', 140); } }
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'partikel', value: true, label: 'Lihat partikelnya' },
+        { type: 'toggle', id: 'termo', value: true, label: 'Tampilkan termometer' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'suhu', label: 'Suhu', tone: 'accent' },
-      { id: 'wujud', label: 'Wujud' },
-      { id: 'tl', label: 'Titik lebur' },
-      { id: 'td', label: 'Titik didih' }
+    baca: [
+      { id: 'suhu', label: 'Suhu', tone: 'aksen' },
+      { id: 'wujud', label: 'Wujud sekarang' },
+      { id: 'titik', label: 'Titik leleh / didih' },
+      { id: 'proses', label: 'Nama perubahan' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 8, warna: 0x0f1620 }));
 
-    onChange: function (sim, id) {
-      if (id === 'zat') {
-        const z = ZAT[sim.get('zat')];
-        sim.data.T = 25;
-        sim.data.wujudLalu = wujudPada(z, 25);
-        sim.data.jejak.clear();
-        sim.data.kalor = 0;
-        buatPartikel(sim);
+      // kaki tiga + kasa
+      const kaki = new T.Group();
+      for (let i = 0; i < 3; i++) {
+        const a = i / 3 * Math.PI * 2;
+        const b = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 1.5, 12), S.matLogam(0x6b747c));
+        b.position.set(Math.cos(a) * 0.85, 0.75, Math.sin(a) * 0.85);
+        b.rotation.z = Math.cos(a) * 0.1; b.rotation.x = -Math.sin(a) * 0.1;
+        kaki.add(b);
       }
-    },
+      const cincin = new T.Mesh(new T.TorusGeometry(0.88, 0.045, 12, 40), S.matLogam(0x6b747c));
+      cincin.rotation.x = Math.PI / 2; cincin.position.y = 1.5;
+      kaki.add(cincin);
+      const kasa = new T.Mesh(new T.CylinderGeometry(0.92, 0.92, 0.035, 36),
+        new T.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.85, metalness: 0.4 }));
+      kasa.position.y = 1.52;
+      kaki.add(kasa);
+      s.tambah(kaki);
 
-    update: function (sim, dt) {
-      dt *= sim.get('laju');
-      const z = ZAT[sim.get('zat')];
-      const tujuan = targetSuhu(sim);
-      const rentang = Math.max(1, z.td - z.tl);
+      // pembakar
+      const bakar = new T.Group();
+      const dasar = new T.Mesh(new T.CylinderGeometry(0.42, 0.52, 0.2, 28), S.matLogam(0x3a4149));
+      dasar.position.y = 0.1; bakar.add(dasar);
+      const pipa = new T.Mesh(new T.CylinderGeometry(0.12, 0.14, 0.78, 20), S.matLogam(0x5a636b));
+      pipa.position.y = 0.58; bakar.add(pipa);
+      const api = S.nyala();
+      api.position.y = 0.95;
+      bakar.add(api);
+      s.data.api = api;
+      s.tambah(bakar);
 
-      // laju perubahan suhu, diperlambat kuat di titik lebur dan titik didih
-      // untuk memunculkan "dataran" kalor laten pada grafik.
-      let laju = (tujuan - sim.data.T) * 0.22;
-      const dekatLebur = Math.abs(sim.data.T - z.tl) < rentang * 0.02;
-      const dekatDidih = Math.abs(sim.data.T - z.td) < rentang * 0.02;
-      if (dekatLebur || dekatDidih) laju *= 0.08;
+      // gelas
+      const gelas = S.gelas({ r: 0.95, h: 1.9, level: 0 });
+      gelas.position.y = 1.54;
+      gelas.userData.cair.visible = false;
+      s.data.gelas = gelas;
+      s.tambah(gelas);
 
-      sim.data.T += laju * dt * 3;
-      sim.data.kalor += Math.abs(sim.get('api')) * dt * 3;
+      // bongkahan padat di dalam gelas
+      const es = new T.Mesh(new T.BoxGeometry(1.05, 0.9, 1.05),
+        new T.MeshPhysicalMaterial({
+          color: 0xaee0f0, roughness: 0.14, metalness: 0, transmission: 0.55,
+          thickness: 0.5, transparent: true, opacity: 0.9, clearcoat: 1, envMapIntensity: 1
+        }));
+      es.position.y = 1.54 + 0.47;
+      es.castShadow = true;
+      s.data.es = es;
+      s.tambah(es);
 
-      const w = wujudPada(z, sim.data.T);
-      if (w !== sim.data.wujudLalu) {
-        const kunci = sim.data.wujudLalu + '>' + w;
-        const info = NAMA_UBAH[kunci];
-        if (info) {
-          sim.data.pesan = info[0] + ' — ' + info[1];
-          sim.data.pesanWaktu = 3.6;
-        }
-        sim.data.wujudLalu = w;
-      }
+      // partikel
+      const p = S.partikel(N, { r: 0.075, warna: 0x7fc7e8, kotak: { x: 0.78, y: 0.78, z: 0.78 } });
+      p.position.y = 1.54 + 0.85;
+      s.data.p = p;
+      s.tambah(p);
 
-      // partikel mengikuti wujud dan suhu
-      const sys = sim.data.sys;
-      const panas = Sim.clamp((sim.data.T - z.tl) / rentang, 0, 1.6);
-      sys.setWujud(w, w === 'gas' ? 0.6 + panas * 0.5 : w === 'cair' ? 0.3 + panas * 0.5 : panas * 0.8);
-      if (w === 'cair') sys.levelCair = 0.62;
-      sys.partikel.forEach(function (p) { p.warna = z.warna; });
-      sys.langkah(dt);
+      // uap keluar dari mulut gelas
+      const uap = S.partikel(60, { r: 0.07, warna: 0xcfe8f4, kotak: { x: 1.4, y: 1.4, z: 1.4 } });
+      uap.material.transparent = true; uap.material.opacity = 0.45;
+      uap.position.y = 3.9;
+      s.data.uap = uap;
+      uap.userData.p.forEach(function (q) {
+        q.pos.set(S.acak(-0.45, 0.45), S.acak(-1.1, 0.5), S.acak(-0.45, 0.45));
+        q.vel.set(S.acak(-0.14, 0.14), S.acak(0.32, 0.72), S.acak(-0.14, 0.14));
+      });
+      s.tambah(uap);
 
-      sim.data.jejak.push(sim.t, sim.data.T);
-      if (sim.data.pesanWaktu > 0) sim.data.pesanWaktu -= dt;
-    },
-
-    draw: function (c, sim) {
-      const z = ZAT[sim.get('zat')];
-      const T = sim.data.T;
-      const w = wujudPada(z, T);
-      const api = sim.get('api');
-
-      /* ---------- kiri: wadah + pemanas ---------- */
-      const bx = 72, by = 104, bw = 150, bh = 172;
-      const isi = w === 'gas' ? 0.96 : w === 'cair' ? 0.6 : 0.5;
-      const warnaIsi = w === 'gas' ? D.alpha(z.warna, 0.2)
-        : w === 'padat' ? D.lighten(z.warna, 0.22) : z.warna;
-      D.beaker(c, bx, by, bw, bh, isi, warnaIsi);
-
-      if (w === 'padat') {
-        // bongkahan padat
-        for (let i = 0; i < 5; i++) {
-          D.roundRect(c, bx + 14 + (i % 3) * 42, by + bh - 70 - Math.floor(i / 3) * 34,
-            34, 28, 4, D.lighten(z.warna, 0.3), 'rgba(255,255,255,.35)', 1.2);
-        }
-      }
-      if (w === 'gas') {
-        for (let i = 0; i < 11; i++) {
-          const px = bx + 14 + ((i * 61 + sim.t * 30) % (bw - 28));
-          const py = by + bh - 16 - ((i * 43 + sim.t * 52) % (bh - 24));
-          D.circle(c, px, py, 5 + (i % 3), D.alpha(z.warna, 0.35));
-        }
-      }
-      if (w === 'cair' && T > z.td - (z.td - z.tl) * 0.1) {
-        // gelembung menjelang mendidih
-        for (let i = 0; i < 7; i++) {
-          const py = by + bh - ((i * 37 + sim.t * 95) % bh);
-          D.circle(c, bx + 22 + (i * 23) % (bw - 44), py, 3.4,
-            null, 'rgba(255,255,255,.5)', 1.2);
-        }
-      }
-
-      // pemanas / pendingin
-      const ax = bx + bw / 2, ay = by + bh + 26;
-      if (api > 0.02) {
-        D.flame(c, ax, ay, api, sim.t);
-        D.roundRect(c, ax - 16, ay + 2, 32, 22, 4, '#3b434b', 'rgba(255,255,255,.2)', 1.2);
-      } else if (api < -0.02) {
-        D.roundRect(c, bx + 4, ay - 2, bw - 8, 22, 5,
-          D.alpha('#4a90d9', 0.3 + (-api) * 0.4), '#4a90d9', 1.4);
-        D.text(c, '❄ pendingin', ax, ay + 9,
-          { size: 11, weight: 700, color: '#9fd4ee', align: 'c', base: 'middle' });
-        for (let i = 0; i < 5; i++) {
-          D.text(c, '❄', bx + 16 + i * 30, ay - 14 - Math.sin(sim.t * 2 + i) * 5,
-            { size: 11, color: D.alpha('#9fd4ee', 0.6), align: 'c', base: 'middle' });
-        }
-      } else {
-        D.roundRect(c, ax - 16, ay + 2, 32, 22, 4, '#3b434b', 'rgba(255,255,255,.14)', 1.2);
-      }
+      // gelembung mendidih
+      const gel = S.gelembung({ n: 40, sebar: 0.62, tinggi: 1.5 });
+      gel.position.y = 1.6;
+      s.data.gel = gel;
+      s.tambah(gel);
 
       // termometer
-      const tx = bx + bw + 34, ty = by - 6, th = bh + 22;
-      D.roundRect(c, tx, ty, 16, th, 8, 'rgba(255,255,255,.07)', 'rgba(255,255,255,.26)', 1.4);
-      const skalaLo = Math.min(z.tl - 40, -20), skalaHi = Math.max(z.td + 60, 120);
-      const frac = Sim.clamp((T - skalaLo) / (skalaHi - skalaLo), 0, 1);
-      const warnaT = D.ramp(['#4a90d9', '#54b64c', '#f0a94a', '#ef6a52'], frac);
-      D.roundRect(c, tx + 3, ty + th - 6 - (th - 12) * frac, 10, (th - 12) * frac + 3, 5, warnaT);
-      D.circle(c, tx + 8, ty + th + 6, 10, warnaT, 'rgba(255,255,255,.26)', 1.4);
-      if (sim.get('titik')) {
-        [[z.tl, 'lebur', '#8fd0ff'], [z.td, 'didih', '#f0a94a']].forEach(function (m) {
-          const f = Sim.clamp((m[0] - skalaLo) / (skalaHi - skalaLo), 0, 1);
-          const y = ty + th - 6 - (th - 12) * f;
-          D.line(c, tx - 6, y, tx + 22, y, m[2], 1.4, [3, 3]);
-          D.text(c, m[1] + ' ' + Math.round(m[0]) + '°', tx + 26, y,
-            { size: 10, weight: 600, color: m[2], base: 'middle' });
-        });
-      }
-      D.text(c, Sim.fmt(T, 1) + ' °C', bx + bw / 2, by - 22,
-        { size: 17, weight: 700, color: warnaT, align: 'c', base: 'middle' });
-      D.text(c, z.nama + ' — ' +
-        (w === 'padat' ? z.padat : w === 'cair' ? z.nama + ' cair' : z.gas),
-        bx + bw / 2, by - 42,
-        { size: 12, weight: 600, color: P.dim, align: 'c', base: 'middle' });
+      const termo = new T.Group();
+      const tabungT = new T.Mesh(new T.CylinderGeometry(0.075, 0.075, 3.2, 20),
+        S.matKaca({ opacity: 0.42, color: 0xdceef8 }));
+      tabungT.position.y = 1.6; termo.add(tabungT);
+      const bulb = new T.Mesh(new T.SphereGeometry(0.14, 24, 18),
+        new T.MeshPhysicalMaterial({ color: 0xef4e4e, roughness: 0.2, emissive: 0xef4e4e, emissiveIntensity: 0.3 }));
+      termo.add(bulb);
+      const kolom = new T.Mesh(new T.CylinderGeometry(0.042, 0.042, 1, 16),
+        new T.MeshPhysicalMaterial({ color: 0xef4e4e, roughness: 0.2, emissive: 0xef4e4e, emissiveIntensity: 0.35 }));
+      termo.add(kolom);
+      s.data.kolom = kolom;
+      termo.position.set(1.45, 1.7, 0.3);
+      s.data.termo = termo;
+      s.tambah(termo);
 
-      /* ---------- kanan atas: partikel ---------- */
-      if (sim.get('partikel')) {
-        const s = sim.data.sys;
-        D.roundRect(c, s.x - 8, s.y - 26, s.w + 16, s.h + 34, 10,
-          'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.2);
-        D.text(c, 'SUSUNAN PARTIKEL · ' + w.toUpperCase(), s.x, s.y - 12,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        s.gambar(c, { label: false });
-        const ket = w === 'padat' ? 'bergetar di tempat, tersusun rapi'
-          : w === 'cair' ? 'berdekatan tetapi bisa bergeser'
-          : 'berjauhan dan bergerak sangat cepat';
-        D.text(c, ket, s.x + s.w / 2, s.y + s.h + 14,
-          { size: 11, weight: 500, color: P.dim, align: 'c', base: 'middle' });
-      }
+      const lbl = S.teks('Padat', { skala: 0.52, lebar: 16, warna: '#9fe8ad' });
+      lbl.position.set(0, 5.2, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
 
-      /* ---------- bawah: grafik suhu ---------- */
-      if (sim.get('grafik')) {
-        const g = { x: 452, y: 330, w: 300, h: 128 };
-        const data = sim.data.jejak.data;
-        const tMax = Math.max(8, sim.t);
-        const lo = Math.min(z.tl - 25, -15), hi = Math.max(z.td + 35, 115);
-        const map = Plot.axes(c, {
-          x: g.x, y: g.y, w: g.w, h: g.h,
-          xmin: Math.max(0, tMax - 30), xmax: tMax,
-          ymin: lo, ymax: hi,
-          xlabel: 'waktu (detik)', ylabel: 'suhu (°C)',
-          judul: 'Suhu terhadap waktu', yticks: 4, xticks: 5
-        });
-        if (sim.get('titik')) {
-          Plot.acuan(c, map, { y: z.tl, color: '#8fd0ff', label: 'titik lebur' });
-          Plot.acuan(c, map, { y: z.td, color: '#f0a94a', label: 'titik didih' });
-        }
-        Plot.line(c, map, data, { color: P.accent, lw: 2.4 });
-        if (data.length) {
-          const last = data[data.length - 1];
-          if (last[0] >= map.xmin) Plot.titik(c, map, last[0], last[1], { color: P.accent2, r: 4, halo: true });
-        }
-      }
-
-      /* ---------- pesan perubahan wujud ---------- */
-      if (sim.data.pesanWaktu > 0) {
-        const a = Math.min(1, sim.data.pesanWaktu / 0.6);
-        c.save(); c.globalAlpha = a;
-        const tw = D.measure(c, sim.data.pesan, { size: 13, weight: 600 }) + 34;
-        D.roundRect(c, 40, H - 44, Math.min(tw, W - 80), 32, 16,
-          'rgba(240,169,74,.16)', P.amber, 1.4);
-        D.text(c, sim.data.pesan, 58, H - 28,
-          { size: 13, weight: 600, color: P.amber, base: 'middle' });
-        c.restore();
-      }
+      pasang(s);
     },
 
-    readoutsUpdate: function (sim) {
-      const z = ZAT[sim.get('zat')];
-      const w = wujudPada(z, sim.data.T);
-      sim.readout('suhu', Sim.fmt(sim.data.T, 1) + '<span class="unit">°C</span>');
-      sim.readout('wujud', w.charAt(0).toUpperCase() + w.slice(1),
-        w === 'gas' ? 'warn' : w === 'padat' ? null : 'accent');
-      sim.readout('tl', Sim.fmt(z.tl, 0) + '<span class="unit">°C</span>');
-      sim.readout('td', Sim.fmt(z.td, 0) + '<span class="unit">°C</span>');
+    ubah: function (s, id) {
+      if (id === 'zat') pasangSkala(s);
+      if (id === 'termo') s.data.termo.visible = s.get('termo');
+      if (id === 'partikel') s.data.p.visible = s.get('partikel');
+      pasang(s);
     },
 
-    notes: `
-      <p>Zat bisa berpindah dari satu wujud ke wujud lain bila diberi atau diambil
-      <strong>kalor</strong> (panas). Zatnya sendiri tidak berubah — air tetap air,
-      baik sebagai es, air cair, maupun uap. Yang berubah hanyalah jarak dan gerak
-      partikelnya.</p>
+    langkah: function (s, dt) {
+      const z = zat(s), t = suhu(s);
+      const w = wujudDari(z, petakanSuhu(z, t));
+      const p = s.data.p, d = p.userData.p;
+      const panas = S.clamp((petakanSuhu(z, t) - z.leleh) / Math.max(1, z.didih - z.leleh), 0, 1);
 
-      <h3>Enam nama perubahan wujud</h3>
-      <table>
-        <thead><tr><th>Perubahan</th><th>Nama</th><th>Kalor</th></tr></thead>
-        <tbody>
-          <tr><td>Padat → cair</td><td><strong>Melebur</strong></td><td>menyerap</td></tr>
-          <tr><td>Cair → padat</td><td><strong>Membeku</strong></td><td>melepas</td></tr>
-          <tr><td>Cair → gas</td><td><strong>Menguap</strong></td><td>menyerap</td></tr>
-          <tr><td>Gas → cair</td><td><strong>Mengembun</strong></td><td>melepas</td></tr>
-          <tr><td>Padat → gas</td><td><strong>Menyublim</strong></td><td>menyerap</td></tr>
-          <tr><td>Gas → padat</td><td><strong>Mengkristal</strong></td><td>melepas</td></tr>
-        </tbody>
-      </table>
+      s.data.api.userData.perbarui(s.waktu, s.get('api') ? S.clamp((t + 40) / 200, 0, 1) : 0);
 
-      <h3>Mengapa grafiknya mendatar?</h3>
-      <p>Perhatikan: saat zat sedang melebur atau mendidih, suhunya <strong>berhenti
-      naik</strong> walaupun api terus menyala. Kalor yang masuk tidak dipakai untuk
-      menaikkan suhu, melainkan untuk <strong>melepaskan partikel dari ikatannya</strong>.
-      Kalor ini disebut kalor laten. Begitu seluruh zat berubah wujud, suhu baru naik lagi.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Titik lebur = titik beku</strong>
-        Air melebur pada 0 °C dan membeku juga pada 0 °C. Suhunya sama; yang
-        membedakan hanyalah arah perpindahan kalornya.
-      </div>
-    `,
-
-    explore: [
-      'Mulai dari air pada 25 °C. Dorong api ke kanan penuh dan amati kapan grafik berhenti naik.',
-      'Setelah air mendidih, geser ke pendingin penuh. Perubahan wujud apa yang muncul berturut-turut?',
-      'Ganti zat ke <strong>Besi</strong>. Mengapa besi berwujud padat di suhu ruang, sedangkan air cair?',
-      'Bandingkan <strong>Etanol</strong> dan <strong>Air</strong>: zat mana yang lebih mudah menguap? Hubungkan dengan titik didihnya.'
-    ],
-
-    quiz: [
-      {
-        q: 'Air dipanaskan terus di atas kompor. Setelah mencapai 100 °C, suhunya tidak naik lagi walaupun api tetap menyala. Mengapa?',
-        options: [
-          'Karena kompornya rusak',
-          'Karena kalor dipakai untuk mengubah air menjadi uap, bukan menaikkan suhu',
-          'Karena air sudah tidak bisa menyerap kalor',
-          'Karena suhu maksimum air adalah 100 °C selamanya'
-        ],
-        answer: 1,
-        explain: 'Selama mendidih, seluruh kalor yang masuk dipakai untuk melepaskan partikel air dari ikatannya menjadi uap. Suhu baru naik lagi setelah semua air berubah menjadi uap.'
-      },
-      {
-        q: 'Embun di rumput pada pagi hari terbentuk melalui proses…',
-        options: ['Menguap', 'Mengembun', 'Menyublim', 'Melebur'],
-        answer: 1,
-        explain: 'Uap air di udara melepas kalor saat udara malam mendingin, lalu berubah menjadi tetesan air cair. Proses gas menjadi cair disebut mengembun.'
-      },
-      {
-        q: 'Kapur barus yang diletakkan di lemari lama-lama habis tanpa pernah menjadi cair. Peristiwa ini disebut…',
-        options: ['Melebur', 'Mengkristal', 'Menyublim', 'Membeku'],
-        answer: 2,
-        explain: 'Perubahan langsung dari wujud padat menjadi gas tanpa melewati wujud cair disebut menyublim.'
-      },
-      {
-        q: 'Es pada 0 °C dan air pada 0 °C sama-sama bersuhu nol. Apa yang membedakan keduanya?',
-        options: [
-          'Zatnya berbeda',
-          'Jumlah kalor yang dikandungnya berbeda',
-          'Es lebih dingin walaupun angkanya sama',
-          'Tidak ada bedanya sama sekali'
-        ],
-        answer: 1,
-        explain: 'Suhunya sama, tetapi air cair sudah menyerap kalor laten peleburan. Itulah sebabnya es terasa jauh lebih mendinginkan daripada air dingin biasa.'
+      if (w === 'gas') {
+        p.userData.gerak(dt, 1.6 + panas);
+        s.data.uap.visible = true;
+        majuUap(s, dt, 1.3);
+        s.data.gel.userData.perbarui(dt, 1.4);
+      } else if (w === 'cair') {
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          q.pos.addScaledVector(q.vel, dt * (0.3 + panas * 0.7));
+          const r = Math.hypot(q.pos.x, q.pos.z);
+          if (r > 0.74) { q.pos.x *= 0.74 / r; q.pos.z *= 0.74 / r; q.vel.x *= -0.72; q.vel.z *= -0.72; }
+          if (q.pos.y > 0.02) { q.pos.y = 0.02; q.vel.y = -Math.abs(q.vel.y); }
+          if (q.pos.y < -0.78) { q.pos.y = -0.78; q.vel.y = Math.abs(q.vel.y); }
+        }
+        p.userData.tulis();
+        s.data.uap.visible = panas > 0.72;
+        if (s.data.uap.visible) majuUap(s, dt, 0.5);
+        s.data.gel.userData.perbarui(dt, panas > 0.6 ? (panas - 0.6) * 2.4 : 0);
+      } else {
+        const dingin = S.clamp((z.leleh - petakanSuhu(z, t)) / 40, 0, 1);
+        const amp = 0.05 * (1 - dingin * 0.75);
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.asal) continue;
+          q.pos.set(
+            q.asal.x + Math.sin(s.waktu * 10 + i * 1.7) * amp,
+            q.asal.y + Math.sin(s.waktu * 12 + i * 2.3) * amp,
+            q.asal.z + Math.cos(s.waktu * 11 + i * 1.1) * amp);
+        }
+        p.userData.tulis();
+        s.data.uap.visible = false;
+        s.data.gel.userData.perbarui(dt, 0);
       }
-    ]
-  });
-})();
+
+      // kolom termometer
+      const f = S.clamp((t + 40) / 200, 0, 1);
+      s.data.kolom.scale.y = Math.max(0.01, f * 3);
+      s.data.kolom.position.y = f * 1.5;
+    },
+
+    bacaUbah: function (s) {
+      const z = zat(s), t = suhu(s);
+      const tt = petakanSuhu(z, t);
+      const w = wujudDari(z, tt);
+      s.baca('suhu', Math.round(t) + ' °C' + (z.n !== 'Air' ? ' (skala ' + z.n.toLowerCase() + ')' : ''),
+        t < 0 ? 'biru' : t > 100 ? 'danger' : 'aksen');
+      s.baca('wujud', w === 'padat' ? 'Padat' : w === 'cair' ? 'Cair' : 'Gas',
+        w === 'padat' ? 'biru' : w === 'cair' ? 'aksen' : 'warn');
+      s.baca('titik', z.leleh + ' °C / ' + z.didih + ' °C');
+      const dekatLeleh = Math.abs(tt - z.leleh) < (z.didih - z.leleh) * 0.06;
+      const dekatDidih = Math.abs(tt - z.didih) < (z.didih - z.leleh) * 0.06;
+      s.baca('proses', dekatLeleh ? 'Mencair / membeku'
+        : dekatDidih ? 'Menguap / mengembun'
+        : w === 'padat' ? 'Belum berubah' : w === 'gas' ? 'Sudah menguap' : 'Sudah mencair');
+    }
+  };
+
+  /* Petakan suhu slider (−40..160) ke skala zat, agar semua zat bisa
+     dilelehkan dalam satu rentang penggeser yang sama. */
+  function petakanSuhu(z, t) {
+    if (z.leleh === 0 && z.didih === 100) return t;
+    const f = (t + 40) / 200;                 // 0..1
+    return z.leleh - 40 + f * (z.didih + 60 - (z.leleh - 40));
+  }
+
+  function majuUap(s, dt, laju) {
+    const u = s.data.uap.userData.p;
+    for (let i = 0; i < u.length; i++) {
+      u[i].pos.addScaledVector(u[i].vel, dt * laju);
+      const naik = (u[i].pos.y + 1.2) / 2.0;
+      u[i].r = 0.075 * (1 - S.clamp(naik, 0, 1) * 0.55);
+      if (u[i].pos.y > 0.8) u[i].pos.set(S.acak(-0.35, 0.35), -1.2, S.acak(-0.35, 0.35));
+    }
+    s.data.uap.userData.tulis();
+  }
+
+  function pasang(s) {
+    const z = zat(s), t = petakanSuhu(zat(s), suhu(s));
+    const w = wujudDari(z, t);
+    const p = s.data.p, d = p.userData.p;
+
+    s.data.es.visible = w === 'padat' && !s.get('partikel');
+    s.data.es.material.color.setHex(z.wP);
+    const tampilCair = w === 'cair' && !s.get('partikel');
+    s.data.gelas.userData.setLevel(tampilCair ? 0.55 : 0, z.wC);
+    s.data.p.visible = s.get('partikel');
+    s.data.uap.material.color.setHex(z.wG);
+
+    const warna = w === 'padat' ? z.wP : w === 'cair' ? z.wC : z.wG;
+    p.material.color.setHex(warna);
+    p.material.emissive.setHex(warna);
+
+    if (w === 'padat') {
+      const sisi = Math.floor(Math.pow(d.length, 1 / 3));
+      const jarak = 0.168;
+      let k = 0;
+      for (let x = 0; x < sisi; x++) for (let y = 0; y < sisi; y++) for (let zz = 0; zz < sisi; zz++) {
+        if (k >= d.length) break;
+        const q = d[k++];
+        q.asal = new T.Vector3(
+          (x - (sisi - 1) / 2) * jarak,
+          (y - (sisi - 1) / 2) * jarak - 0.35,
+          (zz - (sisi - 1) / 2) * jarak);
+        q.pos.copy(q.asal);
+        q.r = 0.072; q.aktif = true;
+      }
+      for (; k < d.length; k++) { d[k].aktif = false; d[k].asal = null; }
+    } else if (w === 'cair') {
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.7;
+        d[i].pos.set(Math.cos(a) * r, -0.78 + Math.random() * 0.78, Math.sin(a) * r);
+        d[i].vel.set(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1)).normalize().multiplyScalar(S.acak(.4, .9));
+        d[i].asal = null; d[i].r = 0.072; d[i].aktif = true;
+      }
+    } else {
+      p.userData.kotak = { x: 0.78, y: 0.82, z: 0.78 };
+      for (let i = 0; i < d.length; i++) {
+        d[i].pos.set(S.acak(-0.7, 0.7), S.acak(-0.78, 0.78), S.acak(-0.7, 0.7));
+        d[i].vel.set(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1)).normalize().multiplyScalar(S.acak(1, 1.8));
+        d[i].asal = null; d[i].r = 0.06; d[i].aktif = true;
+      }
+    }
+    p.userData.tulis();
+
+    s.data.lbl.userData.ganti(z.n + ' — ' + (w === 'padat' ? 'Padat' : w === 'cair' ? 'Cair' : 'Gas'),
+      w === 'padat' ? '#9fc8e8' : w === 'cair' ? '#7fe3d6' : '#f0c88a');
+    s.data.termo.visible = s.get('termo');
+  }
+
+  function pasangSkala(s) { /* skala mengikuti zat lewat petakanSuhu */ }
+})());

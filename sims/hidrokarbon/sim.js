@@ -1,454 +1,445 @@
-/* Hidrokarbon dan Minyak Bumi — Fase E
-   Bangun rantai karbon, temukan isomer, dan jalankan menara distilasi
-   bertingkat minyak bumi. */
+/* Hidrokarbon dan Minyak Bumi — Fase E — adegan 3D */
 
-(function () {
+Sim3D.daftar('hidrokarbon', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  const AKAR = ['met', 'et', 'prop', 'but', 'pent', 'heks', 'hept', 'okt', 'non', 'dek'];
+  const ISOMER = [1, 1, 1, 2, 3, 5, 9, 18, 35, 75];
 
-  const W = 790, H = 570;
-
-  /* --- jumlah isomer rangka alkana --- */
-  const ISOMER = { 1: 1, 2: 1, 3: 1, 4: 2, 5: 3, 6: 5, 7: 9, 8: 18, 9: 35, 10: 75 };
-
-  const ISOMER_C5 = [
-    { n: 'n-pentana', cabang: [], td: 36.1 },
-    { n: '2-metilbutana (isopentana)', cabang: [{ pos: 1, n: 1 }], td: 27.8 },
-    { n: '2,2-dimetilpropana (neopentana)', cabang: [{ pos: 1, n: 2 }], td: 9.5 }
-  ];
-
+  /* fraksi minyak bumi: nama, rentang C, suhu didih, warna, tinggi keluar 0..1 */
   const FRAKSI = [
-    { n: 'Gas',          c: 'C₁–C₄',   td: '< 20 °C',    guna: 'LPG, bahan bakar kompor',    w: '#9fd4ee', tinggi: 0.92 },
-    { n: 'Bensin',       c: 'C₅–C₁₀',  td: '40–180 °C',  guna: 'Bahan bakar kendaraan',      w: '#f0d04a', tinggi: 0.76 },
-    { n: 'Nafta',        c: 'C₆–C₁₂',  td: '70–200 °C',  guna: 'Bahan baku industri plastik', w: '#f0a94a', tinggi: 0.62 },
-    { n: 'Kerosin',      c: 'C₁₂–C₁₆', td: '175–325 °C', guna: 'Avtur dan minyak tanah',      w: '#e8884a', tinggi: 0.48 },
-    { n: 'Solar',        c: 'C₁₅–C₁₈', td: '250–350 °C', guna: 'Mesin diesel',                w: '#c4703a', tinggi: 0.34 },
-    { n: 'Oli & lilin',  c: 'C₁₈–C₃₀', td: '300–400 °C', guna: 'Pelumas mesin',               w: '#8a5a30', tinggi: 0.20 },
-    { n: 'Residu/aspal', c: '> C₃₀',   td: '> 400 °C',   guna: 'Pengeras jalan',              w: '#4a3a30', tinggi: 0.06 }
+    { n: 'Gas (LPG)', c: 'C₁–C₄', suhu: '< 20 °C', warna: 0xbfe8ff, y: 0.96, guna: 'bahan bakar kompor' },
+    { n: 'Petroleum eter', c: 'C₅–C₇', suhu: '20–70 °C', warna: 0xdff0d8, y: 0.84, guna: 'pelarut' },
+    { n: 'Bensin', c: 'C₅–C₁₂', suhu: '70–140 °C', warna: 0xf0e07a, y: 0.70, guna: 'mesin bensin' },
+    { n: 'Nafta', c: 'C₈–C₁₂', suhu: '140–180 °C', warna: 0xf0c868, y: 0.58, guna: 'bahan petrokimia' },
+    { n: 'Kerosin', c: 'C₁₂–C₁₆', suhu: '180–250 °C', warna: 0xe8a84a, y: 0.46, guna: 'avtur, minyak tanah' },
+    { n: 'Diesel', c: 'C₁₅–C₁₈', suhu: '250–350 °C', warna: 0xc8803a, y: 0.33, guna: 'mesin diesel' },
+    { n: 'Oli & lilin', c: 'C₁₈–C₃₀', suhu: '350–400 °C', warna: 0x9a5f30, y: 0.20, guna: 'pelumas, parafin' },
+    { n: 'Residu/aspal', c: '> C₃₀', suhu: '> 400 °C', warna: 0x3a2b22, y: 0.06, guna: 'aspal jalan' }
   ];
 
-  function siapkan(sim) {
-    sim.data.a = 0;
-    sim.data.jalan = false;
+  /* arah tetrahedral untuk menempelkan H */
+  const ARAH = [
+    [1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1],
+    [1, 1, -1], [-1, -1, -1], [-1, 1, 1], [1, -1, 1],
+    [0, 1, 0], [0, -1, 0]
+  ].map(function (a) { return new T.Vector3(a[0], a[1], a[2]).normalize(); });
+
+  /* batas suhu kasar tiap fraksi agar ikut menguap */
+  const BATAS = [20, 70, 140, 180, 250, 350, 400, 999];
+
+  function jenis(s) { return s.get('jenis'); }
+  function nC(s) { return Math.round(s.get('n')); }
+
+  function rumus(s) {
+    const n = nC(s), j = jenis(s);
+    const h = j === 'alkana' ? 2 * n + 2 : j === 'alkena' ? 2 * n : 2 * n - 2;
+    return { n: n, h: h, teks: 'C' + S.sub(n) + 'H' + S.sub(h), mr: n * 12.011 + h * 1.008 };
   }
 
-  /** Rumus molekul deret homolog. */
-  function rumus(n, jenis) {
-    if (jenis === 'alkana') return 'C' + n + 'H' + (2 * n + 2);
-    if (jenis === 'alkena') return 'C' + n + 'H' + (2 * n);
-    return 'C' + n + 'H' + (2 * n - 2);
+  function nama(s) {
+    const n = nC(s), j = jenis(s);
+    const akar = AKAR[n - 1] || ('C' + n);
+    const akhir = j === 'alkana' ? 'ana' : j === 'alkena' ? 'ena' : 'una';
+    const cab = parseInt(s.get('cabang'), 10) || 0;
+    let awal = '';
+    if (cab === 1) awal = '2-metil';
+    if (cab === 2) awal = '3-metil';
+    if (cab === 3) awal = '2,2-dimetil';
+    const utama = Math.max(1, n - (cab === 3 ? 2 : cab > 0 ? 1 : 0));
+    const akarU = AKAR[utama - 1] || ('C' + utama);
+    if (awal) return awal + akarU + akhir;
+    return akar + akhir;
   }
 
-  function nama(n, jenis) {
-    const akar = ['', 'met', 'et', 'prop', 'but', 'pent', 'heks', 'hept', 'okt', 'non', 'dek'][n];
-    return akar + (jenis === 'alkana' ? 'ana' : jenis === 'alkena' ? 'ena' : 'una');
-  }
+  return {
+    latar: 0x060b11,
+    kamera: { jarak: 11, phi: 1.1, theta: 0.6, targetY: 0.3, lajuPutar: 0.12 },
 
-  /** Perkiraan titik didih alkana rantai lurus. */
-  function titikDidih(n, jenis) {
-    const dasar = C.ALKANA[n - 1] ? C.ALKANA[n - 1].td : -160 + n * 32;
-    return jenis === 'alkana' ? dasar : dasar - (jenis === 'alkena' ? 6 : 2);
-  }
-
-  Sim.create({
-    title: 'Hidrokarbon dan Minyak Bumi',
-    subtitle: 'Karbon mampu mengikat dirinya sendiri menjadi rantai panjang. Dari sifat itu lahir jutaan senyawa — dan seluruh industri minyak bumi.',
-    fase: 'E', jenjang: 'SMA Kelas 10',
-    topik: ['Hidrokarbon', 'Isomer', 'Minyak Bumi'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Mode',
-        items: [
-          { type: 'segment', id: 'mode', value: 'rantai', label: '',
-            options: [
-              { value: 'rantai', label: 'Rantai' },
-              { value: 'isomer', label: 'Isomer' },
-              { value: 'distilasi', label: 'Distilasi' }
-            ] }
-        ]
-      },
-      {
-        title: 'Membangun molekul',
-        items: [
-          { type: 'slider', id: 'n', value: 5, min: 1, max: 10, step: 1,
-            label: 'Jumlah atom karbon', dec: 0 },
-          { type: 'segment', id: 'jenis', value: 'alkana', label: 'Deret homolog',
-            options: [
-              { value: 'alkana', label: 'Alkana' },
-              { value: 'alkena', label: 'Alkena' },
-              { value: 'alkuna', label: 'Alkuna' }
-            ],
-            hint: 'Alkana jenuh (ikatan tunggal), alkena rangkap dua, alkuna rangkap tiga.' },
-          { type: 'toggle', id: 'hidrogen', value: true, label: 'Tampilkan atom H' }
-        ]
-      },
-      {
-        title: 'Menara distilasi',
-        items: [
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Jalankan distilasi', primary: true, onClick: function (sim) {
-              sim.set('mode', 'distilasi');
-              sim.data.jalan = true; sim.data.a = 0;
-            } }
-          ] },
-          { type: 'toggle', id: 'guna', value: true, label: 'Tampilkan kegunaan fraksi' }
-        ]
-      }
+    kendali: [
+      { judul: 'Mode', isi: [
+        { type: 'segment', id: 'mode', value: 'rantai', label: 'Yang dikerjakan', options: [
+          { value: 'rantai', label: 'Bangun rantai' },
+          { value: 'distilasi', label: 'Menara distilasi' }
+        ]}
+      ]},
+      { judul: 'Rantai karbon', isi: [
+        { type: 'slider', id: 'n', value: 4, min: 1, max: 10, step: 1, label: 'Jumlah atom C', unit: '', dec: 0 },
+        { type: 'segment', id: 'jenis', value: 'alkana', label: 'Golongan', options: [
+          { value: 'alkana', label: 'Alkana' },
+          { value: 'alkena', label: 'Alkena' },
+          { value: 'alkuna', label: 'Alkuna' }
+        ]},
+        { type: 'select', id: 'cabang', value: 0, label: 'Kerangka', options: [
+          { value: 0, label: 'Rantai lurus' },
+          { value: 1, label: 'Cabang metil di C-2' },
+          { value: 2, label: 'Cabang metil di C-3' },
+          { value: 3, label: 'Dua metil di C-2' }
+        ]},
+        { type: 'toggle', id: 'h', value: true, label: 'Tampilkan atom H' },
+        { type: 'toggle', id: 'putar', value: true, label: 'Putar molekul' }
+      ]},
+      { judul: 'Menara distilasi', isi: [
+        { type: 'slider', id: 'suhu', value: 380, min: 200, max: 500, step: 5,
+          label: 'Suhu umpan masuk', unit: ' °C', dec: 0 },
+        { type: 'slider', id: 'aliran', value: 1, min: 0, max: 2.5, step: 0.1,
+          label: 'Laju aliran', unit: '×', dec: 1 },
+        { type: 'select', id: 'fraksi', value: 2, label: 'Fraksi yang disorot',
+          options: FRAKSI.map(function (f, i) { return { value: i, label: f.n }; }) },
+        { type: 'toggle', id: 'potong', value: true, label: 'Potong dinding menara' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'rumus', label: 'Rumus molekul', tone: 'accent' },
-      { id: 'nama', label: 'Nama senyawa' },
-      { id: 'isomer', label: 'Jumlah isomer' },
-      { id: 'td', label: 'Titik didih' }
+    baca: [
+      { id: 'a', label: 'Nama', tone: 'aksen' },
+      { id: 'b', label: 'Rumus molekul' },
+      { id: 'c', label: 'Massa molar' },
+      { id: 'd', label: 'Keterangan' },
+      { id: 'e', label: 'Isomer kerangka' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9, warna: 0x0b1117, y: -3.2 }));
 
-    update: function (sim, dt) {
-      if (sim.data.jalan) {
-        sim.data.a += dt * 0.35;
-        if (sim.data.a >= 1) { sim.data.a = 1; sim.data.jalan = false; }
-      }
+      /* ---------------- mode rantai ---------------- */
+      const gR = new T.Group();
+      s.data.gR = gR;
+      s.tambah(gR);
+
+      const lblR = S.teks('', { skala: 0.46, lebar: 26, warna: '#d8e4ec' });
+      lblR.position.set(0, 3.0, 0);
+      s.data.lblR = lblR;
+      gR.add(lblR);
+
+      const isi = new T.Group();
+      s.data.isi = isi;
+      gR.add(isi);
+
+      /* ---------------- mode distilasi ---------------- */
+      const gD = new T.Group();
+      gD.visible = false;
+      s.data.gD = gD;
+      s.tambah(gD);
+      bangunMenara(s, gD);
+
+      pasangRantai(s);
+      aturMode(s);
     },
 
-    draw: function (c, sim) {
-      const mode = sim.get('mode');
-      const n = Math.round(sim.get('n'));
-      const jenis = sim.get('jenis');
+    ubah: function (s, id) {
+      if (id === 'mode') { aturMode(s); return; }
+      if (id === 'n' || id === 'jenis' || id === 'cabang' || id === 'h') pasangRantai(s);
+      if (id === 'fraksi') sorot(s);
+      if (id === 'potong') {
+        s.data.dinding.material.opacity = s.get('potong') ? 0.12 : 0.3;
+        s.data.dinding.material.side = s.get('potong') ? T.BackSide : T.DoubleSide;
+      }
+      if (id === 'suhu') warnaMenara(s);
+    },
 
-      /* ============================================== MODE RANTAI ===== */
-      if (mode === 'rantai') {
-        D.text(c, 'DERET HOMOLOG ' + jenis.toUpperCase(), 40, 44,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, nama(n, jenis) + '  ·  ' + Sim.formula(rumus(n, jenis)), 40, 74,
-          { size: 24, weight: 700, color: P.accent2, base: 'middle' });
+    langkah: function (s, dt) {
+      if (s.get('mode') === 'rantai') {
+        if (s.get('putar')) s.data.isi.rotation.y += dt * 0.4;
+        return;
+      }
+      const laju = s.get('aliran');
+      // uap naik di dalam menara
+      const d = s.data.uap.userData.p;
+      for (let i = 0; i < d.length; i++) {
+        d[i].pos.y += dt * (0.5 + d[i].vel.y * 0.3) * laju * 1.6;
+        d[i].pos.x += Math.sin(s.waktu * 1.4 + i) * dt * 0.1;
+        if (d[i].pos.y > 3.1) d[i].pos.set(S.acak(-0.5, 0.5), -3.0, S.acak(-0.5, 0.5));
+      }
+      s.data.uap.userData.tulis();
+      s.data.uap.visible = laju > 0.03;
 
-        // gambar rantai zig-zag
-        const bx = 90, by = 190, dx = Math.min(72, 560 / Math.max(n, 1)), dy = 30;
-        const pos = [];
-        for (let i = 0; i < n; i++) {
-          pos.push({ x: bx + i * dx, y: by + (i % 2 === 0 ? 0 : dy) });
-        }
-        // ikatan C–C
-        for (let i = 0; i < n - 1; i++) {
-          const rangkap = (jenis === 'alkena' && i === 0) ? 2
-            : (jenis === 'alkuna' && i === 0) ? 3 : 1;
-          const a = pos[i], b = pos[i + 1];
-          const dxn = b.x - a.x, dyn = b.y - a.y;
-          const len = Math.hypot(dxn, dyn);
-          const nx = -dyn / len, ny = dxn / len;
-          for (let k = 0; k < rangkap; k++) {
-            const off = (k - (rangkap - 1) / 2) * 5.5;
-            D.line(c, a.x + nx * off, a.y + ny * off, b.x + nx * off, b.y + ny * off,
-              rangkap > 1 ? P.amber : 'rgba(255,255,255,.4)', 3);
-          }
-        }
-        // atom H
-        if (sim.get('hidrogen')) {
-          pos.forEach(function (p, i) {
-            let nH = 2;
-            if (i === 0 || i === n - 1) nH = 3;
-            if (n === 1) nH = 4;
-            if (jenis === 'alkena' && i < 2) nH -= 1;
-            if (jenis === 'alkuna' && i < 2) nH -= 2;
-            nH = Math.max(0, nH);
-            const arah = [[0, -1], [0, 1], [-0.8, -0.6], [0.8, -0.6]];
-            for (let k = 0; k < nH; k++) {
-              const a = arah[k % 4];
-              const hx = p.x + a[0] * 30, hy = p.y + a[1] * 30;
-              D.line(c, p.x, p.y, hx, hy, 'rgba(255,255,255,.2)', 2);
-              D.atom(c, hx, hy, 9, C.warnaAtom('H'), 'H', { size: 9 });
-            }
-          });
-        }
-        pos.forEach(function (p) {
-          D.atom(c, p.x, p.y, 16, C.warnaAtom('C'), 'C', { size: 13 });
-        });
+      // tetesan keluar di tiap pipa
+      s.data.tetes.forEach(function (t, i) {
+        const f = FRAKSI[i];
+        const aktif = laju > 0.03 && suhuCukup(s, i);
+        t.visible = aktif;
+        if (!aktif) return;
+        t.position.x = 1.35 + ((s.waktu * laju * 1.1 + i * 0.37) % 1) * 1.5;
+        t.position.y = -3.2 + f.y * 6.4 - ((s.waktu * laju * 1.1 + i * 0.37) % 1) * 0.5;
+      });
 
-        // tabel deret homolog
-        const TY = 300;
-        D.roundRect(c, 40, TY, W - 80, 170, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'DERET HOMOLOG — PERHATIKAN KENAIKAN TITIK DIDIHNYA', 58, TY + 20,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
+      // nyala tungku
+      s.data.nyalaTungku.userData.perbarui(s.waktu, S.clamp((s.get('suhu') - 200) / 300, 0.08, 1));
+    },
 
-        const map = Plot.axes(c, {
-          x: 420, y: TY + 36, w: 310, h: 112,
-          xmin: 0.5, xmax: 10.5, ymin: -180, ymax: 190,
-          xlabel: 'jumlah atom C', ylabel: '°C',
-          judul: 'Titik didih alkana', xticks: 5, yticks: 4
-        });
-        const titik = [];
-        for (let i = 1; i <= 10; i++) titik.push([i, titikDidih(i, 'alkana')]);
-        Plot.line(c, map, titik, { color: P.accent, lw: 2.2 });
-        Plot.titik(c, map, n, titikDidih(n, jenis), { r: 5, color: '#fff', halo: true });
-        Plot.acuan(c, map, { y: 25, color: 'rgba(255,255,255,.3)', label: 'suhu ruang' });
-
-        for (let i = 1; i <= 6; i++) {
-          const y = TY + 46 + (i - 1) * 21;
-          const aktif = i === n;
-          if (aktif) D.roundRect(c, 50, y - 10, 350, 20, 4, 'rgba(79,209,192,.12)');
-          D.text(c, nama(i, 'alkana'), 58, y,
-            { size: 11.5, weight: aktif ? 700 : 500, color: aktif ? P.accent2 : P.dim, base: 'middle' });
-          D.text(c, Sim.formula(rumus(i, 'alkana')), 170, y,
-            { size: 11.5, weight: 600, color: aktif ? P.accent2 : P.dim, base: 'middle', mono: true });
-          D.text(c, Sim.fmt(titikDidih(i, 'alkana'), 1) + ' °C', 280, y,
-            { size: 11.5, weight: 500, color: P.dim, base: 'middle', mono: true });
-          D.text(c, ISOMER[i] + ' isomer', 350, y,
-            { size: 11, weight: 500, color: P.faint, base: 'middle' });
-        }
-
-      /* ============================================== MODE ISOMER ===== */
-      } else if (mode === 'isomer') {
-        D.text(c, 'ISOMER RANGKA — RUMUS SAMA, STRUKTUR BERBEDA', 40, 44,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, 'C₅H₁₂ — tiga isomer pentana', 40, 74,
-          { size: 22, weight: 700, color: P.accent2, base: 'middle' });
-
-        ISOMER_C5.forEach(function (iso, i) {
-          const bx = 70 + i * 240, by = 170;
-          D.roundRect(c, bx - 40, by - 76, 222, 230, 12,
-            'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-          D.text(c, iso.n, bx - 24, by - 54,
-            { size: 12.5, weight: 700, color: P.text, base: 'middle' });
-
-          // gambar struktur
-          if (i === 0) {
-            for (let k = 0; k < 5; k++) {
-              const x = bx - 20 + k * 36, y = by + (k % 2 === 0 ? 0 : 24);
-              if (k > 0) {
-                const px = bx - 20 + (k - 1) * 36, py = by + ((k - 1) % 2 === 0 ? 0 : 24);
-                D.line(c, px, py, x, y, 'rgba(255,255,255,.4)', 3);
-              }
-              D.atom(c, x, y, 14, C.warnaAtom('C'), 'C', { size: 11 });
-            }
-          } else if (i === 1) {
-            const utama = [[bx - 10, by], [bx + 26, by + 24], [bx + 62, by], [bx + 98, by + 24]];
-            utama.forEach(function (p, k) {
-              if (k > 0) D.line(c, utama[k - 1][0], utama[k - 1][1], p[0], p[1], 'rgba(255,255,255,.4)', 3);
-            });
-            D.line(c, utama[1][0], utama[1][1], utama[1][0], utama[1][1] + 34, P.amber, 3);
-            D.atom(c, utama[1][0], utama[1][1] + 34, 14, C.warnaAtom('C'), 'C', { size: 11 });
-            utama.forEach(function (p) { D.atom(c, p[0], p[1], 14, C.warnaAtom('C'), 'C', { size: 11 }); });
-          } else {
-            const pusat = [bx + 36, by + 18];
-            [[-38, 0], [38, 0], [0, -36], [0, 36]].forEach(function (o) {
-              D.line(c, pusat[0], pusat[1], pusat[0] + o[0], pusat[1] + o[1],
-                o[1] !== 0 ? P.amber : 'rgba(255,255,255,.4)', 3);
-              D.atom(c, pusat[0] + o[0], pusat[1] + o[1], 14, C.warnaAtom('C'), 'C', { size: 11 });
-            });
-            D.atom(c, pusat[0], pusat[1], 14, C.warnaAtom('C'), 'C', { size: 11 });
-          }
-
-          D.text(c, 'Titik didih', bx - 24, by + 96,
-            { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-          D.text(c, Sim.fmt(iso.td, 1) + ' °C', bx - 24, by + 116,
-            { size: 19, weight: 700, color: P.amber, base: 'middle', mono: true });
-          D.text(c, i === 0 ? 'rantai lurus — gaya antarmolekul kuat'
-            : i === 1 ? 'satu cabang — molekul lebih bulat'
-            : 'dua cabang — paling bulat dan ringkas',
-            bx - 24, by + 138, { size: 10.5, weight: 500, color: P.dim, base: 'middle' });
-        });
-
-        D.roundRect(c, 40, 420, W - 80, 86, 12, 'rgba(79,209,192,.1)', P.accent, 1.5);
-        D.text(c, 'Mengapa titik didih turun bila cabangnya bertambah?', 58, 444,
-          { size: 15, weight: 700, color: P.accent2, base: 'middle' });
-        D.text(c, 'Rantai lurus dapat saling berdempetan rapat sehingga gaya London antarmolekul kuat.',
-          58, 468, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-        D.text(c, 'Molekul bercabang berbentuk lebih bulat, luas sentuhnya kecil, sehingga lebih mudah menguap.',
-          58, 488, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-
-      /* =========================================== MODE DISTILASI ===== */
+    bacaUbah: function (s) {
+      if (s.get('mode') === 'rantai') {
+        const r = rumus(s);
+        const j = jenis(s);
+        s.baca('a', nama(s));
+        s.baca('b', r.teks);
+        s.baca('c', S.fmt(r.mr, 2) + ' g/mol');
+        s.baca('d', j === 'alkana' ? 'Ikatan tunggal semua — jenuh'
+          : j === 'alkena' ? 'Ada satu ikatan rangkap dua — tak jenuh'
+            : 'Ada satu ikatan rangkap tiga — tak jenuh',
+          j === 'alkana' ? 'aksen' : 'warn');
+        const n = r.n;
+        s.baca('e', j === 'alkana'
+          ? (ISOMER[n - 1] || '> 75') + ' isomer kerangka untuk C' + S.sub(n)
+          : 'Alkena/alkuna juga punya isomer posisi & geometri');
       } else {
-        const a = sim.data.a;
-        D.text(c, 'DISTILASI BERTINGKAT MINYAK BUMI', 40, 44,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, 'Memisahkan ratusan hidrokarbon berdasarkan titik didihnya', 40, 68,
-          { size: 13, weight: 500, color: P.dim, base: 'middle' });
+        const i = parseInt(s.get('fraksi'), 10) || 0;
+        const f = FRAKSI[i];
+        s.baca('a', f.n, 'aksen');
+        s.baca('b', f.c);
+        s.baca('c', 'Titik didih ' + f.suhu);
+        s.baca('d', 'Dipakai untuk ' + f.guna);
+        s.baca('e', suhuCukup(s, i)
+          ? 'Pada ' + Math.round(s.get('suhu')) + ' °C fraksi ini ikut menguap ✓'
+          : 'Pada ' + Math.round(s.get('suhu')) + ' °C fraksi ini belum menguap',
+          suhuCukup(s, i) ? 'aksen' : 'danger');
+      }
+    }
+  };
 
-        // menara
-        const MX = 190, MY = 96, MW = 170, MH = 390;
-        D.roundRect(c, MX, MY, MW, MH, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.3)', 2);
+  function suhuCukup(s, i) {
+    if (i === 7) return true;                    // residu selalu tertinggal di dasar
+    return s.get('suhu') >= BATAS[i];
+  }
 
-        FRAKSI.forEach(function (f, i) {
-          const y = MY + MH - MH * f.tinggi;
-          // sekat
-          D.line(c, MX, y, MX + MW, y, 'rgba(255,255,255,.18)', 1.2);
-          // pipa keluar
-          const muncul = Sim.clamp((a - i * 0.08) * 3, 0, 1);
-          D.line(c, MX + MW, y + 10, MX + MW + 54, y + 10,
-            D.alpha(f.w, 0.4 + muncul * 0.6), 4);
-          D.roundRect(c, MX + MW + 54, y - 2, 46, 24, 4,
-            D.alpha(f.w, 0.2 + muncul * 0.5), f.w, 1.3);
+  function aturMode(s) {
+    const r = s.get('mode') === 'rantai';
+    s.data.gR.visible = r;
+    s.data.gD.visible = !r;
+    if (s.orbit) s.orbit.set({ jarak: r ? 11 : 16, targetY: r ? 0.3 : 0.2 });
+    if (!r) { sorot(s); warnaMenara(s); }
+  }
 
-          // label kiri
-          D.text(c, f.n, MX - 12, y + 10,
-            { size: 12, weight: 700, color: f.w, align: 'r', base: 'middle' });
-          D.text(c, f.c + '  ·  ' + f.td, MX - 12, y + 26,
-            { size: 10, weight: 500, color: P.faint, align: 'r', base: 'middle' });
+  /* ============================ rantai karbon ============================ */
 
-          // kegunaan di kanan
-          if (sim.get('guna')) {
-            D.text(c, f.guna, MX + MW + 108, y + 10,
-              { size: 11.5, weight: 500, color: muncul > 0.5 ? P.dim : P.faint, base: 'middle' });
-          }
+  function pasangRantai(s) {
+    const isi = s.data.isi;
+    while (isi.children.length) S.buangObjek(isi.children.pop());
 
-          // tetesan di pipa
-          if (muncul > 0.5) {
-            for (let k = 0; k < 3; k++) {
-              const px = MX + MW + 6 + ((sim.t * 50 + k * 18) % 46);
-              D.circle(c, px, y + 10, 3, D.alpha(f.w, 0.9));
-            }
-          }
-        });
+    const n = nC(s), j = jenis(s);
+    let cab = parseInt(s.get('cabang'), 10) || 0;
+    // cabang hanya mungkin bila rantai cukup panjang
+    if (cab === 1 && n < 4) cab = 0;
+    if (cab === 2 && n < 5) cab = 0;
+    if (cab === 3 && n < 5) cab = 0;
 
-        // minyak mentah masuk & tungku
-        D.arrow(c, MX - 70, MY + MH - 30, MX - 6, MY + MH - 30, '#4a3a30', 3, 9);
-        D.text(c, 'minyak mentah', MX - 72, MY + MH - 48,
-          { size: 11, weight: 600, color: P.dim, align: 'r', base: 'middle' });
-        D.flame(c, MX + MW / 2, MY + MH + 22, a > 0.03 ? 0.8 : 0.15, sim.t);
+    const utama = Math.max(1, n - (cab === 3 ? 2 : cab > 0 ? 1 : 0));
+    const pos = [];
+    const ikat = [];      // [i, j, orde]
 
-        // gradien suhu
-        D.text(c, 'SUHU', MX + MW + 130, MY + 10,
-          { size: 10, weight: 700, color: P.faint, base: 'middle' });
-        for (let i = 0; i < MH - 20; i++) {
-          c.fillStyle = D.ramp(['#9fd4ee', '#f0d04a', '#e8884a', '#4a3a30'], i / (MH - 20));
-          c.fillRect(MX + MW + 134, MY + 24 + i, 14, 1.4);
+    // rantai utama zig-zag
+    for (let i = 0; i < utama; i++) {
+      pos.push(new T.Vector3(i * 0.84 - (utama - 1) * 0.42, (i % 2) * 0.5 - 0.25, 0));
+      if (i > 0) {
+        let orde = 1;
+        if (i === 1 && j === 'alkena') orde = 2;
+        if (i === 1 && j === 'alkuna') orde = 3;
+        ikat.push([i - 1, i, orde]);
+      }
+    }
+    // ikatan rangkap pada molekul 1-C tak mungkin
+    if (utama === 1) { /* metana */ }
+
+    // cabang metil
+    const titikCabang = [];
+    if (cab === 1 && utama >= 3) titikCabang.push(1);
+    if (cab === 2 && utama >= 4) titikCabang.push(2);
+    if (cab === 3 && utama >= 3) { titikCabang.push(1); titikCabang.push(1); }
+    titikCabang.forEach(function (idx, k) {
+      const dasar = pos[idx];
+      const arah = new T.Vector3(0, (idx % 2) ? -0.55 : 0.55, k === 0 ? 0.72 : -0.72).normalize();
+      const p = dasar.clone().addScaledVector(arah, 0.84);
+      pos.push(p);
+      ikat.push([idx, pos.length - 1, 1]);
+    });
+
+    // hitung orde terpakai tiap C
+    const terpakai = new Array(pos.length).fill(0);
+    const tetangga = pos.map(function () { return []; });
+    ikat.forEach(function (b) {
+      terpakai[b[0]] += b[2];
+      terpakai[b[1]] += b[2];
+      tetangga[b[0]].push(pos[b[1]]);
+      tetangga[b[1]].push(pos[b[0]]);
+    });
+
+    // bangun atom C
+    const mat = S.matBola(S.UNSUR.C.w, { unik: true });
+    pos.forEach(function (p) {
+      const m = new T.Mesh(S.geoBola(28), mat);
+      m.scale.setScalar(S.UNSUR.C.r * 0.6);
+      m.position.copy(p);
+      m.castShadow = true;
+      isi.add(m);
+    });
+
+    // ikatan C–C
+    ikat.forEach(function (b) {
+      isi.add(S.ikatan(pos[b[0]], pos[b[1]], { orde: b[2], tebal: 0.072, pisah: 0.17 }));
+    });
+
+    // atom H
+    if (s.get('h')) {
+      const matH = S.matBola(S.UNSUR.H.w, { unik: true });
+      pos.forEach(function (p, i) {
+        const sisa = 4 - terpakai[i];
+        if (sisa <= 0) return;
+        const dipakai = [];
+        for (let k = 0; k < sisa; k++) {
+          let terbaik = null, nilai = -9;
+          ARAH.forEach(function (a) {
+            if (dipakai.indexOf(a) >= 0) return;
+            let v = 0;
+            tetangga[i].forEach(function (q) {
+              v -= a.dot(q.clone().sub(p).normalize()) * 2;
+            });
+            dipakai.forEach(function (a2) { v -= a.dot(a2) * 1.3; });
+            if (v > nilai) { nilai = v; terbaik = a; }
+          });
+          if (!terbaik) break;
+          dipakai.push(terbaik);
+          const q = p.clone().addScaledVector(terbaik, 0.62);
+          const m = new T.Mesh(S.geoBola(18), matH);
+          m.scale.setScalar(S.UNSUR.H.r * 0.6);
+          m.position.copy(q);
+          isi.add(m);
+          isi.add(S.ikatan(p, q, { tebal: 0.05, warna: 0x8d97a1 }));
         }
-        D.roundRect(c, MX + MW + 134, MY + 24, 14, MH - 20, 3, null, 'rgba(255,255,255,.2)', 1);
-        D.text(c, '20 °C', MX + MW + 152, MY + 30,
-          { size: 10, weight: 600, color: P.dim, base: 'middle' });
-        D.text(c, '400 °C', MX + MW + 152, MY + MH,
-          { size: 10, weight: 600, color: P.dim, base: 'middle' });
+      });
+    }
 
-        D.roundRect(c, 40, 506, W - 80, 48, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', 1.1);
-        D.text(c, 'Makin panjang rantai karbonnya, makin tinggi titik didihnya, sehingga makin ke bawah posisinya di menara.',
-          58, 530, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-      }
-    },
+    isi.rotation.y = 0;
+    s.data.lblR.userData.ganti(nama(s) + '  —  ' + rumus(s).teks);
+  }
 
-    readoutsUpdate: function (sim) {
-      const n = Math.round(sim.get('n'));
-      const jenis = sim.get('jenis');
-      sim.readout('rumus', Sim.formula(rumus(n, jenis)));
-      sim.readout('nama', nama(n, jenis));
-      sim.readout('isomer', jenis === 'alkana' ? ISOMER[n] + ' isomer' : '—');
-      sim.readout('td', Sim.fmt(titikDidih(n, jenis), 1) + '<span class="unit"> °C</span>');
-    },
+  /* ============================ menara distilasi ============================ */
 
-    notes: `
-      <p>Hidrokarbon adalah senyawa yang hanya tersusun dari <strong>karbon dan
-      hidrogen</strong>. Jumlahnya jutaan, dan semuanya bermula dari satu sifat
-      istimewa karbon.</p>
+  function bangunMenara(s, g) {
+    const H = 6.4, R = 1.3;
 
-      <h3>Kekhasan atom karbon</h3>
-      <ul>
-        <li>Memiliki <strong>4 elektron valensi</strong>, sehingga dapat membentuk empat
-            ikatan kovalen sekaligus.</li>
-        <li>Mampu berikatan dengan <strong>sesama atom karbon</strong> (katenasi)
-            membentuk rantai panjang, bercabang, atau melingkar.</li>
-        <li>Dapat membentuk ikatan tunggal, rangkap dua, dan rangkap tiga.</li>
-      </ul>
+    // dinding menara
+    const dinding = new T.Mesh(new T.CylinderGeometry(R, R, H, 48, 1, true),
+      new T.MeshPhysicalMaterial({
+        color: 0xa8b6c2, roughness: 0.3, metalness: 0.7,
+        transparent: true, opacity: 0.12, side: T.BackSide
+      }));
+    dinding.position.y = -3.2 + H / 2;
+    s.data.dinding = dinding;
+    g.add(dinding);
 
-      <h3>Tiga deret homolog</h3>
-      <table>
-        <thead><tr><th>Deret</th><th>Rumus umum</th><th>Ikatan</th><th>Sifat</th></tr></thead>
-        <tbody>
-          <tr><td>Alkana</td><td>CₙH₂ₙ₊₂</td><td>tunggal</td><td>jenuh, kurang reaktif</td></tr>
-          <tr><td>Alkena</td><td>CₙH₂ₙ</td><td>rangkap dua</td><td>tak jenuh, reaktif</td></tr>
-          <tr><td>Alkuna</td><td>CₙH₂ₙ₋₂</td><td>rangkap tiga</td><td>tak jenuh, sangat reaktif</td></tr>
-        </tbody>
-      </table>
+    // kerangka luar
+    const rangka = new T.Mesh(new T.CylinderGeometry(R + 0.02, R + 0.02, H, 48, 1, true),
+      new T.MeshStandardMaterial({ color: 0x4a5a68, roughness: 0.45, metalness: 0.6,
+        wireframe: true, transparent: true, opacity: 0.22 }));
+    rangka.position.y = dinding.position.y;
+    g.add(rangka);
 
-      <h3>Isomer</h3>
-      <p>Senyawa dengan <strong>rumus molekul sama tetapi struktur berbeda</strong>.
-      Karena strukturnya berbeda, sifat fisikanya pun berbeda.</p>
+    // tudung atas & dasar
+    const tudung = new T.Mesh(new T.SphereGeometry(R, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+      S.matLogam(0x8c9aa6, { roughness: 0.4 }));
+    tudung.position.y = -3.2 + H;
+    g.add(tudung);
+    const dasar = new T.Mesh(new T.CylinderGeometry(R + 0.16, R + 0.3, 0.4, 48),
+      S.matLogam(0x5a6672, { roughness: 0.6 }));
+    dasar.position.y = -3.35;
+    dasar.receiveShadow = true;
+    g.add(dasar);
 
-      <p>C₅H₁₂ memiliki tiga isomer. Yang menarik, titik didihnya berbeda cukup jauh:
-      n-pentana 36,1 °C, isopentana 27,8 °C, neopentana hanya 9,5 °C. Penyebabnya adalah
-      <strong>bentuk molekul</strong>. Rantai lurus dapat saling berdempetan rapat
-      sehingga gaya tarik antarmolekul (gaya London) besar. Molekul bercabang lebih bulat,
-      luas sentuhnya kecil, sehingga lebih mudah dilepaskan menjadi uap.</p>
+    // piringan (tray) + pipa keluar tiap fraksi
+    s.data.cincin = [];
+    s.data.tetes = [];
+    FRAKSI.forEach(function (f, i) {
+      const y = -3.2 + f.y * H;
 
-      <p>Jumlah isomer naik sangat cepat: C₅ punya 3, C₁₀ punya 75, dan C₂₀ punya lebih
-      dari 366 ribu isomer.</p>
+      const tray = new T.Mesh(new T.CylinderGeometry(R - 0.06, R - 0.06, 0.05, 40),
+        new T.MeshStandardMaterial({ color: f.warna, roughness: 0.4, metalness: 0.25,
+          emissive: f.warna, emissiveIntensity: 0.12, transparent: true, opacity: 0.85 }));
+      tray.position.y = y;
+      g.add(tray);
+      s.data.cincin.push(tray);
 
-      <h3>Minyak bumi</h3>
-      <p>Minyak bumi adalah campuran ratusan hidrokarbon yang terbentuk dari jasad renik
-      laut yang terkubur jutaan tahun. Untuk memisahkannya dipakai
-      <strong>distilasi bertingkat</strong>.</p>
+      // pipa keluar ke kanan
+      const pipa = new T.Mesh(new T.CylinderGeometry(0.075, 0.075, 1.6, 16),
+        S.matLogam(0x9aa6b2, { roughness: 0.4 }));
+      pipa.rotation.z = Math.PI / 2;
+      pipa.position.set(R + 0.8, y, 0);
+      g.add(pipa);
 
-      <p>Minyak mentah dipanaskan sampai sekitar 400 °C lalu dialirkan ke menara. Uapnya
-      naik dan mendingin secara bertahap. Fraksi dengan <strong>titik didih tinggi</strong>
-      (rantai panjang) mengembun lebih dulu di bagian bawah; fraksi dengan titik didih
-      rendah terus naik ke puncak.</p>
+      // tangki penampung
+      const tangki = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.46, 24),
+        new T.MeshStandardMaterial({ color: 0x27323c, roughness: 0.55, metalness: 0.35 }));
+      tangki.position.set(R + 1.85, y - 0.2, 0);
+      g.add(tangki);
+      const isiT = new T.Mesh(new T.CylinderGeometry(0.27, 0.27, 0.3, 24),
+        S.matCairan(f.warna, { opacity: 0.9 }));
+      isiT.position.set(R + 1.85, y - 0.26, 0);
+      g.add(isiT);
 
-      <h3>Bilangan oktan</h3>
-      <p>Mutu bensin dinyatakan dengan bilangan oktan, yang mengukur ketahanan terhadap
-      ketukan (<em>knocking</em>). Hidrokarbon <strong>bercabang</strong> seperti
-      isooktana memiliki bilangan oktan tinggi (100), sedangkan n-heptana yang lurus
-      bernilai 0. Itulah sebabnya bensin beroktan tinggi diperkaya senyawa bercabang.</p>
+      // label fraksi
+      const l = S.teks(f.n + '   ' + f.c, { skala: 0.26, lebar: 24, warna: '#cfdbe6' });
+      l.position.set(R + 3.0, y, 0);
+      g.add(l);
 
-      <div class="callout" data-tone="warn">
-        <strong>Dampak lingkungan</strong>
-        Pembakaran hidrokarbon menghasilkan CO₂ yang memperkuat efek rumah kaca. Pembakaran
-        tidak sempurna menghasilkan CO yang beracun dan jelaga. Belerang dalam minyak bumi
-        menghasilkan SO₂ penyebab hujan asam.
-      </div>
-    `,
+      // tetesan yang mengalir keluar
+      const tetes = new T.Mesh(S.geoBola(12),
+        new T.MeshStandardMaterial({ color: f.warna, emissive: f.warna, emissiveIntensity: 0.4,
+          roughness: 0.2 }));
+      tetes.scale.setScalar(0.08);
+      tetes.visible = false;
+      g.add(tetes);
+      s.data.tetes.push(tetes);
+    });
 
-    explore: [
-      'Pada mode <strong>Rantai</strong>, naikkan jumlah karbon dari 1 ke 10. Perhatikan grafik titik didihnya.',
-      'Pada jumlah karbon 5, ganti jenis dari alkana ke alkena lalu alkuna. Bagaimana rumus molekulnya berubah?',
-      'Buka mode <strong>Isomer</strong>. Ketiganya C₅H₁₂, tetapi titik didihnya berbeda 27 derajat. Mengapa?',
-      'Jalankan <strong>Distilasi</strong>. Fraksi mana yang keluar paling atas? Hubungkan dengan panjang rantainya.'
-    ],
+    // uap naik di dalam
+    const uap = S.partikel(80, { r: 0.07, warna: 0xdfe8ee, kotak: { x: 0.9, y: 3, z: 0.9 } });
+    uap.material.transparent = true;
+    uap.material.opacity = 0.42;
+    s.data.uap = uap;
+    g.add(uap);
 
-    quiz: [
-      {
-        q: 'Rumus molekul alkana dengan 6 atom karbon adalah…',
-        options: ['C₆H₁₂', 'C₆H₁₄', 'C₆H₁₀', 'C₆H₆'],
-        answer: 1,
-        explain: 'Rumus umum alkana adalah CₙH₂ₙ₊₂. Untuk n = 6: H = 2(6) + 2 = 14, sehingga rumusnya C₆H₁₄ (heksana).'
-      },
-      {
-        q: 'n-pentana mendidih pada 36 °C sedangkan neopentana pada 9,5 °C, padahal rumus molekulnya sama. Penyebabnya adalah…',
-        options: [
-          'Neopentana memiliki massa lebih kecil',
-          'Molekul bercabang lebih bulat sehingga gaya antarmolekulnya lebih lemah',
-          'Neopentana memiliki ikatan rangkap',
-          'n-pentana adalah senyawa ion'
-        ],
-        answer: 1,
-        explain: 'Rantai lurus dapat berdempetan rapat sehingga gaya London antarmolekul besar. Molekul bercabang lebih bulat, luas sentuhnya kecil, sehingga lebih mudah dipisahkan menjadi uap.'
-      },
-      {
-        q: 'Dalam menara distilasi bertingkat, fraksi aspal keluar di bagian paling bawah karena…',
-        options: [
-          'Massa jenisnya paling besar',
-          'Rantai karbonnya paling panjang sehingga titik didihnya paling tinggi',
-          'Warnanya paling gelap',
-          'Jumlahnya paling sedikit'
-        ],
-        answer: 1,
-        explain: 'Fraksi dengan rantai karbon panjang memiliki gaya antarmolekul besar dan titik didih tinggi, sehingga mengembun lebih dulu di bagian bawah menara yang paling panas.'
-      },
-      {
-        q: 'Manakah yang merupakan ciri senyawa alkena?',
-        options: [
-          'Semua ikatan antar-karbonnya tunggal',
-          'Memiliki satu ikatan rangkap dua antar-karbon',
-          'Rumus umumnya CₙH₂ₙ₊₂',
-          'Tidak dapat mengalami reaksi adisi'
-        ],
-        answer: 1,
-        explain: 'Alkena memiliki setidaknya satu ikatan rangkap dua C=C dengan rumus umum CₙH₂ₙ. Ikatan rangkap ini membuatnya tak jenuh dan mudah mengalami reaksi adisi.'
-      }
-    ]
-  });
-})();
+    // tungku pemanas di bawah
+    const tungku = new T.Mesh(new T.BoxGeometry(2.2, 0.7, 1.6),
+      new T.MeshStandardMaterial({ color: 0x2b2420, roughness: 0.8 }));
+    tungku.position.set(0, -3.95, 0);
+    g.add(tungku);
+    const ny = S.nyala({ r: 0.4, h: 0.8 });
+    ny.position.set(0, -3.75, 0);
+    s.data.nyalaTungku = ny;
+    g.add(ny);
+
+    // pipa umpan minyak mentah
+    const umpan = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 2.4, 18),
+      S.matLogam(0x7a6a52, { roughness: 0.5 }));
+    umpan.rotation.z = Math.PI / 2;
+    umpan.position.set(-R - 1.2, -2.5, 0);
+    g.add(umpan);
+    const lblU = S.teks('minyak mentah', { skala: 0.26, lebar: 22, warna: '#c8a070' });
+    lblU.position.set(-R - 2.6, -2.1, 0);
+    g.add(lblU);
+
+    // sorotan fraksi terpilih
+    const sorotCincin = new T.Mesh(new T.TorusGeometry(R + 0.1, 0.045, 10, 64),
+      new T.MeshStandardMaterial({ color: 0xf0d040, emissive: 0xf0d040, emissiveIntensity: 1.1 }));
+    sorotCincin.rotation.x = Math.PI / 2;
+    s.data.sorot = sorotCincin;
+    g.add(sorotCincin);
+
+    const judul = S.teks('Menara distilasi fraksionasi', { skala: 0.4, lebar: 34, warna: '#d8e4ec' });
+    judul.position.set(0, 3.9, 0);
+    g.add(judul);
+  }
+
+  function sorot(s) {
+    const i = parseInt(s.get('fraksi'), 10) || 0;
+    s.data.sorot.position.y = -3.2 + FRAKSI[i].y * 6.4;
+  }
+
+  function warnaMenara(s) {
+    s.data.cincin.forEach(function (c, i) {
+      const aktif = suhuCukup(s, i);
+      c.material.emissiveIntensity = aktif ? 0.45 : 0.04;
+      c.material.opacity = aktif ? 0.92 : 0.4;
+    });
+  }
+})());

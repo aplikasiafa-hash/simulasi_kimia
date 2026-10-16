@@ -1,340 +1,246 @@
-/* Mengenal Sifat Benda — Fase A
-   Pilih benda, jalankan empat uji sederhana, dan catat sifatnya di kartu. */
+/* Mengenal Sifat Benda — Fase A — adegan 3D */
 
-(function () {
+Sim3D.daftar('sifat-benda', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-
-  // keras 0..1, halus 0..1, lentur 0..1, massa jenis (g/cm³), serap 0..1
-  const BENDA = [
-    { nama: 'Batu',    warna: '#8d939a', keras: 0.95, halus: 0.45, lentur: 0.02, rho: 2.6,  serap: 0.05 },
-    { nama: 'Spons',   warna: '#f0c860', keras: 0.08, halus: 0.30, lentur: 0.95, rho: 0.25, serap: 0.98 },
-    { nama: 'Kayu',    warna: '#a8763f', keras: 0.70, halus: 0.55, lentur: 0.20, rho: 0.6,  serap: 0.45 },
-    { nama: 'Karet',   warna: '#4a4f55', keras: 0.35, halus: 0.75, lentur: 0.90, rho: 1.2,  serap: 0.05 },
-    { nama: 'Kaca',    warna: '#9fd4ee', keras: 0.90, halus: 0.98, lentur: 0.01, rho: 2.5,  serap: 0.00 },
-    { nama: 'Kain',    warna: '#d07a9e', keras: 0.10, halus: 0.70, lentur: 0.98, rho: 0.4,  serap: 0.85 },
-    { nama: 'Besi',    warna: '#aab4bd', keras: 1.00, halus: 0.85, lentur: 0.05, rho: 7.9,  serap: 0.00 },
-    { nama: 'Plastik', warna: '#5fc0e0', keras: 0.55, halus: 0.90, lentur: 0.55, rho: 0.95, serap: 0.02 },
-    { nama: 'Kertas',  warna: '#eee6d0', keras: 0.15, halus: 0.60, lentur: 0.80, rho: 0.8,  serap: 0.80 },
-    { nama: 'Lilin',   warna: '#f2e8c8', keras: 0.25, halus: 0.80, lentur: 0.35, rho: 0.9,  serap: 0.01 }
+  const BAHAN = [
+    { n: 'Kayu',   w: 0xa9763f, apung: true,  magnet: false, tembus: 0.0, keras: 0.45, kasar: 0.7, logam: false },
+    { n: 'Besi',   w: 0x8a949e, apung: false, magnet: true,  tembus: 0.0, keras: 0.95, kasar: 0.2, logam: true },
+    { n: 'Kaca',   w: 0xbfe4f0, apung: false, magnet: false, tembus: 0.92, keras: 0.8, kasar: 0.05, logam: false },
+    { n: 'Karet',  w: 0x3a4149, apung: true,  magnet: false, tembus: 0.0, keras: 0.15, kasar: 0.55, logam: false },
+    { n: 'Busa',   w: 0xe8c86a, apung: true,  magnet: false, tembus: 0.1, keras: 0.05, kasar: 0.85, logam: false },
+    { n: 'Batu',   w: 0x76726c, apung: false, magnet: false, tembus: 0.0, keras: 0.88, kasar: 0.9, logam: false },
+    { n: 'Plastik',w: 0x4aa6d8, apung: true,  magnet: false, tembus: 0.35, keras: 0.4, kasar: 0.15, logam: false },
+    { n: 'Alumunium', w: 0xc8ced4, apung: false, magnet: false, tembus: 0.0, keras: 0.7, kasar: 0.1, logam: true }
   ];
 
-  const UJI = [
-    { id: 'tekan', label: 'Tekan', tanya: 'Keras atau lunak?' },
-    { id: 'raba',  label: 'Raba',  tanya: 'Kasar atau halus?' },
-    { id: 'tekuk', label: 'Tekuk', tanya: 'Lentur atau kaku?' },
-    { id: 'air',   label: 'Celup', tanya: 'Terapung atau tenggelam?' }
-  ];
+  function bahan(s) { return BAHAN[parseInt(s.get('bahan'), 10) || 0]; }
 
-  const W = 780, H = 500;
-  const RAK_Y = 60;
-
-  function siapkan(sim) {
-    sim.data.pilih = 0;
-    sim.data.anim = 0;
-    sim.data.jalan = false;
-    sim.data.catatan = BENDA.map(function () { return {}; });
-  }
-
-  function posisiBenda(i) {
-    const kol = 5;
-    const bx = 60 + (i % kol) * 78;
-    const by = RAK_Y + Math.floor(i / kol) * 84;
-    return { x: bx, y: by };
-  }
-
-  function sifatTeks(b, uji) {
-    if (uji === 'tekan') return b.keras > 0.6 ? 'Keras' : b.keras > 0.3 ? 'Agak keras' : 'Lunak';
-    if (uji === 'raba')  return b.halus > 0.7 ? 'Halus' : b.halus > 0.45 ? 'Agak halus' : 'Kasar';
-    if (uji === 'tekuk') return b.lentur > 0.6 ? 'Lentur' : b.lentur > 0.3 ? 'Agak lentur' : 'Kaku';
-    if (uji === 'air')   return b.rho < 1 ? 'Terapung' : 'Tenggelam';
-    return '';
-  }
-
-  /* ---------------------------------------------------------- menggambar -- */
-
-  function gambarContoh(c, b, x, y, r, tekan, tekuk) {
-    c.save();
-    c.translate(x, y);
-    const sx = 1 + tekan * 0.3, sy = 1 - tekan * 0.42;
-    c.scale(sx, sy);
-    if (tekuk) c.rotate(Math.sin(tekuk * 8) * 0.3 * tekuk);
-    D.roundRect(c, -r, -r * 0.72, r * 2, r * 1.44, Math.max(2, r * 0.22),
-      b.warna, 'rgba(255,255,255,.3)', 1.5);
-    // tekstur permukaan menunjukkan kasar/halus
-    if (b.halus < 0.65) {
-      for (let i = 0; i < 9; i++) {
-        const px = -r + (i * 37 % (r * 1.85));
-        D.line(c, px, -r * 0.6, px + 3, r * 0.6, 'rgba(0,0,0,.16)', 1.1);
-      }
-    } else {
-      D.roundRect(c, -r * 0.72, -r * 0.5, r * 0.6, r * 0.3, 3, 'rgba(255,255,255,.3)');
-    }
-    c.restore();
-  }
-
-  Sim.create({
-    title: 'Mengenal Sifat Benda',
-    subtitle: 'Pilih sebuah benda, lalu jalankan uji. Setiap benda punya gabungan sifat yang berbeda — dan sifat itulah yang menentukan benda dipakai untuk apa.',
-    fase: 'A', jenjang: 'SD Kelas 1–2',
-    topik: ['Sifat Materi', 'Pengamatan'],
-    stage: { w: W, h: H },
-    showPlay: false,
-    stageNote: 'Klik benda di rak untuk memilihnya',
-
-    controls: [
-      {
-        title: 'Uji yang dijalankan',
-        items: [
-          { type: 'segment', id: 'uji', value: 'tekan', label: '',
-            options: UJI.map(function (u) { return { value: u.id, label: u.label }; }),
-            hint: 'Setiap uji menjawab satu pertanyaan tentang benda.' },
-          { type: 'buttons', label: '', items: [
-            { label: '▶ Jalankan uji', primary: true, onClick: function (sim) {
-              sim.data.jalan = true; sim.data.anim = 0;
-              const b = BENDA[sim.data.pilih];
-              sim.data.catatan[sim.data.pilih][sim.get('uji')] = sifatTeks(b, sim.get('uji'));
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'kartu', value: true, label: 'Tampilkan kartu sifat',
-            hint: 'Hasil uji dikumpulkan menjadi kartu identitas benda.' },
-          { type: 'buttons', label: '', items: [
-            { label: 'Uji semua sifat', onClick: function (sim) {
-              const i = sim.data.pilih, b = BENDA[i];
-              UJI.forEach(function (u) { sim.data.catatan[i][u.id] = sifatTeks(b, u.id); });
-            } },
-            { label: 'Hapus catatan', onClick: function (sim) {
-              sim.data.catatan = BENDA.map(function () { return {}; });
-            } }
-          ] }
-        ]
-      }
-    ],
-
-    readouts: [
-      { id: 'benda', label: 'Benda', tone: 'accent' },
-      { id: 'hasil', label: 'Hasil uji' },
-      { id: 'tercatat', label: 'Sifat tercatat' }
-    ],
-
-    setup: siapkan,
-    reset: siapkan,
-
-    onPointerDown: function (sim, x, y) {
-      for (let i = 0; i < BENDA.length; i++) {
-        const p = posisiBenda(i);
-        if (Math.abs(p.x - x) < 34 && Math.abs(p.y - y) < 34) {
-          sim.data.pilih = i;
-          sim.data.jalan = false;
-          sim.data.anim = 0;
-          return;
-        }
-      }
-    },
-
-    update: function (sim, dt) {
-      if (sim.data.jalan) {
-        sim.data.anim += dt * 0.85;
-        if (sim.data.anim >= 1) { sim.data.anim = 1; sim.data.jalan = false; }
-      }
-    },
-
-    draw: function (c, sim) {
-      const b = BENDA[sim.data.pilih];
-      const uji = sim.get('uji');
-      const a = sim.data.anim;
-      const gel = sim.data.jalan ? Math.sin(a * Math.PI) : 0;
-
-      // --- rak benda ---
-      D.text(c, 'RAK BENDA — KLIK UNTUK MEMILIH', 60, 28,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      BENDA.forEach(function (bb, i) {
-        const p = posisiBenda(i);
-        const dipilih = i === sim.data.pilih;
-        const jml = Object.keys(sim.data.catatan[i]).length;
-        if (dipilih) {
-          D.roundRect(c, p.x - 34, p.y - 34, 68, 68, 10, 'rgba(79,209,192,.12)', P.accent, 2);
-        }
-        gambarContoh(c, bb, p.x, p.y - 4, 20, 0, 0);
-        D.text(c, bb.nama, p.x, p.y + 24,
-          { size: 10.5, weight: 600, color: dipilih ? P.accent2 : P.dim, align: 'c', base: 'middle' });
-        if (jml) {
-          D.circle(c, p.x + 25, p.y - 25, 8, P.accent);
-          D.text(c, String(jml), p.x + 25, p.y - 25,
-            { size: 9.5, weight: 800, color: '#06201d', align: 'c', base: 'middle' });
-        }
+  function matBahan(b) {
+    if (b.tembus > 0.6) {
+      return new T.MeshPhysicalMaterial({
+        color: b.w, roughness: 0.05, metalness: 0, transparent: true,
+        opacity: 0.3, clearcoat: 1, envMapIntensity: 0.9
       });
+    }
+    if (b.logam) return S.matLogam(b.w, { roughness: 0.3 });
+    return new T.MeshPhysicalMaterial({
+      color: b.w,
+      roughness: 0.25 + b.kasar * 0.6,
+      metalness: 0.03,
+      clearcoat: b.kasar < 0.3 ? 0.7 : 0.1,
+      transparent: b.tembus > 0.05,
+      opacity: b.tembus > 0.05 ? 1 - b.tembus * 0.55 : 1,
+      envMapIntensity: 0.8
+    });
+  }
 
-      // --- meja uji ---
-      const MX = 440, MY = 268, MW = 300, MH = 190;
-      D.roundRect(c, 40, MY - 26, 360, 216, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      const u = UJI.find(function (q) { return q.id === uji; });
-      D.text(c, 'MEJA UJI · ' + u.label.toUpperCase(), 58, MY - 8,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, u.tanya, 58, MY + 14, { size: 14, weight: 600, color: P.text, base: 'middle' });
+  return {
+    latar: 0x0a1016,
+    kamera: { jarak: 8.6, phi: 1.1, theta: 0.5, targetY: 1.0, lajuPutar: 0.14 },
 
-      const cx = 220, cy = MY + 90;
-
-      if (uji === 'tekan') {
-        const tekan = gel * (1 - b.keras) * 0.9;
-        // jari penekan
-        const jy = cy - 58 + gel * (30 + (1 - b.keras) * 14);
-        D.roundRect(c, cx - 11, jy - 34, 22, 36, 9, '#c9a88a', 'rgba(0,0,0,.2)', 1.2);
-        gambarContoh(c, b, cx, cy, 34, tekan, 0);
-        D.line(c, cx - 60, cy + 26, cx + 60, cy + 26, 'rgba(255,255,255,.2)', 2);
-        if (a > 0.3) {
-          D.text(c, sifatTeks(b, 'tekan'), cx, cy + 52,
-            { size: 15, weight: 700, color: P.accent2, align: 'c', base: 'middle' });
-        }
-
-      } else if (uji === 'raba') {
-        gambarContoh(c, b, cx, cy, 34, 0, 0);
-        // jari bergerak menyapu permukaan
-        const fx = cx - 46 + gel * 92;
-        D.roundRect(c, fx - 9, cy - 56, 18, 30, 8, '#c9a88a', 'rgba(0,0,0,.2)', 1.2);
-        if (sim.data.jalan && b.halus < 0.65) {
-          for (let i = 0; i < 4; i++) {
-            D.circle(c, fx + Math.sin(i * 2 + sim.t * 20) * 8, cy - 30 - i * 5, 1.8,
-              D.alpha('#f0a94a', 0.6 - i * 0.12));
-          }
-        }
-        if (a > 0.3) {
-          D.text(c, sifatTeks(b, 'raba'), cx, cy + 52,
-            { size: 15, weight: 700, color: P.accent2, align: 'c', base: 'middle' });
-        }
-
-      } else if (uji === 'tekuk') {
-        gambarContoh(c, b, cx, cy, 34, 0, gel * b.lentur);
-        if (b.lentur < 0.15 && gel > 0.6) {
-          D.line(c, cx - 8, cy - 26, cx + 6, cy + 26, '#ef6a52', 2.6);
-          D.text(c, 'patah!', cx + 48, cy,
-            { size: 12, weight: 700, color: '#ef6a52', base: 'middle' });
-        }
-        if (a > 0.3) {
-          D.text(c, sifatTeks(b, 'tekuk'), cx, cy + 52,
-            { size: 15, weight: 700, color: P.accent2, align: 'c', base: 'middle' });
-        }
-
-      } else {
-        // bak air
-        const bx = cx - 72, by = cy - 54, bw = 144, bh = 104;
-        D.beaker(c, bx, by, bw, bh, 0.78, D.alpha(P.air, 0.52), { ticks: false });
-        const permukaan = by + bh * 0.22;
-        const tenggelam = b.rho >= 1;
-        const akhir = tenggelam ? by + bh - 26 : permukaan + 2;
-        const mulai = by - 34;
-        const oy = mulai + (akhir - mulai) * (sim.data.jalan ? a : (sim.data.anim ? 1 : 0));
-        gambarContoh(c, b, cx, oy, 24, 0, 0);
-        D.line(c, bx, permukaan, bx + bw, permukaan, 'rgba(255,255,255,.4)', 1.6);
-        if (a > 0.5) {
-          D.text(c, sifatTeks(b, 'air'), cx, by + bh + 22,
-            { size: 15, weight: 700, color: P.accent2, align: 'c', base: 'middle' });
-          D.text(c, 'massa jenis ' + Sim.fmt(b.rho, 2) + ' g/cm³ · air 1,00 g/cm³',
-            cx, by + bh + 40, { size: 10.5, weight: 500, color: P.faint, align: 'c', base: 'middle' });
-        }
-      }
-
-      // --- kartu sifat ---
-      if (sim.get('kartu')) {
-        D.roundRect(c, MX, MY - 26, MW, 216, 12, 'rgba(255,255,255,.05)', 'rgba(255,255,255,.14)', 1.3);
-        D.text(c, 'KARTU SIFAT', MX + 18, MY - 8,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, b.nama, MX + 18, MY + 16,
-          { size: 19, weight: 700, color: P.text, base: 'middle' });
-        gambarContoh(c, b, MX + MW - 42, MY + 14, 18, 0, 0);
-
-        const cat = sim.data.catatan[sim.data.pilih];
-        UJI.forEach(function (uu, i) {
-          const y = MY + 52 + i * 32;
-          D.text(c, uu.tanya, MX + 18, y,
-            { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-          const nilai = cat[uu.id];
-          D.text(c, nilai || 'belum diuji', MX + MW - 18, y, {
-            size: 13, weight: 700,
-            color: nilai ? P.accent2 : P.faint,
-            align: 'r', base: 'middle'
-          });
-          D.line(c, MX + 18, y + 14, MX + MW - 18, y + 14, 'rgba(255,255,255,.08)', 1);
-        });
-      }
-    },
-
-    readoutsUpdate: function (sim) {
-      const b = BENDA[sim.data.pilih];
-      sim.readout('benda', b.nama);
-      const cat = sim.data.catatan[sim.data.pilih];
-      sim.readout('hasil', cat[sim.get('uji')] || '—');
-      sim.readout('tercatat', Object.keys(cat).length + ' / 4');
-    },
-
-    notes: `
-      <p>Setiap benda punya <strong>sifat</strong> — ciri khas yang bisa kita amati
-      atau ukur. Sifat inilah yang membuat kita memilih bahan tertentu untuk
-      keperluan tertentu.</p>
-
-      <h3>Empat sifat yang diuji di sini</h3>
-      <ul>
-        <li><strong>Keras atau lunak</strong> — seberapa kuat benda menahan tekanan.
-            Batu keras, spons lunak.</li>
-        <li><strong>Kasar atau halus</strong> — bagaimana permukaannya terasa.
-            Kaca halus, batu kasar.</li>
-        <li><strong>Lentur atau kaku</strong> — apakah benda bisa ditekuk lalu kembali.
-            Karet lentur, kaca kaku sampai patah.</li>
-        <li><strong>Terapung atau tenggelam</strong> — ini bergantung pada
-            <strong>massa jenis</strong>, yaitu berat benda dibanding ukurannya.</li>
-      </ul>
-
-      <h3>Mengapa ada yang terapung?</h3>
-      <p>Benda terapung bila massa jenisnya <strong>lebih kecil daripada air</strong>
-      (1 gram tiap sentimeter kubik). Kayu punya massa jenis sekitar 0,6 sehingga
-      terapung. Besi 7,9 sehingga tenggelam. Perhatikan: ini bukan soal berat saja —
-      sebatang kayu besar bisa lebih berat daripada paku besi kecil, tetapi kayu tetap
-      terapung.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Hubungkan dengan kehidupan</strong>
-        Mengapa pegangan panci dibuat dari plastik, bukan besi? Mengapa ban dibuat dari
-        karet, bukan kaca? Jawabannya selalu kembali ke sifat bahan.
-      </div>
-    `,
-
-    explore: [
-      'Uji <strong>Spons</strong> dan <strong>Batu</strong> dengan uji Tekan. Bandingkan seberapa dalam benda berubah bentuk.',
-      'Celupkan <strong>Kayu</strong> lalu <strong>Besi</strong>. Keduanya padat, tetapi hasilnya berbeda — mengapa?',
-      'Tekuk <strong>Kaca</strong>. Apa yang terjadi? Lalu tekuk <strong>Karet</strong>.',
-      'Pakai tombol <strong>Uji semua sifat</strong> pada tiga benda, lalu bandingkan kartunya.'
+    kendali: [
+      { judul: 'Benda', isi: [
+        { type: 'select', id: 'bahan', value: 0, label: 'Terbuat dari',
+          options: BAHAN.map(function (b, i) { return { value: i, label: b.n }; }) },
+        { type: 'segment', id: 'bentuk', value: 'kubus', label: 'Bentuk', options: [
+          { value: 'kubus', label: 'Kubus' }, { value: 'bola', label: 'Bola' },
+          { value: 'batang', label: 'Batang' }
+        ]}
+      ]},
+      { judul: 'Percobaan', isi: [
+        { type: 'segment', id: 'uji', value: 'lihat', label: 'Yang diuji', options: [
+          { value: 'lihat', label: 'Amati' }, { value: 'air', label: 'Air' },
+          { value: 'magnet', label: 'Magnet' }, { value: 'cahaya', label: 'Cahaya' }
+        ]},
+        { type: 'toggle', id: 'jalan', value: true, label: 'Jalankan percobaan' }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'label', value: true, label: 'Tampilkan nama benda' },
+        { type: 'slider', id: 'ukuran', value: 1, min: 0.5, max: 1.8, step: 0.05,
+          label: 'Ukuran benda', unit: '×', dec: 2 }
+      ]}
     ],
 
-    quiz: [
-      {
-        q: 'Sebuah benda memiliki massa jenis 0,8 g/cm³. Apa yang terjadi bila dimasukkan ke air?',
-        options: ['Tenggelam ke dasar', 'Terapung di permukaan', 'Melayang di tengah', 'Larut dalam air'],
-        answer: 1,
-        explain: 'Massa jenis air adalah 1,0 g/cm³. Karena 0,8 lebih kecil daripada 1,0, benda itu terapung.'
-      },
-      {
-        q: 'Mengapa karet dipilih sebagai bahan ban kendaraan?',
-        options: [
-          'Karena karet sangat keras dan kaku',
-          'Karena karet lentur sehingga meredam guncangan',
-          'Karena karet menyerap banyak air',
-          'Karena karet lebih berat daripada besi'
-        ],
-        answer: 1,
-        explain: 'Sifat lentur membuat karet bisa berubah bentuk saat menerima benturan lalu kembali seperti semula. Inilah yang meredam guncangan di jalan.'
-      },
-      {
-        q: 'Spons dipakai untuk mengelap tumpahan air karena sifat apa?',
-        options: ['Keras', 'Halus', 'Daya serap tinggi', 'Massa jenis besar'],
-        answer: 2,
-        explain: 'Spons memiliki banyak rongga kecil yang dapat menampung air, sehingga daya serapnya sangat tinggi.'
+    baca: [
+      { id: 'bahan', label: 'Bahan', tone: 'aksen' },
+      { id: 'hasil', label: 'Hasil uji' },
+      { id: 'sifat', label: 'Sifat menonjol' }
+    ],
+
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 7, warna: 0x101820 }));
+
+      // meja bundar
+      const meja = new T.Mesh(new T.CylinderGeometry(2.4, 2.4, 0.16, 56),
+        new T.MeshStandardMaterial({ color: 0x1e2830, roughness: 0.7, metalness: 0.1 }));
+      meja.position.y = 0.08; meja.receiveShadow = true;
+      s.tambah(meja);
+
+      // benda uji
+      const benda = new T.Group();
+      s.data.benda = benda;
+      s.tambah(benda);
+
+      // bak air
+      const bak = new T.Group();
+      const dinding = new T.Mesh(new T.BoxGeometry(3.2, 1.8, 2.2), S.matKaca());
+      dinding.position.y = 0.9; dinding.renderOrder = 3;
+      bak.add(dinding);
+      const air = new T.Mesh(new T.BoxGeometry(3.14, 1.2, 2.14), S.matCairan(0x3b8ad0, { opacity: 0.68 }));
+      air.position.y = 0.6; air.renderOrder = 1;
+      bak.add(air);
+      bak.visible = false; bak.position.y = 0.16;
+      s.data.bak = bak; s.data.air = air;
+      s.tambah(bak);
+
+      // magnet tapal kuda
+      const magnet = new T.Group();
+      const mMerah = S.matLogam(0xd0402a, { metalness: 0.5, roughness: 0.4 });
+      const mBiru = S.matLogam(0x3a6fd0, { metalness: 0.5, roughness: 0.4 });
+      const lengkung = new T.Mesh(new T.TorusGeometry(0.55, 0.17, 16, 28, Math.PI), mMerah);
+      lengkung.rotation.z = Math.PI;
+      magnet.add(lengkung);
+      [-0.55, 0.55].forEach(function (x, i) {
+        const kaki = new T.Mesh(new T.CylinderGeometry(0.17, 0.17, 0.7, 20), i ? mBiru : mMerah);
+        kaki.position.set(x, 0.35, 0);
+        magnet.add(kaki);
+      });
+      magnet.position.set(0, 2.8, 0);
+      magnet.visible = false;
+      s.data.magnet = magnet;
+      s.tambah(magnet);
+
+      // senter / berkas cahaya
+      const cahaya = new T.Group();
+      const badan = new T.Mesh(new T.CylinderGeometry(0.17, 0.22, 0.75, 24), S.matLogam(0x3a4149));
+      badan.rotation.z = Math.PI / 2;
+      badan.position.x = -2.5;
+      cahaya.add(badan);
+      const berkas = new T.Mesh(new T.CylinderGeometry(0.1, 0.42, 4.4, 28, 1, true),
+        S.matNyala(0xfff0c0, 0.16));
+      berkas.rotation.z = -Math.PI / 2;
+      berkas.position.x = -0.1;
+      cahaya.add(berkas);
+      const layar = new T.Mesh(new T.PlaneGeometry(2.2, 1.8),
+        new T.MeshStandardMaterial({ color: 0x20282f, roughness: 0.9 }));
+      layar.position.set(2.6, 0, 0);
+      layar.rotation.y = -Math.PI / 2;
+      cahaya.add(layar);
+      const bayang = new T.Mesh(new T.CircleGeometry(0.52, 36),
+        new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 }));
+      bayang.position.set(2.58, 0, 0);
+      bayang.rotation.y = -Math.PI / 2;
+      cahaya.add(bayang);
+      cahaya.position.y = 1.5;
+      cahaya.visible = false;
+      s.data.cahaya = cahaya; s.data.berkas = berkas; s.data.bayang = bayang;
+      s.tambah(cahaya);
+
+      const lbl = S.teks('Kayu', { skala: 0.5, lebar: 11, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.5, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.y = 1.4;
+      s.data.vy = 0;
+      pasangBenda(s);
+      pasangUji(s);
+    },
+
+    ubah: function (s, id) {
+      if (id === 'bahan' || id === 'bentuk' || id === 'ukuran') pasangBenda(s);
+      if (id === 'uji' || id === 'jalan') pasangUji(s);
+      if (id === 'label') s.data.lbl.visible = s.get('label');
+    },
+
+    langkah: function (s, dt) {
+      const b = bahan(s);
+      const uji = s.get('uji');
+      const jalan = s.get('jalan');
+      const o = s.data.benda;
+
+      if (uji === 'air' && jalan) {
+        const target = b.apung ? 1.0 : 0.42;   // tinggi akhir di dalam bak
+        s.data.vy += (target - s.data.y) * dt * 9 - s.data.vy * dt * 5.5;
+        s.data.y += s.data.vy * dt;
+        o.position.y = s.data.y;
+        o.rotation.y += dt * 0.3;
+        // riak
+        s.data.air.scale.y = 1 + Math.sin(s.waktu * 5) * 0.012;
+      } else if (uji === 'magnet' && jalan) {
+        const target = b.magnet ? 2.25 : 1.1;
+        s.data.vy += (target - s.data.y) * dt * (b.magnet ? 11 : 7) - s.data.vy * dt * 6;
+        s.data.y += s.data.vy * dt;
+        o.position.y = s.data.y;
+        s.data.magnet.position.y = 2.8 + Math.sin(s.waktu * 1.4) * 0.12;
+        o.rotation.y += dt * (b.magnet ? 1.6 : 0.3);
+      } else if (uji === 'cahaya' && jalan) {
+        o.position.y = 1.5;
+        o.rotation.y += dt * 0.5;
+        const t = b.tembus;
+        s.data.bayang.material.opacity = 0.72 * (1 - t);
+        s.data.bayang.material.color.setHex(t > 0.3 ? 0x2a4a60 : 0x000000);
+        s.data.berkas.material.opacity = 0.14 + 0.05 * Math.sin(s.waktu * 3);
+      } else {
+        s.data.y += (1.4 - s.data.y) * dt * 5;
+        o.position.y = s.data.y + Math.sin(s.waktu * 1.3) * 0.05;
+        o.rotation.y += dt * 0.55;
+        o.rotation.x = Math.sin(s.waktu * 0.7) * 0.14;
       }
-    ]
-  });
-})();
+      s.data.lbl.position.y = 3.5;
+    },
+
+    bacaUbah: function (s) {
+      const b = bahan(s);
+      const uji = s.get('uji');
+      s.baca('bahan', b.n);
+      if (uji === 'air') {
+        s.baca('hasil', b.apung ? 'Terapung' : 'Tenggelam', b.apung ? 'aksen' : 'warn');
+      } else if (uji === 'magnet') {
+        s.baca('hasil', b.magnet ? 'Ditarik magnet' : 'Tidak ditarik', b.magnet ? 'aksen' : 'warn');
+      } else if (uji === 'cahaya') {
+        s.baca('hasil', b.tembus > 0.6 ? 'Tembus cahaya'
+          : b.tembus > 0.15 ? 'Tembus sebagian' : 'Tidak tembus',
+          b.tembus > 0.6 ? 'aksen' : b.tembus > 0.15 ? 'warn' : 'danger');
+      } else {
+        s.baca('hasil', 'Amati bentuk dan warnanya');
+      }
+      const sifat = [];
+      if (b.keras > 0.7) sifat.push('keras'); else if (b.keras < 0.25) sifat.push('lentur');
+      if (b.kasar > 0.6) sifat.push('kasar'); else if (b.kasar < 0.2) sifat.push('halus');
+      if (b.logam) sifat.push('mengilap');
+      if (b.tembus > 0.6) sifat.push('bening');
+      s.baca('sifat', sifat.join(', ') || 'biasa');
+    }
+  };
+
+  function pasangBenda(s) {
+    const b = bahan(s);
+    const g = s.data.benda;
+    while (g.children.length) { const c = g.children.pop(); S.buangObjek(c); }
+    const k = s.get('ukuran');
+    let geo;
+    const bentuk = s.get('bentuk');
+    if (bentuk === 'bola') geo = new T.SphereGeometry(0.62 * k, 40, 30);
+    else if (bentuk === 'batang') geo = new T.CylinderGeometry(0.3 * k, 0.3 * k, 1.5 * k, 32);
+    else geo = new T.BoxGeometry(1.05 * k, 1.05 * k, 1.05 * k);
+    const m = new T.Mesh(geo, matBahan(b));
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    s.data.lbl.userData.ganti(b.n);
+    s.data.lbl.visible = s.get('label');
+  }
+
+  function pasangUji(s) {
+    const uji = s.get('uji');
+    s.data.bak.visible = uji === 'air';
+    s.data.magnet.visible = uji === 'magnet';
+    s.data.cahaya.visible = uji === 'cahaya';
+    s.data.vy = 0;
+    s.data.y = uji === 'air' ? 2.3 : uji === 'magnet' ? 1.1 : 1.4;
+    s.data.benda.position.set(0, s.data.y, 0);
+    s.orbit.set({ targetY: uji === 'magnet' ? 1.7 : 1.1 });
+  }
+})());

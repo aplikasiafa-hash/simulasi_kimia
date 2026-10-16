@@ -1,372 +1,230 @@
-/* Bentuk Molekul (VSEPR) dan Kepolaran — Fase E
-   Atur jumlah pasangan elektron ikatan dan bebas; bentuk ruang dan resultan
-   momen dipol dihitung ulang seketika. */
+/* Bentuk Molekul (VSEPR) dan Kepolaran — Fase E — adegan 3D */
 
-(function () {
+Sim3D.daftar('bentuk-molekul', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  /* x = pasangan ikatan, e = pasangan bebas pada atom pusat */
+  const BENTUK = {
+    '2-0': { n: 'Linear', sudut: '180°', arah: [[0,0,1],[0,0,-1]] },
+    '3-0': { n: 'Segitiga datar', sudut: '120°', arah: sudutDatar(3) },
+    '2-1': { n: 'Bengkok (V)', sudut: '≈118°', arah: [sudutDatar(3)[0], sudutDatar(3)[1]], bebas: [sudutDatar(3)[2]] },
+    '4-0': { n: 'Tetrahedron', sudut: '109,5°', arah: [[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]] },
+    '3-1': { n: 'Piramida segitiga', sudut: '≈107°', arah: [[-1,-1,1],[-1,1,-1],[1,-1,-1]], bebas: [[1,1,1]] },
+    '2-2': { n: 'Bengkok (V)', sudut: '≈104,5°', arah: [[-1,1,-1],[1,-1,-1]], bebas: [[1,1,1],[-1,-1,1]] },
+    '5-0': { n: 'Bipiramida segitiga', sudut: '120° dan 90°',
+      arah: sudutDatar(3).concat([[0,1,0],[0,-1,0]]) },
+    '4-1': { n: 'Jungkat-jungkit', sudut: '≈117° dan 90°',
+      arah: [sudutDatar(3)[0], sudutDatar(3)[1], [0,1,0], [0,-1,0]], bebas: [sudutDatar(3)[2]] },
+    '6-0': { n: 'Oktahedron', sudut: '90°',
+      arah: [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]] },
+    '5-1': { n: 'Piramida segiempat', sudut: '≈90°',
+      arah: [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0]], bebas: [[0,-1,0]] },
+    '4-2': { n: 'Segiempat datar', sudut: '90°',
+      arah: [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]], bebas: [[0,1,0],[0,-1,0]] }
+  };
 
-  const W = 790, H = 560;
-
-  const MOLEKUL = [
-    { n: 'CH₄ — metana',      x: 4, e: 0, pusat: 'C', luar: 'H', polar: false },
-    { n: 'NH₃ — amonia',      x: 3, e: 1, pusat: 'N', luar: 'H', polar: true },
-    { n: 'H₂O — air',         x: 2, e: 2, pusat: 'O', luar: 'H', polar: true },
-    { n: 'CO₂ — karbon dioksida', x: 2, e: 0, pusat: 'C', luar: 'O', polar: false },
-    { n: 'BF₃ — boron trifluorida', x: 3, e: 0, pusat: 'B', luar: 'F', polar: false },
-    { n: 'PCl₅ — fosforus pentaklorida', x: 5, e: 0, pusat: 'P', luar: 'Cl', polar: false },
-    { n: 'SF₆ — belerang heksafluorida', x: 6, e: 0, pusat: 'S', luar: 'F', polar: false },
-    { n: 'SO₂ — belerang dioksida', x: 2, e: 1, pusat: 'S', luar: 'O', polar: true },
-    { n: 'XeF₄ — xenon tetrafluorida', x: 4, e: 2, pusat: 'Xe', luar: 'F', polar: false },
-    { n: 'SF₄ — belerang tetrafluorida', x: 4, e: 1, pusat: 'S', luar: 'F', polar: true },
-    { n: 'ClF₃ — klorin trifluorida', x: 3, e: 2, pusat: 'Cl', luar: 'F', polar: true }
-  ];
-
-  /** Arah pasangan elektron untuk tiap bentuk (dalam 2D, sudut derajat). */
-  function arahDomain(x, e) {
-    const total = x + e;
-    const baku = {
-      2: [180, 0],
-      3: [90, 210, 330],
-      4: [90, 200, 340, 270],
-      5: [90, 270, 0, 130, 230],
-      6: [90, 270, 0, 180, 45, 225]
-    }[total];
-    if (baku) return baku;
-    // Susunan di luar daftar baku: sebarkan merata agar tetap tergambar.
-    const n = Math.max(1, total);
+  function sudutDatar(n) {
     const out = [];
-    for (let i = 0; i < n; i++) out.push(90 + i * 360 / n);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2;
+      out.push([Math.cos(a), 0, Math.sin(a)]);
+    }
     return out;
   }
 
-  function siapkan(sim) {
-    sim.data.putar = 0;
-  }
+  const MOLEKUL = [
+    { n: 'CO₂', pusat: 'C', luar: 'O', x: 2, e: 0, orde: 2, polar: false, ket: 'Simetris — dipol saling meniadakan' },
+    { n: 'BF₃', pusat: 'B', luar: 'F', x: 3, e: 0, orde: 1, polar: false, ket: 'Simetris datar' },
+    { n: 'SO₂', pusat: 'S', luar: 'O', x: 2, e: 1, orde: 2, polar: true, ket: 'Bengkok — dipol tidak meniadakan' },
+    { n: 'CH₄', pusat: 'C', luar: 'H', x: 4, e: 0, orde: 1, polar: false, ket: 'Tetrahedron sempurna' },
+    { n: 'NH₃', pusat: 'N', luar: 'H', x: 3, e: 1, orde: 1, polar: true, ket: 'Pasangan bebas mendorong ikatan' },
+    { n: 'H₂O', pusat: 'O', luar: 'H', x: 2, e: 2, orde: 1, polar: true, ket: 'Dua pasangan bebas — sudut 104,5°' },
+    { n: 'PCl₅', pusat: 'P', luar: 'Cl', x: 5, e: 0, orde: 1, polar: false, ket: 'Lima ikatan, simetris' },
+    { n: 'SF₄', pusat: 'S', luar: 'F', x: 4, e: 1, orde: 1, polar: true, ket: 'Bentuk jungkat-jungkit' },
+    { n: 'SF₆', pusat: 'S', luar: 'F', x: 6, e: 0, orde: 1, polar: false, ket: 'Oktahedron sempurna' },
+    { n: 'XeF₄', pusat: 'X', luar: 'F', x: 4, e: 2, orde: 1, polar: false, ket: 'Datar — dipol meniadakan' }
+  ];
 
-  Sim.create({
-    title: 'Bentuk Molekul (VSEPR) dan Kepolaran',
-    subtitle: 'Pasangan elektron saling tolak dan mengatur diri sejauh mungkin. Dari susunan itulah bentuk molekul — dan kepolarannya — ditentukan.',
-    fase: 'E', jenjang: 'SMA Kelas 10',
-    topik: ['Bentuk Molekul', 'Kepolaran'],
-    stage: { w: W, h: H },
+  function mol(s) { return MOLEKUL[parseInt(s.get('m'), 10) || 0]; }
 
-    controls: [
-      {
-        title: 'Domain elektron',
-        items: [
-          { type: 'slider', id: 'x', value: 2, min: 2, max: 6, step: 1,
-            label: 'Pasangan elektron ikatan (X)', dec: 0,
-            hint: 'Jumlah atom yang terikat pada atom pusat.' },
-          { type: 'slider', id: 'e', value: 2, min: 0, max: 3, step: 1,
-            label: 'Pasangan elektron bebas (E)', dec: 0,
-            hint: 'Pasangan yang tidak dipakai berikatan. Tolakannya lebih kuat.' }
-        ]
-      },
-      {
-        title: 'Molekul contoh',
-        items: [
-          { type: 'select', id: 'contoh', value: 2, label: 'Muat molekul',
-            options: MOLEKUL.map(function (m, i) { return { value: i, label: m.n }; }) },
-          { type: 'buttons', label: '', items: [
-            { label: 'Muat molekul ini', primary: true, onClick: function (sim) {
-              const m = MOLEKUL[parseInt(sim.get('contoh'), 10) || 0];
-              sim.set('x', m.x); sim.set('e', m.e);
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'peb', value: true, label: 'Tampilkan pasangan bebas' },
-          { type: 'toggle', id: 'dipol', value: true, label: 'Tampilkan momen dipol' },
-          { type: 'toggle', id: 'putar', value: false, label: 'Putar molekul' }
-        ]
-      }
+  return {
+    latar: 0x060c12,
+    kamera: { jarak: 6.6, phi: 1.1, theta: 0.6, targetY: 0, lajuPutar: 0.3 },
+
+    kendali: [
+      { judul: 'Molekul', isi: [
+        { type: 'select', id: 'm', value: 5, label: 'Contoh molekul',
+          options: MOLEKUL.map(function (m, i) { return { value: i, label: m.n + '  —  ' + bentukDari(m).n }; }) }
+      ]},
+      { judul: 'Susun sendiri', isi: [
+        { type: 'toggle', id: 'sendiri', value: false, label: 'Pakai pengaturan sendiri' },
+        { type: 'slider', id: 'x', value: 4, min: 2, max: 6, step: 1,
+          label: 'Pasangan ikatan (X)', unit: '', dec: 0 },
+        { type: 'slider', id: 'e', value: 0, min: 0, max: 2, step: 1,
+          label: 'Pasangan bebas (E)', unit: '', dec: 0 }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'bebas', value: true, label: 'Tampilkan pasangan bebas' },
+        { type: 'toggle', id: 'dipol', value: true, label: 'Tampilkan panah dipol' },
+        { type: 'toggle', id: 'sudutT', value: true, label: 'Tampilkan sudut ikatan' },
+        { type: 'segment', id: 'gaya', value: 'tongkat', label: 'Gaya gambar', options: [
+          { value: 'tongkat', label: 'Bola-tongkat' }, { value: 'penuh', label: 'Ruang penuh' }
+        ]}
+      ]}
     ],
 
-    readouts: [
-      { id: 'notasi', label: 'Notasi VSEPR', tone: 'accent' },
+    baca: [
+      { id: 'molekul', label: 'Molekul', tone: 'aksen' },
+      { id: 'notasi', label: 'Notasi VSEPR' },
       { id: 'bentuk', label: 'Bentuk molekul' },
       { id: 'sudut', label: 'Sudut ikatan' },
       { id: 'polar', label: 'Kepolaran' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-
-    update: function (sim, dt) {
-      if (sim.get('putar')) sim.data.putar += dt * 0.5;
+    bangun: function (s) {
+      s.data.w = new T.Group();
+      s.tambah(s.data.w);
+      const lbl = S.teks('', { skala: 0.44, lebar: 16, warna: '#d8e4ec' });
+      lbl.position.set(0, 2.9, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+      const ket = S.teks('', { skala: 0.26, lebar: 40, warna: '#9aa8b4' });
+      ket.position.set(0, -2.5, 0);
+      s.data.ket = ket;
+      s.tambah(ket);
+      pasang(s);
     },
 
-    draw: function (c, sim) {
-      const x = Math.round(sim.get('x'));
-      const e = Math.round(sim.get('e'));
-      const total = x + e;
-      const v = C.cariVSEPR(x, e);
-      const contoh = MOLEKUL[parseInt(sim.get('contoh'), 10) || 0];
-      const cocok = contoh.x === x && contoh.e === e;
-      const pusatSym = cocok ? contoh.pusat : 'A';
-      const luarSym = cocok ? contoh.luar : 'X';
+    ubah: function (s) { pasang(s); },
 
-      const cx = 260, cy = 258, R = 100;
-      const arah = arahDomain(x, e);
-      const putar = sim.data.putar * 57.3;
-
-      /* ---------- molekul ---------- */
-      D.text(c, 'BENTUK RUANG MOLEKUL', 40, 50,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      // ikatan
-      for (let i = 0; i < x; i++) {
-        const ang = (arah[i] + putar) * Math.PI / 180;
-        const px = cx + Math.cos(ang) * R, py = cy - Math.sin(ang) * R;
-        D.line(c, cx, cy, px, py, 'rgba(255,255,255,.35)', 5);
-        D.line(c, cx, cy, px, py, 'rgba(255,255,255,.15)', 2);
+    langkah: function (s, dt) {
+      if (s.data.dipolTotal) {
+        s.data.dipolTotal.scale.setScalar(1 + Math.sin(s.waktu * 2.4) * 0.05);
       }
+    },
 
-      // pasangan elektron bebas
-      if (sim.get('peb')) {
-        for (let i = x; i < total; i++) {
-          const ang = (arah[i] + putar) * Math.PI / 180;
-          const px = cx + Math.cos(ang) * 52, py = cy - Math.sin(ang) * 52;
-          // awan berbentuk balon
-          c.save();
-          c.translate(px, py); c.rotate(-ang);
-          c.beginPath();
-          c.ellipse(10, 0, 30, 19, 0, 0, Math.PI * 2);
-          c.fillStyle = D.alpha('#f0a94a', 0.2); c.fill();
-          c.strokeStyle = D.alpha('#f0a94a', 0.5); c.lineWidth = 1.4; c.stroke();
-          c.restore();
-          D.circle(c, px + Math.cos(ang) * 6 - Math.sin(ang) * 6,
-            py - Math.sin(ang) * 6 - Math.cos(ang) * 6, 3.6, P.amber);
-          D.circle(c, px + Math.cos(ang) * 6 + Math.sin(ang) * 6,
-            py - Math.sin(ang) * 6 + Math.cos(ang) * 6, 3.6, P.amber);
-        }
+    bacaUbah: function (s) {
+      const m = aktif(s);
+      const b = bentukDari(m);
+      s.baca('molekul', m.n);
+      s.baca('notasi', 'AX' + m.x + (m.e ? 'E' + m.e : ''));
+      s.baca('bentuk', b.n);
+      s.baca('sudut', b.sudut);
+      s.baca('polar', m.polar ? 'Polar' : 'Nonpolar', m.polar ? 'warn' : 'aksen');
+    }
+  };
+
+  function aktif(s) {
+    if (!s.get('sendiri')) return mol(s);
+    const x = Math.round(s.get('x')), e = Math.round(s.get('e'));
+    const b = BENTUK[x + '-' + e];
+    return { n: 'AX' + x + (e ? 'E' + e : ''), pusat: 'C', luar: 'F',
+      x: x, e: e, orde: 1, polar: e > 0 && !(x === 4 && e === 2) && !(x === 2 && e === 0),
+      ket: b ? 'Bentuk ' + b.n.toLowerCase() : 'Gabungan ini tidak lazim' };
+  }
+
+  function bentukDari(m) {
+    return BENTUK[m.x + '-' + m.e] || { n: 'tidak lazim', sudut: '—', arah: [] };
+  }
+
+  function pasang(s) {
+    const m = aktif(s);
+    const b = bentukDari(m);
+    const w = s.data.w;
+    while (w.children.length) { const c = w.children.pop(); S.buangObjek(c); }
+    s.data.dipolTotal = null;
+
+    const penuh = s.get('gaya') === 'penuh';
+    const skalaP = penuh ? 1.0 : 0.46;
+    const skalaL = penuh ? 0.9 : 0.36;
+    const jarak = penuh ? 1.15 : 1.45;
+
+    const pusat = S.atom(m.pusat, null, { skala: skalaP });
+    w.add(pusat);
+    const tp = S.teks(m.pusat === 'X' ? 'Xe' : m.pusat,
+      { skala: 0.26, latar: false, warna: '#ffffff', depthTest: false });
+    tp.renderOrder = 10;
+    w.add(tp);
+
+    const arah = (b.arah || []).map(function (a) { return new T.Vector3(a[0], a[1], a[2]).normalize(); });
+    const dipol = new T.Vector3();
+
+    arah.forEach(function (a, i) {
+      const p = a.clone().multiplyScalar(jarak);
+      const at = S.atom(m.luar, null, { skala: skalaL });
+      at.position.copy(p);
+      w.add(at);
+      if (!penuh) {
+        w.add(S.ikatan([0, 0, 0], p, { orde: m.orde, tebal: 0.075 }));
       }
-
-      // atom luar
-      for (let i = 0; i < x; i++) {
-        const ang = (arah[i] + putar) * Math.PI / 180;
-        const px = cx + Math.cos(ang) * R, py = cy - Math.sin(ang) * R;
-        const warna = C.warnaAtom(luarSym);
-        D.atom(c, px, py, 20, warna, luarSym, { size: 14 });
+      // dipol ikatan menunjuk ke atom yang lebih elektronegatif
+      dipol.add(a.clone().multiplyScalar(-1));
+      if (s.get('dipol') && !penuh) {
+        const d = S.panah(a.clone().multiplyScalar(jarak * 0.35),
+          a.clone().multiplyScalar(jarak * 0.82), { warna: 0xf0718f, tebal: 0.028, kepala: 0.16 });
+        w.add(d);
       }
+    });
 
-      // atom pusat
-      D.atom(c, cx, cy, 28, C.warnaAtom(pusatSym), pusatSym, { size: 19 });
-
-      // momen dipol
-      if (sim.get('dipol') && cocok) {
-        let sx = 0, sy = 0;
-        for (let i = 0; i < x; i++) {
-          const ang = (arah[i] + putar) * Math.PI / 180;
-          const enP = C.bySym[pusatSym] ? C.bySym[pusatSym].en : 2.5;
-          const enL = C.bySym[luarSym] ? C.bySym[luarSym].en : 2.5;
-          const kuat = (enL - enP);
-          if (Math.abs(kuat) < 0.1) continue;
-          const px = cx + Math.cos(ang) * 60, py = cy - Math.sin(ang) * 60;
-          D.arrow(c, cx, cy, px, py, D.alpha('#5b9bf5', 0.75), 2, 7);
-          sx += Math.cos(ang) * kuat; sy += -Math.sin(ang) * kuat;
-        }
+    // pasangan bebas sebagai awan
+    if (s.get('bebas')) {
+      (b.bebas || []).forEach(function (a) {
+        const v = new T.Vector3(a[0], a[1], a[2]).normalize().multiplyScalar(jarak * 0.72);
+        const awan = new T.Mesh(new T.SphereGeometry(0.42, 28, 20),
+          new T.MeshPhysicalMaterial({
+            color: 0xb795f0, roughness: 0.25, transmission: 0.4, thickness: 0.4,
+            transparent: true, opacity: 0.38, emissive: 0xb795f0, emissiveIntensity: 0.18,
+            depthWrite: false
+          }));
+        awan.scale.set(0.8, 0.8, 1.4);
+        awan.position.copy(v);
+        awan.lookAt(0, 0, 0);
+        awan.renderOrder = 2;
+        w.add(awan);
         // pasangan bebas juga menyumbang dipol
-        for (let i = x; i < total; i++) {
-          const ang = (arah[i] + putar) * Math.PI / 180;
-          sx += Math.cos(ang) * 0.9; sy += -Math.sin(ang) * 0.9;
-        }
-        const besar = Math.hypot(sx, sy);
-        if (besar > 0.25) {
-          const nx = sx / besar, ny = sy / besar;
-          D.arrow(c, cx - nx * 70, cy - ny * 70, cx + nx * 86, cy + ny * 86, P.rose, 3.4, 11);
-          D.text(c, 'resultan dipol μ ≠ 0', cx + nx * 100, cy + ny * 100,
-            { size: 11.5, weight: 700, color: P.rose, align: 'c', base: 'middle' });
-        } else {
-          D.roundRect(c, cx - 66, cy + 122, 132, 24, 12,
-            'rgba(111,207,127,.15)', P.green, 1.3);
-          D.text(c, 'resultan dipol μ = 0', cx, cy + 134,
-            { size: 11.5, weight: 700, color: P.green, align: 'c', base: 'middle' });
-        }
-      }
-
-      /* ---------- panel keterangan ---------- */
-      const RX = 440, RW = 320;
-      D.roundRect(c, RX, 92, RW, 206, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'HASIL RAMALAN VSEPR', RX + 16, 112,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      if (v) {
-        D.text(c, v.notasi, RX + 16, 142,
-          { size: 26, weight: 700, color: P.accent2, base: 'middle' });
-        D.text(c, v.nama, RX + 16, 174,
-          { size: 18, weight: 650, color: P.text, base: 'middle' });
-        const baris = [
-          ['Domain elektron', String(total)],
-          ['Pasangan ikatan (X)', String(x)],
-          ['Pasangan bebas (E)', String(e)],
-          ['Sudut ikatan', v.sudut],
-          ['Contoh molekul', v.contoh]
-        ];
-        baris.forEach(function (b, i) {
-          const y = 200 + i * 19;
-          D.text(c, b[0], RX + 16, y, { size: 11.5, weight: 500, color: P.faint, base: 'middle' });
-          D.text(c, b[1], RX + RW - 16, y,
-            { size: 11.5, weight: 650, color: P.dim, align: 'r', base: 'middle' });
-        });
-      } else {
-        D.text(c, 'Susunan AX' + Sim.sub(x) + (e ? 'E' + Sim.sub(e) : '') +
-          ' tidak lazim ditemui.', RX + 16, 150,
-          { size: 14, weight: 600, color: P.amber, base: 'middle' });
-        D.text(c, 'Coba kurangi pasangan bebas atau pasangan ikatannya.',
-          RX + 16, 174, { size: 12, weight: 500, color: P.dim, base: 'middle' });
-      }
-
-      /* ---------- aturan tolakan ---------- */
-      D.roundRect(c, RX, 312, RW, 110, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'URUTAN KEKUATAN TOLAKAN', RX + 16, 332,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, 'PEB–PEB  >  PEB–PEI  >  PEI–PEI', RX + 16, 358,
-        { size: 15, weight: 700, color: P.amber, base: 'middle' });
-      D.text(c, 'Pasangan elektron bebas lebih dekat ke inti sehingga', RX + 16, 382,
-        { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-      D.text(c, 'menolak lebih kuat dan memperkecil sudut ikatan.', RX + 16, 398,
-        { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-
-      /* ---------- perbandingan sudut ---------- */
-      const CX = 40, CY = 404;
-      D.roundRect(c, CX, CY, 372, 120, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PENGARUH PASANGAN BEBAS PADA SUDUT IKATAN', CX + 16, CY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      const banding = [
-        { n: 'CH₄', x: 4, e: 0, s: '109,5°' },
-        { n: 'NH₃', x: 3, e: 1, s: '107°' },
-        { n: 'H₂O', x: 2, e: 2, s: '104,5°' }
-      ];
-      banding.forEach(function (b, i) {
-        const bx = CX + 28 + i * 118;
-        const aktif = b.x === x && b.e === e;
-        D.roundRect(c, bx - 12, CY + 34, 106, 70, 8,
-          aktif ? 'rgba(79,209,192,.14)' : 'rgba(255,255,255,.03)',
-          aktif ? P.accent : 'rgba(255,255,255,.1)', aktif ? 1.8 : 1.2);
-        D.text(c, b.n, bx + 41, CY + 54,
-          { size: 15, weight: 700, color: aktif ? P.accent2 : P.text, align: 'c', base: 'middle' });
-        D.text(c, b.s, bx + 41, CY + 76,
-          { size: 17, weight: 700, color: aktif ? P.accent2 : P.dim, align: 'c', base: 'middle', mono: true });
-        D.text(c, b.e + ' PEB', bx + 41, CY + 94,
-          { size: 10.5, weight: 500, color: P.faint, align: 'c', base: 'middle' });
+        dipol.add(v.clone().normalize().multiplyScalar(1.4));
       });
-      D.text(c, 'Makin banyak pasangan bebas, makin kecil sudutnya.',
-        CX + 16, CY + 114, { size: 11, weight: 500, color: P.faint, base: 'middle' });
-    },
+    } else {
+      (b.bebas || []).forEach(function (a) {
+        dipol.add(new T.Vector3(a[0], a[1], a[2]).normalize().multiplyScalar(1.4));
+      });
+    }
 
-    readoutsUpdate: function (sim) {
-      const x = Math.round(sim.get('x'));
-      const e = Math.round(sim.get('e'));
-      const v = C.cariVSEPR(x, e);
-      const contoh = MOLEKUL[parseInt(sim.get('contoh'), 10) || 0];
-      const cocok = contoh.x === x && contoh.e === e;
-      sim.readout('notasi', v ? v.notasi : 'AX' + Sim.sub(x) + (e ? 'E' + Sim.sub(e) : ''));
-      sim.readout('bentuk', v ? v.nama : 'tidak lazim');
-      sim.readout('sudut', v ? v.sudut : '—');
-      sim.readout('polar', cocok ? (contoh.polar ? 'Polar' : 'Nonpolar') : 'pilih contoh',
-        cocok ? (contoh.polar ? 'warn' : 'accent') : null);
-    },
+    // dipol total
+    if (s.get('dipol') && dipol.length() > 0.12) {
+      const d = S.panah([0, 0, 0], dipol.clone().normalize().multiplyScalar(2.2),
+        { warna: 0xf0c04a, tebal: 0.05, kepala: 0.3 });
+      w.add(d);
+      s.data.dipolTotal = d;
+      const t = S.teks('dipol total', { skala: 0.17, lebar: 11, warna: '#f0c04a' });
+      t.position.copy(dipol.clone().normalize().multiplyScalar(2.95));
+      w.add(t);
+    }
 
-    notes: `
-      <p>Teori VSEPR (<em>Valence Shell Electron Pair Repulsion</em>) berangkat dari satu
-      gagasan: <strong>pasangan elektron di sekitar atom pusat saling tolak</strong>,
-      sehingga mengatur diri sejauh mungkin satu sama lain. Susunan yang terbentuk itulah
-      bentuk molekulnya.</p>
-
-      <h3>Cara menentukan bentuk molekul</h3>
-      <ol>
-        <li>Gambar struktur Lewis molekulnya.</li>
-        <li>Hitung <strong>domain elektron</strong> di sekitar atom pusat. Satu domain
-            bisa berupa ikatan tunggal, rangkap, atau pasangan bebas. Ikatan rangkap
-            tetap dihitung satu domain.</li>
-        <li>Tentukan jumlah pasangan ikatan (X) dan pasangan bebas (E).</li>
-        <li>Cocokkan dengan notasi AXₙEₘ.</li>
-      </ol>
-
-      <h3>Mengapa pasangan bebas memperkecil sudut?</h3>
-      <p>Pasangan elektron bebas hanya ditarik oleh <strong>satu inti</strong>, sedangkan
-      pasangan ikatan ditarik <strong>dua inti</strong>. Akibatnya awan elektron bebas
-      lebih gemuk dan lebih dekat ke atom pusat, sehingga menolak lebih kuat.</p>
-
-      <p>Perhatikan deret berikut, semuanya berdomain empat:</p>
-      <ul>
-        <li>CH₄ (4 ikatan, 0 bebas) → tetrahedral, sudut 109,5°</li>
-        <li>NH₃ (3 ikatan, 1 bebas) → piramida segitiga, sudut 107°</li>
-        <li>H₂O (2 ikatan, 2 bebas) → bentuk V, sudut 104,5°</li>
-      </ul>
-      <p>Susunan domainnya sama, tetapi bentuk molekulnya berbeda — karena yang kita
-      sebut "bentuk molekul" hanya memperhitungkan posisi <strong>atom</strong>, bukan
-      pasangan bebas.</p>
-
-      <h3>Kepolaran molekul</h3>
-      <p>Molekul bersifat polar bila memenuhi dua syarat:</p>
-      <ol>
-        <li>Ikatannya polar (ada selisih keelektronegatifan), <strong>dan</strong></li>
-        <li>Bentuknya <strong>tidak simetris</strong>, sehingga momen dipolnya tidak saling meniadakan.</li>
-      </ol>
-
-      <p>Contoh yang sering mengecoh: CO₂ memiliki dua ikatan C=O yang sangat polar,
-      tetapi bentuknya linear dan simetris. Kedua momen dipol berlawanan arah dan
-      <strong>saling meniadakan</strong>, sehingga CO₂ bersifat nonpolar. Sebaliknya
-      H₂O berbentuk V, sehingga dipolnya menjumlah dan air bersifat sangat polar.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Inilah sebabnya air melarutkan garam</strong>
-        Sifat polar air membuat molekulnya dapat mengelilingi dan menstabilkan ion Na⁺
-        dan Cl⁻. Minyak yang nonpolar tidak bisa melakukannya — dari sinilah muncul
-        kaidah "like dissolves like".
-      </div>
-    `,
-
-    explore: [
-      'Muat <strong>CH₄</strong>, lalu ubah pasangan bebas menjadi 1 dan 2. Amati sudutnya mengecil.',
-      'Bandingkan <strong>CO₂</strong> dan <strong>H₂O</strong>. Keduanya punya dua atom luar — mengapa kepolarannya berbeda?',
-      'Muat <strong>XeF₄</strong>. Ada dua pasangan bebas, tetapi molekulnya nonpolar. Mengapa?',
-      'Atur X = 5, E = 0 lalu X = 4, E = 1. Bagaimana satu pasangan bebas mengubah bentuknya?'
-    ],
-
-    quiz: [
-      {
-        q: 'Molekul NH₃ memiliki 3 pasangan elektron ikatan dan 1 pasangan elektron bebas. Bentuk molekulnya adalah…',
-        options: ['Tetrahedral', 'Segitiga datar', 'Piramida segitiga', 'Bentuk V'],
-        answer: 2,
-        explain: 'Empat domain elektron tersusun tetrahedral, tetapi karena satu domain berupa pasangan bebas, bentuk molekul yang teramati (hanya posisi atom) adalah piramida segitiga.'
-      },
-      {
-        q: 'Mengapa sudut ikatan H₂O (104,5°) lebih kecil daripada CH₄ (109,5°)?',
-        options: [
-          'Karena oksigen lebih kecil daripada karbon',
-          'Karena dua pasangan elektron bebas pada oksigen menolak lebih kuat',
-          'Karena H₂O memiliki lebih sedikit atom',
-          'Karena ikatan O—H lebih pendek'
-        ],
-        answer: 1,
-        explain: 'Pasangan elektron bebas hanya ditarik satu inti sehingga awannya lebih gemuk dan menolak lebih kuat. Dua pasangan bebas pada oksigen menekan sudut H—O—H menjadi lebih sempit.'
-      },
-      {
-        q: 'CO₂ memiliki ikatan C=O yang sangat polar, tetapi molekulnya bersifat nonpolar. Alasannya adalah…',
-        options: [
-          'Karbon dan oksigen punya keelektronegatifan sama',
-          'Bentuknya linear dan simetris sehingga kedua momen dipol saling meniadakan',
-          'CO₂ berwujud gas',
-          'Ikatan rangkap selalu nonpolar'
-        ],
-        answer: 1,
-        explain: 'Dua momen dipol C=O menunjuk ke arah berlawanan dengan besar yang sama. Resultannya nol, sehingga molekul secara keseluruhan nonpolar meski ikatannya polar.'
-      },
-      {
-        q: 'Suatu molekul memiliki notasi AX₂E₃. Bentuk molekulnya adalah…',
-        options: ['Bentuk T', 'Linear', 'Bentuk V', 'Piramida segitiga'],
-        answer: 1,
-        explain: 'Lima domain tersusun bipiramida segitiga. Tiga pasangan bebas menempati bidang khatulistiwa, sehingga kedua atom tersisa berada pada sumbu dan membentuk susunan linear. Contohnya XeF₂.'
+    // sudut ikatan
+    if (s.get('sudutT') && arah.length >= 2) {
+      const a1 = arah[0], a2 = arah[1];
+      const sudut = Math.acos(S.clamp(a1.dot(a2), -1, 1));
+      const titik = [];
+      const n = 26;
+      const sumbu = new T.Vector3().crossVectors(a1, a2).normalize();
+      for (let i = 0; i <= n; i++) {
+        const v = a1.clone().applyAxisAngle(sumbu, sudut * i / n).multiplyScalar(jarak * 0.52);
+        titik.push(v);
       }
-    ]
-  });
-})();
+      const busur = new T.Line(new T.BufferGeometry().setFromPoints(titik),
+        new T.LineBasicMaterial({ color: 0x7fe3d6, transparent: true, opacity: 0.8 }));
+      w.add(busur);
+      const tengah = a1.clone().applyAxisAngle(sumbu, sudut / 2).multiplyScalar(jarak * 0.68);
+      const t = S.teks(Math.round(sudut * 180 / Math.PI) + '°',
+        { skala: 0.24, lebar: 5, warna: '#7fe3d6' });
+      t.position.copy(tengah);
+      w.add(t);
+    }
+
+    s.data.lbl.userData.ganti(m.n + ' — ' + b.n, m.polar ? '#f0c88a' : '#9fe8ad');
+    s.data.ket.userData.ganti(m.ket);
+    s.orbit.set({ jarak: penuh ? 5.6 : 7.0 });
+  }
+})());

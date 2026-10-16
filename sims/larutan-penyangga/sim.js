@@ -1,436 +1,364 @@
-/* Larutan Penyangga (Buffer) — Fase F
-   Tambahkan asam atau basa kuat ke buffer dan ke air biasa secara berdampingan,
-   lalu bandingkan goyangan pH keduanya. */
+/* Larutan Penyangga (Buffer) — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('larutan-penyangga', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 590;
+  const KW = 1e-14;
 
   const BUFFER = [
-    { id: 'asetat', n: 'CH₃COOH / CH₃COO⁻', jenis: 'asam', K: 1.8e-5,
-      asam: 'CH₃COOH', basa: 'CH₃COONa', pKa: 4.74,
-      guna: 'Pengawet makanan, larutan baku laboratorium.' },
-    { id: 'format', n: 'HCOOH / HCOO⁻', jenis: 'asam', K: 1.8e-4,
-      asam: 'HCOOH', basa: 'HCOONa', pKa: 3.74,
-      guna: 'Elektroforesis dan analisis kimia.' },
-    { id: 'amonia', n: 'NH₃ / NH₄⁺', jenis: 'basa', K: 1.8e-5,
-      asam: 'NH₄Cl', basa: 'NH₃', pKa: 9.26,
-      guna: 'Pembersih dan media kultur sel.' },
-    { id: 'fosfat', n: 'H₂PO₄⁻ / HPO₄²⁻', jenis: 'asam', K: 6.2e-8,
-      asam: 'NaH₂PO₄', basa: 'Na₂HPO₄', pKa: 7.21,
-      guna: 'Penyangga utama di dalam sel tubuh manusia.' }
+    { n: 'CH₃COOH / CH₃COO⁻', ka: 1.8e-5, jenis: 'asam', pel: 'asetat' },
+    { n: 'H₂CO₃ / HCO₃⁻ (darah)', ka: 4.3e-7, jenis: 'asam', pel: 'karbonat' },
+    { n: 'H₂PO₄⁻ / HPO₄²⁻ (dalam sel)', ka: 6.2e-8, jenis: 'asam', pel: 'fosfat' },
+    { n: 'NH₄⁺ / NH₃', ka: 5.6e-10, jenis: 'basa', pel: 'amonium' },
+    { n: 'HCOOH / HCOO⁻', ka: 1.8e-4, jenis: 'asam', pel: 'format' }
   ];
 
-  function bufferAktif(sim) {
-    return BUFFER.find(function (b) { return b.id === sim.get('buffer'); }) || BUFFER[0];
+  function buffer(s) { return BUFFER[parseInt(s.get('b'), 10) || 0]; }
+
+  /* pH buffer setelah penambahan mmol asam (+) atau basa (−) kuat */
+  function phBuffer(s, tambah) {
+    const b = buffer(s);
+    const V = s.get('v') / 1000;
+    let na = s.get('ca') * V * 1000;     // mmol asam lemah
+    let ng = s.get('cg') * V * 1000;     // mmol basa konjugat
+    if (tambah > 0) { na += tambah; ng -= tambah; }     // asam kuat ditambahkan
+    else { na += tambah; ng -= tambah; }                 // basa kuat: tambah<0 → na turun, ng naik
+    const pKa = -Math.log10(b.ka);
+    if (ng <= 0.0001) {
+      // kapasitas habis: sisa asam kuat berlebih
+      const sisa = (tambah > 0 ? tambah - s.get('cg') * V * 1000 : 0);
+      const H = Math.max(1e-7, (sisa / 1000) / V);
+      return S.clamp(-Math.log10(H), 0, 14);
+    }
+    if (na <= 0.0001) {
+      const sisa = (tambah < 0 ? -tambah - s.get('ca') * V * 1000 : 0);
+      const OH = Math.max(1e-7, (sisa / 1000) / V);
+      return S.clamp(14 + Math.log10(OH), 0, 14);
+    }
+    return S.clamp(pKa + Math.log10(ng / na), 0, 14);
   }
 
-  /** pH buffer setelah penambahan asam/basa kuat. */
-  function hitung(sim) {
-    const B = bufferAktif(sim);
-    const Vb = 0.1;                                 // 100 mL
-    const nAsam0 = sim.get('cAsam') * Vb;
-    const nBasa0 = sim.get('cBasa') * Vb;
-    const tambah = sim.get('tambah') / 1000;        // mol asam/basa kuat
-    const asamKuat = sim.get('jenis') === 'asam';
-
-    // asam kuat menambah komponen asam, basa kuat menambah komponen basa
-    let nAsam = asamKuat ? nAsam0 + tambah : nAsam0 - tambah;
-    let nBasa = asamKuat ? nBasa0 - tambah : nBasa0 + tambah;
-    const jebol = nAsam < 0 || nBasa < 0;
-    nAsam = Math.max(nAsam, 1e-9);
-    nBasa = Math.max(nBasa, 1e-9);
-
-    let pH;
-    if (B.jenis === 'asam') {
-      pH = -Math.log10(B.K) + Math.log10(nBasa / nAsam);
-    } else {
-      const pOH = -Math.log10(B.K) + Math.log10(nAsam / nBasa);
-      pH = 14 - pOH;
+  /* pH air murni setelah penambahan mmol asam/basa kuat yang sama */
+  function phAir(s, tambah) {
+    const V = s.get('v') / 1000;
+    if (Math.abs(tambah) < 1e-9) return 7;
+    if (tambah > 0) {
+      const H = (tambah / 1000) / V;
+      return S.clamp(-Math.log10(H), 0, 14);
     }
-    if (jebol) {
-      // kapasitas penyangga terlampaui: pH melonjak seperti air biasa
-      const sisa = asamKuat ? (tambah - nBasa0) : (tambah - nAsam0);
-      pH = asamKuat
-        ? Math.min(pH, -Math.log10(Math.max(sisa / Vb, 1e-14)))
-        : Math.max(pH, 14 + Math.log10(Math.max(sisa / Vb, 1e-14)));
-    }
-
-    // pembanding: air murni
-    let pHAir = 7;
-    if (tambah > 1e-9) {
-      pHAir = asamKuat
-        ? -Math.log10(tambah / Vb)
-        : 14 + Math.log10(tambah / Vb);
-    }
-
-    return {
-      pH: Sim.clamp(pH, 0, 14), pHAir: Sim.clamp(pHAir, 0, 14),
-      nAsam: nAsam, nBasa: nBasa, jebol: jebol,
-      pH0: B.jenis === 'asam'
-        ? -Math.log10(B.K) + Math.log10(nBasa0 / Math.max(nAsam0, 1e-9))
-        : 14 - (-Math.log10(B.K) + Math.log10(nAsam0 / Math.max(nBasa0, 1e-9))),
-      B: B
-    };
+    const OH = (-tambah / 1000) / V;
+    return S.clamp(14 + Math.log10(OH), 0, 14);
   }
 
-  function siapkan(sim) {
-    sim.data.jejakB = new Plot.Buffer(300);
-    sim.data.jejakA = new Plot.Buffer(300);
-  }
-
-  Sim.create({
-    title: 'Larutan Penyangga (Buffer)',
-    subtitle: 'Buffer mempertahankan pH hampir tetap meski ditambah asam atau basa kuat. Bandingkan langsung dengan air murni pada perlakuan yang sama.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Buffer', 'Henderson-Hasselbalch'],
-    stage: { w: W, h: H },
-    showPlay: false,
-
-    controls: [
-      {
-        title: 'Susunan buffer',
-        items: [
-          { type: 'select', id: 'buffer', value: 'asetat', label: 'Pasangan penyangga',
-            options: BUFFER.map(function (b) { return { value: b.id, label: b.n }; }) },
-          { type: 'slider', id: 'cAsam', value: 0.1, min: 0.01, max: 0.5, step: 0.01,
-            label: 'Konsentrasi komponen asam', unit: 'M', dec: 2 },
-          { type: 'slider', id: 'cBasa', value: 0.1, min: 0.01, max: 0.5, step: 0.01,
-            label: 'Konsentrasi komponen basa', unit: 'M', dec: 2 }
-        ]
-      },
-      {
-        title: 'Gangguan',
-        items: [
-          { type: 'segment', id: 'jenis', value: 'asam', label: 'Zat yang ditambahkan',
-            options: [{ value: 'asam', label: 'HCl (asam kuat)' }, { value: 'basa', label: 'NaOH (basa kuat)' }] },
-          { type: 'slider', id: 'tambah', value: 0, min: 0, max: 30, step: 0.5,
-            label: 'Jumlah ditambahkan', unit: 'mmol', dec: 1,
-            hint: 'Volume larutan dianggap tetap 100 mL.' },
-          { type: 'buttons', label: '', items: [
-            { label: 'Kembalikan ke nol', onClick: function (sim) { sim.set('tambah', 0); } },
-            { label: 'Buat 1 : 1 (pH = pKa)', onClick: function (sim) {
-              sim.set('cAsam', 0.1); sim.set('cBasa', 0.1);
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'reaksi', value: true, label: 'Tampilkan reaksi penyangga' }
-        ]
+  function warnaPH(p) {
+    const titik = [
+      [0, 0xd02020], [2, 0xe85a20], [4, 0xf0a030], [6, 0xd8d040],
+      [7, 0x60c860], [8, 0x40b8a0], [10, 0x3878d0], [12, 0x5030b0], [14, 0x30107a]
+    ];
+    for (let i = 0; i < titik.length - 1; i++) {
+      if (p <= titik[i + 1][0]) {
+        const u = (p - titik[i][0]) / (titik[i + 1][0] - titik[i][0]);
+        return new T.Color(titik[i][1]).lerp(new T.Color(titik[i + 1][1]), u);
       }
+    }
+    return new T.Color(0x30107a);
+  }
+
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 11.5, phi: 1.06, theta: 0.5, targetY: 1.5, lajuPutar: 0.1 },
+
+    kendali: [
+      { judul: 'Penyangga', isi: [
+        { type: 'select', id: 'b', value: 0, label: 'Pasangan penyangga',
+          options: BUFFER.map(function (b, i) { return { value: i, label: b.n }; }) },
+        { type: 'slider', id: 'ca', value: 0.1, min: 0.01, max: 0.5, step: 0.01,
+          label: 'Konsentrasi asam lemah', unit: ' M', dec: 2 },
+        { type: 'slider', id: 'cg', value: 0.1, min: 0.01, max: 0.5, step: 0.01,
+          label: 'Konsentrasi basa konjugat', unit: ' M', dec: 2 },
+        { type: 'slider', id: 'v', value: 100, min: 25, max: 250, step: 5,
+          label: 'Volume larutan', unit: ' mL', dec: 0 }
+      ]},
+      { judul: 'Penambahan', isi: [
+        { type: 'slider', id: 'tambah', value: 0, min: -20, max: 20, step: 0.1,
+          label: 'Asam kuat (+) / basa kuat (−)', unit: ' mmol', dec: 1 },
+        { type: 'buttons', label: '', items: [
+          { label: '＋ Teteskan HCl', utama: true, klik: function (s) { s.data.alir = 1; } },
+          { label: '− Teteskan NaOH', klik: function (s) { s.data.alir = -1; } },
+          { label: '⏸ Berhenti', klik: function (s) { s.data.alir = 0; } },
+          { label: '↺ Ulangi', klik: function (s) { s.set('tambah', 0); s.data.alir = 0; } }
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan grafik perbandingan' },
+        { type: 'toggle', id: 'ion', value: true, label: 'Tampilkan partikel di larutan' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'ph', label: 'pH buffer', tone: 'accent' },
-      { id: 'phair', label: 'pH air murni' },
-      { id: 'delta', label: 'Perubahan pH buffer' },
-      { id: 'kapasitas', label: 'Keadaan' }
+    baca: [
+      { id: 'phb', label: 'pH larutan penyangga', tone: 'aksen' },
+      { id: 'pha', label: 'pH air biasa (pembanding)' },
+      { id: 'geser', label: 'Pergeseran pH' },
+      { id: 'pka', label: 'pKa dan perbandingan' },
+      { id: 'kapasitas', label: 'Kapasitas penyangga' },
+      { id: 'status', label: 'Keadaan' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9.5, warna: 0x0b1118 }));
 
-    draw: function (c, sim) {
-      const h = hitung(sim);
-      const B = h.B;
-      const asamKuat = sim.get('jenis') === 'asam';
-
-      /* ---------- dua gelas berdampingan ---------- */
-      const gelas = [
-        { x: 86, label: 'LARUTAN PENYANGGA', pH: h.pH, pH0: h.pH0, warna: C.warnaPH(h.pH), buffer: true },
-        { x: 290, label: 'AIR MURNI (pembanding)', pH: h.pHAir, pH0: 7, warna: C.warnaPH(h.pHAir), buffer: false }
-      ];
-
-      gelas.forEach(function (g) {
-        const GW = 136, GH = 150, GY = 150;
-        D.text(c, g.label, g.x + GW / 2, GY - 44,
-          { size: 10.5, weight: 700, color: g.buffer ? P.accent : P.faint, align: 'c', base: 'middle' });
-        D.beaker(c, g.x, GY, GW, GH, 0.72, D.alpha(g.warna, 0.88));
-
-        // partikel buffer
-        if (g.buffer && sim.get('reaksi')) {
-          const total = 18;
-          const fBasa = h.nBasa / (h.nAsam + h.nBasa);
-          for (let i = 0; i < total; i++) {
-            const basa = (i / total) < fBasa;
-            const seed = i * 71.3;
-            const x = g.x + 14 + ((seed * 5.9) % (GW - 28));
-            const y = GY + 48 + ((seed * 3.3) % (GH - 62));
-            D.circle(c, x + Math.sin(sim.t + i) * 2.4, y + Math.cos(sim.t * 1.1 + i) * 2.4,
-              6.5, basa ? '#5b9bf5' : '#ef6a52');
-          }
-        }
-
-        // pH besar
-        D.text(c, Sim.fmt(g.pH, 2), g.x + GW / 2, GY + GH + 34,
-          { size: 30, weight: 700, color: g.warna, align: 'c', base: 'middle', mono: true });
-        const delta = g.pH - g.pH0;
-        D.text(c, (delta >= 0 ? '+' : '') + Sim.fmt(delta, 2) + ' dari awal',
-          g.x + GW / 2, GY + GH + 58, {
-            size: 12, weight: 650, align: 'c', base: 'middle',
-            color: Math.abs(delta) < 0.5 ? P.green : Math.abs(delta) < 2 ? P.amber : P.red
-          });
-      });
-
-      // panah penambahan
-      if (sim.get('tambah') > 0) {
-        gelas.forEach(function (g) {
-          const tx = g.x + 68;
-          D.arrow(c, tx, 86, tx, 128, asamKuat ? '#ef6a52' : '#5b9bf5', 2.4, 9);
-          for (let i = 0; i < 3; i++) {
-            const dy = ((sim.t * 90 + i * 16) % 42);
-            D.circle(c, tx, 92 + dy, 3.4,
-              D.alpha(asamKuat ? '#ef6a52' : '#5b9bf5', 0.9));
-          }
-        });
-        D.text(c, Sim.fmt(sim.get('tambah'), 1) + ' mmol ' + (asamKuat ? 'HCl' : 'NaOH'),
-          228, 74, { size: 13, weight: 700, align: 'c', base: 'middle',
-            color: asamKuat ? '#ef6a52' : '#5b9bf5' });
+      /* dua gelas berdampingan */
+      function unit(x, judul, warnaJudul) {
+        const g = new T.Group();
+        const gls = S.gelas({ r: 1.3, h: 2.1, level: 0.66, warna: 0x60c860, opacity: 0.62 });
+        g.add(gls);
+        const t = S.teks(judul, { skala: 0.3, lebar: 20, warna: warnaJudul });
+        t.position.set(0, -0.55, 0);
+        g.add(t);
+        g.position.set(x, 0.05, 0);
+        g.userData.gls = gls;
+        return g;
       }
+      const uB = unit(-2.0, 'larutan penyangga', '#9fe8ad');
+      const uA = unit(2.0, 'air biasa', '#6fb6ff');
+      s.data.uB = uB; s.data.uA = uA;
+      s.tambah(uB); s.tambah(uA);
 
-      /* ---------- Henderson-Hasselbalch ---------- */
-      const HX = 468, HW = 300;
-      D.roundRect(c, HX, 90, HW, 160, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PERSAMAAN HENDERSON-HASSELBALCH', HX + 16, 110,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, B.jenis === 'asam' ? 'pH = pKa + log ([basa] / [asam])'
-        : 'pOH = pKb + log ([asam] / [basa])',
-        HX + 16, 136, { size: 13.5, weight: 700, color: P.accent2, base: 'middle', mono: true });
-
-      const rows = [
-        [B.jenis === 'asam' ? 'pKa' : 'pKb', Sim.fmt(-Math.log10(B.K), 2)],
-        ['mol komponen asam', Sim.fmt(h.nAsam * 1000, 2) + ' mmol'],
-        ['mol komponen basa', Sim.fmt(h.nBasa * 1000, 2) + ' mmol'],
-        ['perbandingan basa/asam', Sim.fmt(h.nBasa / h.nAsam, 3)],
-        ['log perbandingan', Sim.fmt(Math.log10(h.nBasa / h.nAsam), 3)]
-      ];
-      rows.forEach(function (r, i) {
-        const y = 160 + i * 18;
-        D.text(c, r[0], HX + 16, y, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        D.text(c, r[1], HX + HW - 16, y,
-          { size: 10.5, weight: 650, color: P.dim, align: 'r', base: 'middle', mono: true });
-      });
-
-      /* ---------- reaksi penyangga ---------- */
-      if (sim.get('reaksi')) {
-        D.roundRect(c, HX, 262, HW, 118, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'BAGAIMANA BUFFER BEKERJA', HX + 16, 282,
-          { size: 10, weight: 700, color: P.faint, base: 'middle' });
-
-        const r1 = B.jenis === 'asam'
-          ? ['Bila ditambah asam (H⁺):', 'CH₃COO⁻ + H⁺ → CH₃COOH', '#ef6a52']
-          : ['Bila ditambah asam (H⁺):', 'NH₃ + H⁺ → NH₄⁺', '#ef6a52'];
-        const r2 = B.jenis === 'asam'
-          ? ['Bila ditambah basa (OH⁻):', 'CH₃COOH + OH⁻ → CH₃COO⁻ + H₂O', '#5b9bf5']
-          : ['Bila ditambah basa (OH⁻):', 'NH₄⁺ + OH⁻ → NH₃ + H₂O', '#5b9bf5'];
-
-        [r1, r2].forEach(function (r, i) {
-          const y = 306 + i * 38;
-          const aktif = (i === 0) === asamKuat && sim.get('tambah') > 0;
-          if (aktif) D.roundRect(c, HX + 10, y - 14, HW - 20, 34, 6, D.alpha(r[2], 0.12));
-          D.text(c, r[0], HX + 18, y - 3,
-            { size: 10.5, weight: 600, color: aktif ? r[2] : P.faint, base: 'middle' });
-          D.text(c, r[1], HX + 18, y + 13,
-            { size: 11.5, weight: 700, color: aktif ? r[2] : P.dim, base: 'middle', mono: true });
-        });
-        D.text(c, 'Asam/basa kuat yang ditambahkan diubah menjadi komponen buffer sendiri.',
-          HX + 16, 370, { size: 10, weight: 500, color: P.faint, base: 'middle' });
+      /* pH meter di atas tiap gelas */
+      function meter(x, warna) {
+        const g = new T.Group();
+        const badan = new T.Mesh(new T.BoxGeometry(1.2, 0.72, 0.4),
+          new T.MeshStandardMaterial({ color: 0x232d36, roughness: 0.5, metalness: 0.3 }));
+        g.add(badan);
+        const layar = new T.Mesh(new T.BoxGeometry(0.95, 0.42, 0.05),
+          new T.MeshStandardMaterial({ color: 0x08181a, emissive: 0x0a2a2c, emissiveIntensity: 0.6 }));
+        layar.position.z = 0.22;
+        g.add(layar);
+        const angka = S.teks('7,00', { skala: 0.3, lebar: 8, latar: false, warna: warna });
+        angka.position.z = 0.28;
+        g.add(angka);
+        g.userData.angka = angka;
+        return g;
       }
+      const mB = meter(0, '#4fd1c0');
+      mB.position.set(-2.0, 3.5, 0);
+      const mA = meter(0, '#6fb6ff');
+      mA.position.set(2.0, 3.5, 0);
+      s.data.mB = mB; s.data.mA = mA;
+      s.tambah(mB); s.tambah(mA);
 
-      /* ---------- grafik perbandingan ---------- */
-      const g = { x: 90, y: 420, w: 330, h: 136 };
-      const maksTambah = 30;
-      const map = Plot.axes(c, {
-        x: g.x, y: g.y, w: g.w, h: g.h,
-        xmin: 0, xmax: maksTambah, ymin: 0, ymax: 14,
-        xlabel: 'asam/basa kuat ditambahkan (mmol)', ylabel: 'pH',
-        judul: 'Buffer vs air murni', yticks: 4, xticks: 5
+      // elektrode menjulur ke dalam gelas
+      [[-2.0, mB], [2.0, mA]].forEach(function (p) {
+        const probe = new T.Mesh(new T.CylinderGeometry(0.075, 0.075, 1.7, 18),
+          new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.1, transparent: true,
+            opacity: 0.4, side: T.DoubleSide }));
+        probe.position.set(p[0] + 0.45, 2.2, 0.2);
+        s.tambah(probe);
       });
 
-      // kurva buffer
-      const kurvaB = [], kurvaA = [];
-      const simpanTambah = sim.get('tambah');
-      for (let t = 0; t <= maksTambah; t += 0.4) {
-        sim.state.tambah = t;
-        const hh = hitung(sim);
-        kurvaB.push([t, hh.pH]);
-        kurvaA.push([t, hh.pHAir]);
+      /* pipet penambah */
+      const pipet = new T.Group();
+      const badanP = new T.Mesh(new T.CylinderGeometry(0.14, 0.14, 1.6, 20),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+      pipet.add(badanP);
+      const isiP = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 1.1, 18),
+        S.matCairan(0xef6a52, { opacity: 0.85 }));
+      isiP.position.y = -0.1;
+      pipet.add(isiP);
+      s.data.isiP = isiP;
+      const ujungP = new T.Mesh(new T.ConeGeometry(0.13, 0.4, 18),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+      ujungP.position.y = -1.0;
+      ujungP.rotation.x = Math.PI;
+      pipet.add(ujungP);
+      const karet = new T.Mesh(S.geoBola(18),
+        new T.MeshStandardMaterial({ color: 0xd04a5a, roughness: 0.8 }));
+      karet.scale.set(0.2, 0.26, 0.2);
+      karet.position.y = 1.0;
+      pipet.add(karet);
+      pipet.position.set(0, 4.4, 0);
+      s.data.pipet = pipet;
+      s.tambah(pipet);
+
+      /* tetesan jatuh ke dua gelas */
+      const tetes = [];
+      for (let i = 0; i < 8; i++) {
+        const m = new T.Mesh(S.geoBola(12),
+          new T.MeshStandardMaterial({ color: 0xef6a52, emissive: 0xef6a52,
+            emissiveIntensity: 0.5, roughness: 0.2 }));
+        m.scale.setScalar(0.07);
+        m.visible = false;
+        s.tambah(m);
+        tetes.push({ m: m, y: 9, x: i % 2 === 0 ? -2.0 : 2.0 });
       }
-      sim.state.tambah = simpanTambah;
+      s.data.tetesan = tetes;
 
-      Plot.line(c, map, kurvaA, { color: P.rose, lw: 2, dash: [5, 4] });
-      Plot.line(c, map, kurvaB, { color: P.accent, lw: 2.6 });
-      Plot.titik(c, map, simpanTambah, h.pH, { r: 5, color: '#fff', halo: true });
-      Plot.legenda(c, g.x, g.y + g.h + 36, [
-        { label: 'larutan penyangga', warna: P.accent },
-        { label: 'air murni', warna: P.rose, dash: [5, 4] }
-      ]);
+      /* partikel di dalam tiap gelas */
+      function awan(x, warna, n) {
+        const p = S.partikel(n, { r: 0.085, warna: warna, kotak: { x: 1, y: 0.55, z: 1 } });
+        p.position.set(x, 0.75, 0);
+        p.material.transparent = true;
+        p.material.opacity = 0.9;
+        return p;
+      }
+      s.data.pHA = awan(-2.0, 0xf0a94a, 70);   // asam lemah
+      s.data.pGA = awan(-2.0, 0x6fb6ff, 70);   // basa konjugat
+      s.data.pAir = awan(2.0, 0xdfe8ee, 50);   // molekul air
+      [s.data.pHA, s.data.pGA, s.data.pAir].forEach(function (p) { s.tambah(p); });
 
-      /* ---------- kapasitas & kegunaan ---------- */
-      const KX = 468, KW2 = 300;
-      D.roundRect(c, KX, 392, KW2, 164, 12,
-        h.jebol ? 'rgba(239,106,82,.1)' : 'rgba(255,255,255,.04)',
-        h.jebol ? P.red : 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'KAPASITAS PENYANGGA', KX + 16, 412,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
+      /* panel grafik */
+      const g1 = S.panelGrafik({ w: 5.2, px: 740, py: 460 });
+      g1.position.set(0, 6.1, -1.4);
+      s.data.g1 = g1;
+      s.tambah(g1);
 
-      const batas = asamKuat ? sim.get('cBasa') * 100 : sim.get('cAsam') * 100;
-      const pakai = Sim.clamp(sim.get('tambah') / Math.max(batas, 0.001), 0, 1);
-      D.roundRect(c, KX + 16, 428, KW2 - 32, 16, 8, 'rgba(255,255,255,.07)');
-      D.roundRect(c, KX + 16, 428, (KW2 - 32) * pakai, 16, 8,
-        D.ramp(['#6fcf7f', '#f0a94a', '#ef6a52'], pakai));
-      D.text(c, Sim.fmt(sim.get('tambah'), 1) + ' / ' + Sim.fmt(batas, 1) + ' mmol terpakai',
-        KX + 16, 458, { size: 11, weight: 600, color: P.dim, base: 'middle' });
+      const lbl = S.teks('', { skala: 0.36, lebar: 38, warna: '#d8e4ec' });
+      lbl.position.set(0, 8.6, -1.4);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
 
-      D.text(c, h.jebol ? '⚠ Kapasitas terlampaui — buffer rusak, pH melonjak.'
-        : pakai > 0.8 ? 'Hampir habis — buffer mulai kewalahan.'
-        : 'Buffer masih bekerja dengan baik.',
-        KX + 16, 480, {
-          size: 12, weight: 700, base: 'middle',
-          color: h.jebol ? P.red : pakai > 0.8 ? P.amber : P.green
-        });
-
-      D.line(c, KX + 16, 498, KX + KW2 - 16, 498, 'rgba(255,255,255,.1)', 1);
-      D.text(c, 'Penerapan', KX + 16, 514,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const kata = B.guna.split(' ');
-      let baris = [''];
-      kata.forEach(function (w) {
-        const coba = baris[baris.length - 1] ? baris[baris.length - 1] + ' ' + w : w;
-        if (D.measure(c, coba, { size: 11.5 }) > KW2 - 36) baris.push(w);
-        else baris[baris.length - 1] = coba;
-      });
-      baris.slice(0, 2).forEach(function (b, i) {
-        D.text(c, b, KX + 16, 532 + i * 16,
-          { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-      });
+      s.data.alir = 0;
+      pasang(s);
     },
 
-    readoutsUpdate: function (sim) {
-      const h = hitung(sim);
-      sim.readout('ph', Sim.fmt(h.pH, 2));
-      sim.readout('phair', Sim.fmt(h.pHAir, 2), 'danger');
-      const d = h.pH - h.pH0;
-      sim.readout('delta', (d >= 0 ? '+' : '') + Sim.fmt(d, 2),
-        Math.abs(d) < 0.5 ? 'accent' : 'warn');
-      sim.readout('kapasitas', h.jebol ? 'Terlampaui' : 'Masih menyangga',
-        h.jebol ? 'danger' : 'accent');
+    ubah: function (s, id) {
+      if (id === 'b' || id === 'ca' || id === 'cg' || id === 'v') pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'ion') {
+        [s.data.pHA, s.data.pGA, s.data.pAir].forEach(function (p) { p.visible = s.get('ion'); });
+      }
+      perbarui(s);
     },
 
-    notes: `
-      <p>Larutan penyangga mampu <strong>mempertahankan pH hampir tetap</strong> walaupun
-      ditambah sedikit asam kuat, basa kuat, atau diencerkan. Kemampuan ini berasal dari
-      adanya dua zat sekaligus di dalam larutan.</p>
-
-      <h3>Susunan larutan penyangga</h3>
-      <ul>
-        <li><strong>Penyangga asam</strong> — asam lemah + basa konjugasinya.
-            Contoh: CH₃COOH + CH₃COONa. Bekerja di daerah pH asam.</li>
-        <li><strong>Penyangga basa</strong> — basa lemah + asam konjugasinya.
-            Contoh: NH₃ + NH₄Cl. Bekerja di daerah pH basa.</li>
-      </ul>
-
-      <h3>Cara kerjanya</h3>
-      <p>Buffer bekerja seperti dua "bantalan" yang saling melengkapi:</p>
-      <span class="formula">Ditambah asam (H⁺):   CH₃COO⁻ + H⁺ → CH₃COOH
-Ditambah basa (OH⁻):  CH₃COOH + OH⁻ → CH₃COO⁻ + H₂O</span>
-
-      <p>Asam atau basa kuat yang masuk <strong>diubah menjadi komponen buffer itu
-      sendiri</strong> — zat yang ionisasinya lemah. Akibatnya [H⁺] hampir tidak berubah,
-      meski perbandingan kedua komponennya bergeser.</p>
-
-      <h3>Persamaan Henderson-Hasselbalch</h3>
-      <span class="formula">pH = pKa + log ([basa konjugasi] ÷ [asam lemah])</span>
-
-      <p>Dua akibat penting dari persamaan ini:</p>
-      <ol>
-        <li>Saat perbandingannya <strong>1 : 1</strong>, log 1 = 0 sehingga
-            <strong>pH = pKa</strong>. Inilah keadaan buffer paling kuat.</li>
-        <li>pH bergantung pada <strong>perbandingan mol</strong>, bukan jumlah mutlaknya.
-            Karena itu <strong>pengenceran hampir tidak mengubah pH buffer</strong> —
-            kedua komponen diencerkan bersama-sama.</li>
-      </ol>
-
-      <h3>Kapasitas penyangga</h3>
-      <p>Buffer tidak mampu menahan selamanya. Bila asam kuat yang ditambahkan
-      <strong>melebihi jumlah mol basa konjugasi</strong>, komponen itu habis dan pH
-      melonjak seperti pada larutan biasa.</p>
-
-      <p>Kapasitas penyangga membesar bila: konsentrasi kedua komponen diperbesar, dan
-      perbandingannya mendekati 1 : 1. Buffer bekerja efektif dalam rentang
-      <strong>pH = pKa ± 1</strong>.</p>
-
-      <h3>Buffer dalam tubuh</h3>
-      <p>pH darah manusia dijaga sangat ketat antara <strong>7,35 dan 7,45</strong>.
-      Di luar rentang itu, enzim berhenti bekerja dengan baik. Tubuh memakai tiga sistem
-      penyangga:</p>
-      <ul>
-        <li><strong>H₂CO₃ / HCO₃⁻</strong> — penyangga utama dalam plasma darah.</li>
-        <li><strong>H₂PO₄⁻ / HPO₄²⁻</strong> — penyangga utama di dalam sel.</li>
-        <li><strong>Protein dan hemoglobin</strong> — menyumbang kapasitas tambahan.</li>
-      </ul>
-
-      <div class="callout" data-tone="tip">
-        <strong>Mengapa air ludah pun bersifat penyangga?</strong>
-        Air liur mengandung bikarbonat yang menetralkan asam dari bakteri mulut. Inilah
-        pertahanan alami gigi terhadap pengeroposan.
-      </div>
-    `,
-
-    explore: [
-      'Mulai dengan buffer asetat 1 : 1. Berapa pH-nya? Bandingkan dengan nilai pKa.',
-      'Tambahkan 5 mmol HCl. Bandingkan perubahan pH buffer dengan pH air murni.',
-      'Terus tambahkan sampai 15 mmol. Pada titik mana buffer mulai jebol? Hubungkan dengan mol komponen basanya.',
-      'Naikkan kedua konsentrasi menjadi 0,5 M lalu ulangi. Mengapa buffer menjadi jauh lebih tahan?'
-    ],
-
-    quiz: [
-      {
-        q: 'Larutan penyangga asetat dibuat dari CH₃COOH 0,1 M dan CH₃COONa 0,1 M (Ka = 1,8 × 10⁻⁵). pH larutan ini adalah…',
-        options: ['4,74', '5,74', '7,00', '9,26'],
-        answer: 0,
-        explain: 'Karena perbandingan basa : asam adalah 1 : 1, maka log 1 = 0 sehingga pH = pKa = −log(1,8 × 10⁻⁵) ≈ 4,74.'
-      },
-      {
-        q: 'Larutan penyangga diencerkan dengan air sampai volumenya dua kali lipat. Apa yang terjadi pada pH-nya?',
-        options: [
-          'Naik 1 satuan',
-          'Turun 1 satuan',
-          'Hampir tidak berubah',
-          'Menjadi 7'
-        ],
-        answer: 2,
-        explain: 'pH buffer bergantung pada perbandingan mol asam dan basa konjugasi. Pengenceran memperkecil keduanya dengan faktor yang sama, sehingga perbandingannya tetap dan pH hampir tidak berubah.'
-      },
-      {
-        q: 'Mengapa penambahan sedikit HCl ke larutan penyangga tidak banyak mengubah pH?',
-        options: [
-          'Karena HCl tidak bereaksi sama sekali',
-          'Karena ion H⁺ diikat oleh basa konjugasi menjadi asam lemah',
-          'Karena buffer menetralkan HCl menjadi air saja',
-          'Karena pH buffer selalu 7'
-        ],
-        answer: 1,
-        explain: 'Basa konjugasi (misalnya CH₃COO⁻) menangkap ion H⁺ dari HCl dan mengubahnya menjadi CH₃COOH yang hanya terionisasi sedikit. Ion H⁺ bebas hampir tidak bertambah.'
-      },
-      {
-        q: 'Suatu buffer mengandung 10 mmol asam lemah dan 10 mmol basa konjugasinya. Lalu ditambahkan 12 mmol NaOH. Apa yang terjadi?',
-        options: [
-          'pH tetap seperti semula',
-          'Kapasitas buffer terlampaui, pH melonjak tajam',
-          'Buffer menjadi lebih kuat',
-          'pH turun drastis'
-        ],
-        answer: 1,
-        explain: 'NaOH bereaksi dengan komponen asam lemah yang hanya tersedia 10 mmol. Sisa 2 mmol NaOH tetap sebagai basa kuat bebas, sehingga pH melonjak seperti pada larutan biasa.'
+    langkah: function (s, dt) {
+      // pipet mengalir
+      if (s.data.alir !== 0) {
+        const v = S.clamp(s.get('tambah') + s.data.alir * dt * 3.2, -20, 20);
+        s.setDiam('tambah', v);
+        if (Math.abs(v) >= 20) s.data.alir = 0;
+        perbarui(s);
       }
-    ]
-  });
-})();
+
+      const tambah = s.get('tambah');
+      const asam = tambah >= 0;
+      const warna = asam ? 0xef6a52 : 0x6fb6ff;
+      s.data.isiP.material.color.setHex(warna);
+      s.data.pipet.position.x = S.lerp(s.data.pipet.position.x, 0, dt * 4);
+
+      // tetesan
+      s.data.tetesan.forEach(function (t) {
+        if (s.data.alir !== 0 && t.y > 8 && Math.random() < dt * 3) t.y = 3.6;
+        if (t.y < 8) {
+          t.y -= dt * 4.6;
+          t.m.visible = true;
+          t.m.material.color.setHex(warna);
+          t.m.material.emissive.setHex(warna);
+          t.m.position.set(t.x, t.y, 0);
+          if (t.y < 1.4) { t.y = 9; t.m.visible = false; }
+        } else t.m.visible = false;
+      });
+
+      s.data.pHA.userData.gerak(dt, 0.8);
+      s.data.pGA.userData.gerak(dt, 0.9);
+      s.data.pAir.userData.gerak(dt, 0.7);
+    },
+
+    bacaUbah: function (s) {
+      const b = buffer(s);
+      const tambah = s.get('tambah');
+      const pb = phBuffer(s, tambah);
+      const pa = phAir(s, tambah);
+      const pb0 = phBuffer(s, 0);
+      const V = s.get('v') / 1000;
+      const mmolA = s.get('ca') * V * 1000;
+      const mmolG = s.get('cg') * V * 1000;
+      const kapasitas = Math.min(mmolA, mmolG);
+      const habis = tambah > mmolG + 0.001 || -tambah > mmolA + 0.001;
+
+      s.baca('phb', S.fmt(pb, 2) + '   (awal ' + S.fmt(pb0, 2) + ')',
+        Math.abs(pb - pb0) < 0.5 ? 'aksen' : 'warn');
+      s.baca('pha', S.fmt(pa, 2) + '   (awal 7,00)', 'danger');
+      s.baca('geser', 'penyangga ' + (pb - pb0 >= 0 ? '+' : '') + S.fmt(pb - pb0, 2)
+        + '   vs air ' + (pa - 7 >= 0 ? '+' : '') + S.fmt(pa - 7, 2));
+      s.baca('pka', 'pKa = ' + S.fmt(-Math.log10(b.ka), 2) + '   [basa]/[asam] = '
+        + S.fmt(Math.max(0.001, (mmolG - tambah)) / Math.max(0.001, (mmolA + tambah)), 2));
+      s.baca('kapasitas', S.fmt(kapasitas, 1) + ' mmol asam/basa kuat masih dapat ditahan',
+        kapasitas > 5 ? 'aksen' : 'warn');
+      s.baca('status', habis
+        ? 'Kapasitas penyangga terlampaui — pH melonjak seperti air biasa'
+        : Math.abs(tambah) < 0.05 ? 'Belum ada penambahan'
+          : 'Penyangga masih bekerja — pH hampir tak bergerak',
+        habis ? 'danger' : Math.abs(tambah) < 0.05 ? undefined : 'aksen');
+      gambar(s);
+    }
+  };
+
+  function perbarui(s) {
+    const tambah = s.get('tambah');
+    const pb = phBuffer(s, tambah);
+    const pa = phAir(s, tambah);
+    const cb = warnaPH(pb), ca = warnaPH(pa);
+    s.data.uB.userData.gls.userData.setLevel(0.66, cb.getHex());
+    s.data.uA.userData.gls.userData.setLevel(0.66, ca.getHex());
+    s.data.mB.userData.angka.userData.ganti(S.fmt(pb, 2), '#' + cb.getHexString());
+    s.data.mA.userData.angka.userData.ganti(S.fmt(pa, 2), '#' + ca.getHexString());
+
+    // jumlah partikel asam lemah vs basa konjugat
+    const V = s.get('v') / 1000;
+    const mmolA = s.get('ca') * V * 1000 + Math.max(0, tambah) - Math.max(0, -tambah) * 0;
+    const na = Math.max(0.001, s.get('ca') * V * 1000 + tambah);
+    const ng = Math.max(0.001, s.get('cg') * V * 1000 - tambah);
+    const tot = na + ng;
+    atur(s.data.pHA, Math.round(na / tot * 70));
+    atur(s.data.pGA, Math.round(ng / tot * 70));
+    gambar(s);
+  }
+
+  function atur(p, n) {
+    const d = p.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      if (!d[i].aktif && i < n) d[i].pos.set(S.acak(-0.9, 0.9), S.acak(-0.45, 0.45), S.acak(-0.9, 0.9));
+      d[i].aktif = i < n;
+    }
+    p.userData.tulis();
+  }
+
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const kB = [], kA = [];
+    for (let i = -40; i <= 40; i++) {
+      const x = i / 2;
+      kB.push([x, phBuffer(s, x)]);
+      kA.push([x, phAir(s, x)]);
+    }
+    const tambah = s.get('tambah');
+    S.gambarGrafik(s.data.g1, {
+      judul: 'pH terhadap jumlah asam/basa kuat yang ditambahkan',
+      xMin: -20, xMax: 20, yMin: 0, yMax: 14,
+      xLabel: 'mmol  (−) basa kuat  ←→  asam kuat (+)', yLabel: 'pH',
+      seri: [
+        { titik: kA, warna: '#6fb6ff', tebal: 2.6, putus: true, nama: 'air biasa' },
+        { titik: kB, warna: '#9fe8ad', tebal: 3.4, nama: 'larutan penyangga' }
+      ],
+      garisX: [{ v: 0, warna: 'rgba(214,228,240,.35)' }],
+      garisY: [{ v: phBuffer(s, 0), warna: 'rgba(79,209,192,.7)',
+        label: 'pH awal penyangga ' + S.fmt(phBuffer(s, 0), 2) }],
+      titikTebal: [
+        { x: tambah, y: phBuffer(s, tambah), warna: '#9fe8ad', r: 7 },
+        { x: tambah, y: phAir(s, tambah), warna: '#6fb6ff', r: 6 }
+      ]
+    });
+  }
+
+  function pasang(s) {
+    const b = buffer(s);
+    s.data.alir = 0;
+    s.data.g1.visible = s.get('grafik');
+    [s.data.pHA, s.data.pGA, s.data.pAir].forEach(function (p) { p.visible = s.get('ion'); });
+    s.data.lbl.userData.ganti('Penyangga ' + b.n + '  dibandingkan dengan air murni');
+    perbarui(s);
+  }
+})());

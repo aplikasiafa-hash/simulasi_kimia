@@ -1,388 +1,247 @@
-/* Wujud Benda di Sekitar Kita — Fase A
-   Seret benda ke keranjang padat, cair, atau gas. Keranjang menampilkan
-   susunan partikel masing-masing wujud. */
+/* Wujud Benda di Sekitar Kita — Fase A — adegan 3D */
 
-(function () {
+Sim3D.daftar('wujud-benda', (function () {
   'use strict';
-
-  const D = Sim.Draw, P = Sim.P;
+  const T = THREE, S = S3;
 
   const BENDA = [
-    { nama: 'Batu',     wujud: 'padat', warna: '#8d939a', bentuk: 'batu' },
-    { nama: 'Kayu',     wujud: 'padat', warna: '#a8763f', bentuk: 'balok' },
-    { nama: 'Es batu',  wujud: 'padat', warna: '#9fd4ee', bentuk: 'kubus' },
-    { nama: 'Buku',     wujud: 'padat', warna: '#c25a4a', bentuk: 'balok' },
-    { nama: 'Air',      wujud: 'cair',  warna: '#4a9fd0', bentuk: 'gelas' },
-    { nama: 'Susu',     wujud: 'cair',  warna: '#eee6d8', bentuk: 'gelas' },
-    { nama: 'Minyak',   wujud: 'cair',  warna: '#e0c04a', bentuk: 'botol' },
-    { nama: 'Kecap',    wujud: 'cair',  warna: '#4a3a30', bentuk: 'botol' },
-    { nama: 'Udara',    wujud: 'gas',   warna: '#7fd8e0', bentuk: 'balon' },
-    { nama: 'Asap',     wujud: 'gas',   warna: '#9aa4ae', bentuk: 'awan' },
-    { nama: 'Uap air',  wujud: 'gas',   warna: '#bcd8e8', bentuk: 'awan' },
-    { nama: 'Gas balon',wujud: 'gas',   warna: '#e07aa8', bentuk: 'balon' }
+    { n: 'Batu', wujud: 'padat', warna: 0x8a8378, pw: 0x6f6a60 },
+    { n: 'Es batu', wujud: 'padat', warna: 0xaee0f0, pw: 0x7fc7e8 },
+    { n: 'Buku', wujud: 'padat', warna: 0xd06a4a, pw: 0xc07850 },
+    { n: 'Air', wujud: 'cair', warna: 0x3f8fd8, pw: 0x4a9fe0 },
+    { n: 'Susu', wujud: 'cair', warna: 0xf0f2f4, pw: 0xe8eef2 },
+    { n: 'Minyak', wujud: 'cair', warna: 0xe8c54a, pw: 0xf0d060 },
+    { n: 'Udara', wujud: 'gas', warna: 0x6fd0e0, pw: 0x7fe3d6 },
+    { n: 'Asap', wujud: 'gas', warna: 0x9aa4ae, pw: 0xb0bac4 },
+    { n: 'Uap air', wujud: 'gas', warna: 0xc0e0f0, pw: 0xd0eaf6 }
   ];
 
-  const KERANJANG = [
-    { wujud: 'padat', label: 'PADAT', warna: '#e8713c',
-      sifat: 'Bentuk tetap · Volume tetap' },
-    { wujud: 'cair',  label: 'CAIR',  warna: '#4a9fd0',
-      sifat: 'Bentuk berubah · Volume tetap' },
-    { wujud: 'gas',   label: 'GAS',   warna: '#9a7fd0',
-      sifat: 'Bentuk berubah · Volume berubah' }
-  ];
+  const INFO = {
+    padat: { n: 'Padat', w: 0x6fcf7f, bentuk: 'Tetap', isi: 'Tetap' },
+    cair:  { n: 'Cair',  w: 0x5b9bf5, bentuk: 'Berubah', isi: 'Tetap' },
+    gas:   { n: 'Gas',   w: 0xf0a94a, bentuk: 'Berubah', isi: 'Berubah' }
+  };
 
-  const W = 780, H = 500;
-  const TRAY_Y = 56, KER_Y = 250, KER_H = 190;
+  const N = 160;
 
-  function siapkan(sim) {
-    sim.data.item = BENDA.map(function (b, i) {
-      return Object.assign({}, b, {
-        i: i, x: 0, y: 0, hx: 0, hy: 0,
-        ditempatkan: null, goyang: 0, muncul: 0, seret: false
-      });
-    });
-    sim.data.ambil = null;
-    sim.data.pesan = '';
-    sim.data.pesanWaktu = 0;
-    sim.data.benar = 0; sim.data.salah = 0;
-    aturTray(sim);
-  }
+  function benda(s) { return BENDA[parseInt(s.get('benda'), 10) || 0]; }
 
-  /** Letakkan kembali benda yang belum ditempatkan ke baki atas. */
-  function aturTray(sim) {
-    const sisa = sim.data.item.filter(function (b) { return !b.ditempatkan; });
-    const lebar = W - 80;
-    const jarak = Math.min(78, lebar / Math.max(1, sisa.length));
-    const x0 = W / 2 - (sisa.length - 1) * jarak / 2;
-    sisa.forEach(function (b, k) {
-      if (b.seret) return;
-      b.hx = x0 + k * jarak;
-      b.hy = TRAY_Y + 46;
-    });
-  }
+  return {
+    latar: 0x0a1218,
+    kamera: { jarak: 9.4, phi: 1.15, theta: 0.6, targetY: 0.9, lajuPutar: 0.1 },
 
-  function kotakKeranjang(k) {
-    const w = (W - 80) / 3;
-    return { x: 40 + k * w + 7, y: KER_Y, w: w - 14, h: KER_H };
-  }
+    kendali: [
+      { judul: 'Benda yang diamati', isi: [
+        { type: 'select', id: 'benda', value: 0, label: 'Pilih benda',
+          options: BENDA.map(function (b, i) { return { value: i, label: b.n + '  —  ' + INFO[b.wujud].n }; }) }
+      ]},
+      { judul: 'Wadah', isi: [
+        { type: 'segment', id: 'wadah', value: 'gelas', label: 'Bentuk wadah', options: [
+          { value: 'gelas', label: 'Gelas' },
+          { value: 'kotak', label: 'Kotak' },
+          { value: 'tanpa', label: 'Tanpa' }
+        ]},
+        { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan partikel' },
+        { type: 'toggle', id: 'gerak', value: true, label: 'Partikel bergerak' }
+      ]},
+      { judul: 'Pengamatan', isi: [
+        { type: 'slider', id: 'laju', value: 1, min: 0.1, max: 2.5, step: 0.1,
+          label: 'Kecepatan gerak', unit: '×', dec: 1 }
+      ]}
+    ],
 
-  /* ---------------------------------------------------------- menggambar -- */
+    baca: [
+      { id: 'wujud', label: 'Wujud', tone: 'aksen' },
+      { id: 'bentuk', label: 'Bentuknya' },
+      { id: 'isi', label: 'Ruang yang diisi' },
+      { id: 'susun', label: 'Susunan partikel' }
+    ],
 
-  function gambarBenda(c, b, t) {
-    const x = b.x + Math.sin(b.goyang * 26) * b.goyang * 11;
-    const y = b.y;
-    const s = b.ditempatkan ? 15 : 21;
-    c.save();
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 7, y: 0, warna: 0x121a21 }));
 
-    if (b.bentuk === 'balok' || b.bentuk === 'kubus') {
-      D.roundRect(c, x - s, y - s * 0.78, s * 2, s * 1.56, 4,
-        b.warna, 'rgba(255,255,255,.3)', 1.4);
-      if (b.bentuk === 'kubus') {
-        D.line(c, x - s, y - s * 0.78, x - s * 0.6, y - s * 1.1, 'rgba(255,255,255,.25)', 1.2);
+      // wadah gelas
+      const gelas = S.gelas({ r: 1.5, h: 2.6, level: 0 });
+      gelas.userData.cair.visible = false;
+      s.data.gelas = gelas;
+      s.tambah(gelas);
+
+      // wadah kotak
+      const kotak = new T.Group();
+      const kaca = S.matKaca({ thickness: 0.25 });
+      const kg = new T.Mesh(new T.BoxGeometry(2.8, 2.6, 2.8), kaca);
+      kg.position.y = 1.3;
+      kg.renderOrder = 2;
+      kotak.add(kg);
+      const rangka = new T.LineSegments(
+        new T.EdgesGeometry(new T.BoxGeometry(2.8, 2.6, 2.8)),
+        new T.LineBasicMaterial({ color: 0x7fe3d6, transparent: true, opacity: 0.4 }));
+      rangka.position.y = 1.3;
+      kotak.add(rangka);
+      kotak.visible = false;
+      s.data.kotak = kotak;
+      s.tambah(kotak);
+
+      // partikel
+      const p = S.partikel(N, { r: 0.12, warna: 0x5b9bf5, kotak: { x: 1.2, y: 1.1, z: 1.2 } });
+      p.position.y = 1.2;
+      s.data.p = p;
+      s.tambah(p);
+
+      // cairan nyata di dalam wadah (untuk wujud cair)
+      const cairan = new T.Mesh(
+        new T.CylinderGeometry(1.47, 1.47, 1, 48),
+        S.matCairan(0x3f8fd8, { opacity: 0.85 }));
+      cairan.renderOrder = 1;
+      s.data.cairan = cairan;
+      s.tambah(cairan);
+
+      // bongkahan padat
+      const padat = new T.Group();
+      const blok = new T.Mesh(new T.BoxGeometry(1.5, 1.2, 1.5),
+        new T.MeshPhysicalMaterial({ color: 0x8a8378, roughness: 0.55, metalness: 0.08, clearcoat: 0.3 }));
+      blok.castShadow = true; blok.receiveShadow = true;
+      blok.position.y = 0.6;
+      padat.add(blok);
+      s.data.padat = padat;
+      s.data.blok = blok;
+      s.tambah(padat);
+
+      // label wujud melayang
+      const lbl = S.teks('Padat', { skala: 0.52, warna: '#9fe8ad' });
+      lbl.position.set(0, 3.4, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
+    },
+
+    ubah: function (s, id) {
+      if (id === 'benda' || id === 'wadah') pasang(s);
+      if (id === 'partikel') s.data.p.visible = s.get('partikel');
+    },
+
+    langkah: function (s, dt) {
+      const b = benda(s);
+      const p = s.data.p;
+      const laju = s.get('gerak') ? s.get('laju') : 0;
+      const d = p.userData.p;
+
+      if (b.wujud === 'gas') {
+        p.userData.gerak(dt, laju * 1.5);
+      } else if (b.wujud === 'cair') {
+        // partikel berdesakan: gerak lambat + tarikan ke pusat bawah
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          q.pos.addScaledVector(q.vel, dt * laju * 0.42);
+          const r = Math.hypot(q.pos.x, q.pos.z);
+          if (r > 1.18) { q.pos.x *= 1.18 / r; q.pos.z *= 1.18 / r; q.vel.x *= -0.7; q.vel.z *= -0.7; }
+          if (q.pos.y > -0.1) { q.pos.y = -0.1; q.vel.y = -Math.abs(q.vel.y); }
+          if (q.pos.y < -1.05) { q.pos.y = -1.05; q.vel.y = Math.abs(q.vel.y); }
+        }
+        p.userData.tulis();
+      } else {
+        // padat: bergetar di sekitar titik kisi
+        for (let i = 0; i < d.length; i++) {
+          const q = d[i];
+          if (!q.asal) continue;
+          const g = 0.055 * laju;
+          q.pos.set(
+            q.asal.x + Math.sin(s.waktu * 9 + i * 1.7) * g,
+            q.asal.y + Math.sin(s.waktu * 11 + i * 2.3) * g,
+            q.asal.z + Math.cos(s.waktu * 10 + i * 1.1) * g
+          );
+        }
+        p.userData.tulis();
       }
-    } else if (b.bentuk === 'batu') {
-      c.beginPath();
-      for (let i = 0; i < 7; i++) {
-        const a = i / 7 * Math.PI * 2;
-        const r = s * (0.78 + 0.22 * Math.sin(i * 2.7 + b.i));
-        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.82;
-        i ? c.lineTo(px, py) : c.moveTo(px, py);
+
+      if (s.data.padat.visible) {
+        s.data.blok.rotation.y += dt * 0.25;
       }
-      c.closePath();
-      c.fillStyle = b.warna; c.fill();
-      c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = 1.4; c.stroke();
-    } else if (b.bentuk === 'gelas') {
-      D.beaker(c, x - s * 0.62, y - s * 0.8, s * 1.24, s * 1.6, 0.68, b.warna, { ticks: false, lw: 1.8 });
-    } else if (b.bentuk === 'botol') {
-      D.roundRect(c, x - s * 0.5, y - s * 0.5, s, s * 1.3, 4, b.warna, 'rgba(255,255,255,.3)', 1.3);
-      D.roundRect(c, x - s * 0.18, y - s * 0.95, s * 0.36, s * 0.48, 2, b.warna, 'rgba(255,255,255,.3)', 1.1);
-    } else if (b.bentuk === 'balon') {
-      c.beginPath();
-      c.ellipse(x, y - s * 0.22, s * 0.72, s * 0.88, 0, 0, Math.PI * 2);
-      c.fillStyle = D.alpha(b.warna, 0.72); c.fill();
-      c.strokeStyle = b.warna; c.lineWidth = 1.6; c.stroke();
-      D.line(c, x, y + s * 0.62, x + Math.sin(t * 2 + b.i) * 4, y + s * 1.2, 'rgba(255,255,255,.4)', 1.2);
-    } else { // awan
-      for (let i = 0; i < 4; i++) {
-        const a = i / 4 * Math.PI * 2;
-        D.circle(c, x + Math.cos(a) * s * 0.42, y + Math.sin(a) * s * 0.3 - s * 0.1,
-          s * 0.5, D.alpha(b.warna, 0.5));
-      }
-      D.circle(c, x, y - s * 0.1, s * 0.56, D.alpha(b.warna, 0.62));
+    },
+
+    bacaUbah: function (s) {
+      const b = benda(s);
+      const i = INFO[b.wujud];
+      s.baca('wujud', i.n, b.wujud === 'padat' ? 'aksen' : b.wujud === 'cair' ? 'biru' : 'warn');
+      s.baca('bentuk', i.bentuk);
+      s.baca('isi', i.isi);
+      s.baca('susun', b.wujud === 'padat' ? 'Rapat dan teratur'
+        : b.wujud === 'cair' ? 'Rapat tapi bebas bergeser' : 'Renggang dan bebas');
     }
+  };
 
-    D.text(c, b.nama, x, y + s + 13, {
-      size: 11.5, weight: 600, color: b.ditempatkan ? P.dim : P.text, align: 'c', base: 'middle'
-    });
-    c.restore();
-  }
+  function pasang(s) {
+    const b = benda(s);
+    const wadah = s.get('wadah');
+    const p = s.data.p;
+    const d = p.userData.p;
 
-  /** Gambaran susunan partikel di dalam keranjang. */
-  function gambarPartikel(c, kotak, wujud, t, warna) {
-    const x = kotak.x + 13, y = kotak.y + 46;
-    const w = kotak.w - 26, h = 54;
-    c.save();
-    c.beginPath(); c.rect(x, y, w, h); c.clip();
-    D.roundRect(c, x, y, w, h, 5, 'rgba(255,255,255,.05)');
+    s.data.gelas.visible = wadah === 'gelas';
+    s.data.kotak.visible = wadah === 'kotak';
 
-    if (wujud === 'padat') {
-      const kol = 8, bar = 3;
-      for (let j = 0; j < bar; j++) for (let i = 0; i < kol; i++) {
-        const px = x + w * (i + 0.5) / kol + Math.sin(t * 3 + i + j) * 1.1;
-        const py = y + h * (j + 0.5) / bar + Math.cos(t * 3.4 + i * 1.3) * 1.1;
-        D.circle(c, px, py, 5, warna);
+    // bentuk ruang partikel menyesuaikan wadah
+    const kotakGas = wadah === 'kotak'
+      ? { x: 1.25, y: 1.15, z: 1.25 }
+      : wadah === 'gelas' ? { x: 1.3, y: 1.15, z: 1.3 } : { x: 1.9, y: 1.5, z: 1.9 };
+    p.userData.kotak = kotakGas;
+
+    p.material.color.setHex(b.pw);
+    p.material.emissive.setHex(b.pw);
+    p.visible = s.get('partikel');
+
+    s.data.cairan.visible = b.wujud === 'cair';
+    s.data.padat.visible = b.wujud === 'padat';
+
+    if (b.wujud === 'cair') {
+      s.data.cairan.material.color.setHex(b.warna);
+      const tinggi = 1.1;
+      s.data.cairan.scale.y = tinggi;
+      s.data.cairan.position.y = tinggi / 2;
+      s.data.cairan.scale.x = s.data.cairan.scale.z = wadah === 'kotak' ? 0.92 : 1;
+      s.data.cairan.visible = wadah !== 'tanpa';
+      // partikel berkumpul di bawah
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 1.1;
+        d[i].pos.set(Math.cos(a) * r, -0.1 - Math.random() * 0.95, Math.sin(a) * r);
+        d[i].vel.set(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1)).normalize().multiplyScalar(S.acak(.4, .9));
+        d[i].asal = null;
+        d[i].r = 0.11;
       }
-    } else if (wujud === 'cair') {
-      for (let i = 0; i < 20; i++) {
-        const fx = (i * 0.618) % 1;
-        const px = x + 8 + ((fx * w * 0.92) + Math.sin(t * 0.9 + i) * 9) % (w - 16);
-        const py = y + h * 0.42 + Math.sin(t * 1.3 + i * 1.7) * 10 + (i % 3) * 7;
-        D.circle(c, px, Math.min(py, y + h - 6), 5, warna);
+      p.position.y = 1.2;
+    } else if (b.wujud === 'padat') {
+      s.data.blok.material.color.setHex(b.warna);
+      // kisi kubus teratur
+      const sisi = Math.floor(Math.pow(d.length, 1 / 3));
+      const jarak = 1.24 / sisi;
+      let k = 0;
+      for (let x = 0; x < sisi; x++) for (let y = 0; y < sisi; y++) for (let z = 0; z < sisi; z++) {
+        if (k >= d.length) break;
+        const q = d[k++];
+        q.asal = new T.Vector3(
+          (x - (sisi - 1) / 2) * jarak,
+          (y - (sisi - 1) / 2) * jarak,
+          (z - (sisi - 1) / 2) * jarak);
+        q.pos.copy(q.asal);
+        q.r = 0.11;
       }
+      for (; k < d.length; k++) { d[k].asal = null; d[k].r = 0.0001; }
+      p.position.y = 1.2;
+      s.data.padat.visible = true;
+      s.data.blok.visible = !s.get('partikel');
     } else {
-      for (let i = 0; i < 11; i++) {
-        const px = x + 10 + ((i * 97 + t * 46 * (1 + i % 3)) % (w - 20));
-        const py = y + 9 + ((i * 53 + t * 31 * (1 + (i % 2))) % (h - 18));
-        D.circle(c, px, py, 4.6, warna);
+      for (let i = 0; i < d.length; i++) {
+        d[i].pos.set(S.acak(-kotakGas.x, kotakGas.x), S.acak(-kotakGas.y, kotakGas.y), S.acak(-kotakGas.z, kotakGas.z));
+        d[i].vel.set(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1)).normalize().multiplyScalar(S.acak(.7, 1.4));
+        d[i].asal = null;
+        d[i].r = 0.085;
       }
+      p.position.y = 1.2;
     }
-    c.restore();
-    D.roundRect(c, x, y, w, h, 5, null, 'rgba(255,255,255,.14)', 1);
+    p.userData.tulis();
+
+    const i = INFO[b.wujud];
+    s.data.lbl.userData.ganti(b.n + ' — ' + i.n);
+    s.data.lbl.material.map.needsUpdate = true;
   }
-
-  Sim.create({
-    title: 'Wujud Benda di Sekitar Kita',
-    subtitle: 'Seret setiap benda ke keranjang yang tepat. Perhatikan susunan partikel di tiap wujud — itulah yang membuat padat, cair, dan gas berbeda.',
-    fase: 'A', jenjang: 'SD Kelas 1–2',
-    topik: ['Wujud Zat', 'Pengamatan'],
-    stage: { w: W, h: H },
-    autoplay: true,
-    showPlay: false,
-    stageNote: 'Seret benda dengan jari atau tetikus',
-
-    controls: [
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan partikel',
-            hint: 'Lihat bagaimana partikel tersusun di dalam setiap wujud.' },
-          { type: 'toggle', id: 'sifat', value: true, label: 'Tampilkan sifat wujud' },
-          { type: 'toggle', id: 'bantuan', value: false, label: 'Mode bantuan',
-            hint: 'Keranjang yang tepat akan bersinar saat benda diangkat.' }
-        ]
-      },
-      {
-        title: 'Permainan',
-        items: [
-          { type: 'buttons', label: '', items: [
-            { label: 'Acak ulang', onClick: function (sim) { siapkan(sim); } },
-            { label: 'Isi otomatis', onClick: function (sim) {
-              sim.data.item.forEach(function (b) { b.ditempatkan = b.wujud; });
-              sim.data.benar = BENDA.length; sim.data.salah = 0;
-              aturTray(sim);
-            } }
-          ] }
-        ]
-      }
-    ],
-
-    readouts: [
-      { id: 'benar', label: 'Tepat', tone: 'accent' },
-      { id: 'salah', label: 'Keliru' },
-      { id: 'sisa', label: 'Sisa benda' }
-    ],
-
-    setup: siapkan,
-    reset: siapkan,
-
-    onPointerDown: function (sim, x, y) {
-      const items = sim.data.item;
-      for (let i = items.length - 1; i >= 0; i--) {
-        const b = items[i];
-        if (Math.hypot(b.x - x, b.y - y) < 26) {
-          b.seret = true;
-          sim.data.ambil = b;
-          if (b.ditempatkan) {
-            b.ditempatkan = null;
-            aturTray(sim);
-          }
-          items.splice(i, 1); items.push(b);  // gambar paling atas
-          return;
-        }
-      }
-    },
-
-    onPointerMove: function (sim, x, y) {
-      const b = sim.data.ambil;
-      if (b) { b.hx = x; b.hy = y; }
-    },
-
-    onPointerUp: function (sim, x, y) {
-      const b = sim.data.ambil;
-      if (!b) return;
-      b.seret = false;
-      sim.data.ambil = null;
-      for (let k = 0; k < 3; k++) {
-        const kk = kotakKeranjang(k);
-        if (x > kk.x && x < kk.x + kk.w && y > kk.y && y < kk.y + kk.h) {
-          if (KERANJANG[k].wujud === b.wujud) {
-            b.ditempatkan = b.wujud;
-            b.muncul = 1;
-            sim.data.benar++;
-            sim.data.pesan = 'Tepat! ' + b.nama + ' berwujud ' + b.wujud + '.';
-          } else {
-            b.goyang = 1;
-            sim.data.salah++;
-            sim.data.pesan = b.nama + ' bukan ' + KERANJANG[k].wujud + '. Coba lagi ya!';
-          }
-          sim.data.pesanWaktu = 2.6;
-          aturTray(sim);
-          return;
-        }
-      }
-      aturTray(sim);
-    },
-
-    update: function (sim, dt) {
-      const terisi = {};
-      sim.data.item.forEach(function (b) {
-        if (b.ditempatkan) {
-          const k = b.ditempatkan;
-          terisi[k] = (terisi[k] || 0);
-          const idx = KERANJANG.findIndex(function (q) { return q.wujud === k; });
-          const kk = kotakKeranjang(idx);
-          const kol = 4;
-          const n = terisi[k]++;
-          b.hx = kk.x + kk.w * ((n % kol) + 0.5) / kol;
-          b.hy = kk.y + 128 + Math.floor(n / kol) * 36;
-        }
-        b.x += (b.hx - b.x) * Math.min(1, dt * 15);
-        b.y += (b.hy - b.y) * Math.min(1, dt * 15);
-        b.goyang = Math.max(0, b.goyang - dt * 2.2);
-        b.muncul = Math.max(0, b.muncul - dt * 1.6);
-      });
-      if (sim.data.pesanWaktu > 0) sim.data.pesanWaktu -= dt;
-    },
-
-    draw: function (c, sim) {
-      const t = sim.t;
-
-      // baki atas
-      D.roundRect(c, 24, TRAY_Y - 30, W - 48, 100, 12, 'rgba(255,255,255,.035)', 'rgba(255,255,255,.1)', 1);
-      D.text(c, 'BENDA YANG BELUM DIKELOMPOKKAN', W / 2, TRAY_Y - 15,
-        { size: 10.5, weight: 700, color: P.faint, align: 'c', base: 'middle' });
-
-      // keranjang
-      const diangkat = sim.data.ambil;
-      KERANJANG.forEach(function (k, i) {
-        const kk = kotakKeranjang(i);
-        const sorot = diangkat && sim.get('bantuan') && diangkat.wujud === k.wujud;
-        D.roundRect(c, kk.x, kk.y, kk.w, kk.h, 12,
-          sorot ? D.alpha(k.warna, 0.14) : 'rgba(255,255,255,.04)',
-          sorot ? k.warna : 'rgba(255,255,255,.14)', sorot ? 2.4 : 1.4);
-
-        D.roundRect(c, kk.x, kk.y, kk.w, 30, 12, D.alpha(k.warna, 0.2));
-        D.text(c, k.label, kk.x + kk.w / 2, kk.y + 16,
-          { size: 14, weight: 800, color: k.warna, align: 'c', base: 'middle' });
-
-        if (sim.get('partikel')) gambarPartikel(c, kk, k.wujud, t, k.warna);
-
-        if (sim.get('sifat')) {
-          D.text(c, k.sifat, kk.x + kk.w / 2, kk.y + 115,
-            { size: 10.5, weight: 500, color: P.dim, align: 'c', base: 'middle' });
-        }
-      });
-
-      // benda
-      sim.data.item.forEach(function (b) { gambarBenda(c, b, t); });
-
-      // pesan
-      if (sim.data.pesanWaktu > 0 && sim.data.pesan) {
-        const a = Math.min(1, sim.data.pesanWaktu / 0.5);
-        const w = D.measure(c, sim.data.pesan, { size: 13.5, weight: 600 }) + 32;
-        c.save(); c.globalAlpha = a;
-        D.roundRect(c, W / 2 - w / 2, H - 42, w, 30, 15, 'rgba(79,209,192,.17)', P.accent, 1.4);
-        D.text(c, sim.data.pesan, W / 2, H - 27,
-          { size: 13.5, weight: 600, color: P.accent2, align: 'c', base: 'middle' });
-        c.restore();
-      }
-    },
-
-    readoutsUpdate: function (sim) {
-      sim.readout('benar', sim.data.benar);
-      sim.readout('salah', sim.data.salah, sim.data.salah > 0 ? 'warn' : null);
-      const sisa = sim.data.item.filter(function (b) { return !b.ditempatkan; }).length;
-      sim.readout('sisa', sisa);
-    },
-
-    notes: `
-      <p>Semua benda di sekitar kita bisa dikelompokkan menjadi tiga <strong>wujud</strong>:
-      padat, cair, dan gas. Yang membedakan ketiganya bukan bahannya, melainkan
-      <strong>bagaimana partikel di dalamnya tersusun dan bergerak</strong>.</p>
-
-      <h3>Padat</h3>
-      <p>Partikelnya berdempetan rapat dan tersusun rapi seperti barisan. Partikel
-      hanya bisa bergetar di tempat, tidak bisa berpindah. Itulah sebabnya benda padat
-      punya <strong>bentuk tetap</strong> — batu tetap berbentuk batu ke mana pun dibawa.</p>
-
-      <h3>Cair</h3>
-      <p>Partikelnya masih berdekatan, tetapi sudah bisa bergeser dan menggelinding
-      melewati satu sama lain. Karena itu zat cair <strong>mengikuti bentuk wadahnya</strong>,
-      tetapi jumlahnya tidak berubah. Satu gelas air dituang ke mangkuk tetap satu gelas air.</p>
-
-      <h3>Gas</h3>
-      <p>Partikelnya berjauhan dan bergerak sangat cepat ke segala arah. Gas
-      <strong>memenuhi seluruh ruang</strong> yang tersedia — baik bentuk maupun volumenya
-      ikut wadah.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Perhatikan ini</strong>
-        Es batu, air, dan uap air adalah zat yang sama, yaitu air. Yang berbeda hanyalah
-        wujudnya. Jadi satu zat bisa punya tiga wujud sekaligus, tergantung suhunya.
-      </div>
-    `,
-
-    explore: [
-      'Nyalakan <strong>Tampilkan partikel</strong>. Keranjang mana yang partikelnya paling rapat? Mana yang paling renggang?',
-      'Taruh <strong>Es batu</strong> di keranjang padat, lalu <strong>Air</strong> di cair, lalu <strong>Uap air</strong> di gas. Ketiganya zat yang sama — apa yang berbeda?',
-      'Coba sengaja salah menaruh satu benda. Baca pesan yang muncul dan perbaiki.',
-      'Cari lima benda di sekitarmu sekarang. Tebak wujudnya sebelum memastikan.'
-    ],
-
-    quiz: [
-      {
-        q: 'Air yang dituang dari gelas ke mangkuk berubah bentuknya. Mengapa?',
-        options: [
-          'Karena jumlah airnya berkurang',
-          'Karena partikel zat cair bisa bergeser melewati satu sama lain',
-          'Karena air berubah menjadi gas',
-          'Karena mangkuk menarik partikel air'
-        ],
-        answer: 1,
-        explain: 'Partikel zat cair masih berdekatan, tetapi tidak terkunci pada tempatnya. Partikel bisa saling bergeser, sehingga bentuknya mengikuti wadah. Volumenya sendiri tidak berubah.'
-      },
-      {
-        q: 'Balon yang ditiup menggembung ke segala arah. Sifat gas apa yang ditunjukkan?',
-        options: [
-          'Gas memiliki bentuk tetap',
-          'Gas memiliki volume tetap',
-          'Gas memenuhi seluruh ruang yang tersedia',
-          'Gas lebih berat daripada zat padat'
-        ],
-        answer: 2,
-        explain: 'Partikel gas bergerak cepat ke segala arah dan berjauhan satu sama lain, sehingga gas selalu menyebar memenuhi seluruh wadahnya.'
-      },
-      {
-        q: 'Manakah kelompok yang seluruhnya berwujud padat?',
-        options: [
-          'Batu, kayu, susu',
-          'Es batu, buku, kayu',
-          'Asap, batu, minyak',
-          'Udara, uap air, es batu'
-        ],
-        answer: 1,
-        explain: 'Es batu, buku, dan kayu semuanya mempertahankan bentuknya sendiri. Susu dan minyak berwujud cair, sedangkan asap, udara, dan uap air berwujud gas.'
-      }
-    ]
-  });
-})();
+})());

@@ -1,449 +1,356 @@
-/* Kesetimbangan Kimia dan Asas Le Châtelier — Fase F
-   Ganggu kesetimbangan dengan konsentrasi, tekanan, dan suhu; amati arah
-   pergeserannya dan nilai Kc yang tetap kecuali suhunya diubah. */
+/* Kesetimbangan Kimia dan Asas Le Chatelier — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('kesetimbangan', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 590;
-
+  /* Setiap sistem: A ⇌ B dengan koefisien, dH, dan warna gas/larutan.
+     mol: koefisien kiri/kanan untuk menentukan pengaruh tekanan. */
   const SISTEM = [
-    {
-      id: 'haber', nama: 'N₂(g) + 3H₂(g) ⇌ 2NH₃(g)',
-      kiri: [{ z: 'N₂', k: 1, w: '#5b9bf5' }, { z: 'H₂', k: 3, w: '#f0f2f4' }],
-      kanan: [{ z: 'NH₃', k: 2, w: '#4fd1c0' }],
-      dH: -92, molKiri: 4, molKanan: 2, Kc25: 6.0e5,
-      catatan: 'Proses Haber-Bosch, pembuatan pupuk. Eksoterm dan mol gas berkurang.'
-    },
-    {
-      id: 'ester', nama: 'CH₃COOH + C₂H₅OH ⇌ ester + H₂O',
-      kiri: [{ z: 'asam', k: 1, w: '#f0a94a' }, { z: 'alkohol', k: 1, w: '#b795f0' }],
-      kanan: [{ z: 'ester', k: 1, w: '#4fd1c0' }, { z: 'air', k: 1, w: '#5b9bf5' }],
-      dH: -2, molKiri: 2, molKanan: 2, Kc25: 4.0,
-      catatan: 'Esterifikasi. Jumlah mol kedua ruas sama, sehingga tekanan tidak berpengaruh.'
-    },
-    {
-      id: 'no2', nama: '2NO₂(g) ⇌ N₂O₄(g)',
-      kiri: [{ z: 'NO₂', k: 2, w: '#c4703a' }],
-      kanan: [{ z: 'N₂O₄', k: 1, w: '#f0f2f4' }],
-      dH: -57, molKiri: 2, molKanan: 1, Kc25: 8.8,
-      catatan: 'NO₂ berwarna cokelat, N₂O₄ tidak berwarna. Pergeserannya terlihat langsung.'
-    },
-    {
-      id: 'kapur', nama: 'CaCO₃(s) ⇌ CaO(s) + CO₂(g)',
-      kiri: [{ z: 'CaCO₃', k: 1, w: '#f0f0ea' }],
-      kanan: [{ z: 'CaO', k: 1, w: '#e8e8e0' }, { z: 'CO₂', k: 1, w: '#9aa4ae' }],
-      dH: 178, molKiri: 0, molKanan: 1, Kc25: 1.1e-23,
-      catatan: 'Endoterm. Zat padat tidak masuk dalam ungkapan Kc.'
-    }
+    { n: 'N₂O₄(g) ⇌ 2NO₂(g)', molKi: 1, molKa: 2, dH: 57.2, K: 0.36,
+      ki: { n: 'N₂O₄', w: 0xdfe8ee }, ka: { n: 'NO₂', w: 0xc86a28 }, fase: 'gas' },
+    { n: 'N₂(g) + 3H₂(g) ⇌ 2NH₃(g)', molKi: 4, molKa: 2, dH: -92.4, K: 0.65,
+      ki: { n: 'N₂+3H₂', w: 0x9ec8f0 }, ka: { n: 'NH₃', w: 0x8ad0a8 }, fase: 'gas' },
+    { n: '2SO₂(g) + O₂(g) ⇌ 2SO₃(g)', molKi: 3, molKa: 2, dH: -197, K: 0.8,
+      ki: { n: 'SO₂+O₂', w: 0xe8d870 }, ka: { n: 'SO₃', w: 0xeaf2f6 }, fase: 'gas' },
+    { n: 'H₂(g) + I₂(g) ⇌ 2HI(g)', molKi: 2, molKa: 2, dH: -9.4, K: 0.78,
+      ki: { n: 'H₂+I₂', w: 0xc868c8 }, ka: { n: 'HI', w: 0xdfe8ee }, fase: 'gas' },
+    { n: 'Fe³⁺ + SCN⁻ ⇌ FeSCN²⁺', molKi: 2, molKa: 1, dH: -18, K: 0.55,
+      ki: { n: 'Fe³⁺+SCN⁻', w: 0xf0d8a0 }, ka: { n: 'FeSCN²⁺', w: 0xb02a1a }, fase: 'larutan' },
+    { n: 'CoCl₄²⁻ + 6H₂O ⇌ Co(H₂O)₆²⁺', molKi: 1, molKa: 1, dH: -40, K: 0.5,
+      ki: { n: 'CoCl₄²⁻ (biru)', w: 0x2a5ad0 }, ka: { n: 'Co(H₂O)₆²⁺ (merah)', w: 0xd8486a }, fase: 'larutan' }
   ];
 
-  function sistemAktif(sim) {
-    return SISTEM.find(function (s) { return s.id === sim.get('sistem'); }) || SISTEM[0];
+  const NP = 120;
+
+  function sistem(s) { return SISTEM[parseInt(s.get('sis'), 10) || 0]; }
+
+  /* Fraksi produk pada kesetimbangan, dipengaruhi suhu, tekanan, dan gangguan */
+  function setimbang(s) {
+    const z = sistem(s);
+    const Tk = s.get('suhu') + 273.15;
+    // ln K bergeser menurut van't Hoff: endoterm → K naik saat panas
+    const lnK = Math.log(z.K / (1 - z.K)) + (z.dH / 8.314) * (1 / 298.15 - 1 / Tk) * 1000 / 1000 * 1.0;
+    let f = 1 / (1 + Math.exp(-lnK));
+    // tekanan: bergeser ke ruas dengan mol gas lebih kecil
+    if (z.fase === 'gas') {
+      const p = s.get('tekanan');
+      const beda = z.molKi - z.molKa;          // > 0 → kanan lebih sedikit mol
+      f = S.clamp(f + Math.log(p) * beda * 0.14, 0.02, 0.98);
+    }
+    // gangguan konsentrasi: tambah pereaksi (geser kanan) / tambah produk (geser kiri)
+    f = S.clamp(f + s.get('tambah') * 0.09, 0.02, 0.98);
+    return f;
   }
 
-  /** Kc pada suhu terpilih memakai persamaan van 't Hoff. */
-  function Kc(sim) {
-    const S = sistemAktif(sim);
-    const T = sim.get('suhu') + 273;
-    return C.vantHoff(S.Kc25, S.dH, 298, T);
+  function arah(s) {
+    const f = setimbang(s);
+    const lama = s.data ? (s.data.fLama === undefined ? f : s.data.fLama) : f;
+    const d = f - lama;
+    if (Math.abs(d) < 0.004) return { teks: 'Sudah setimbang — laju maju = laju balik', tone: 'aksen', d: 0 };
+    return d > 0
+      ? { teks: 'Bergeser ke kanan (ke arah hasil)', tone: 'warn', d: 1 }
+      : { teks: 'Bergeser ke kiri (ke arah pereaksi)', tone: 'biru', d: -1 };
   }
 
-  /** Posisi kesetimbangan: 0 = seluruhnya kiri, 1 = seluruhnya kanan. */
-  function posisi(sim) {
-    const S = sistemAktif(sim);
-    let p = 0.5;
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 11.5, phi: 1.06, theta: 0.6, targetY: 1.5, lajuPutar: 0.1 },
 
-    // pengaruh suhu lewat Kc
-    const k = Kc(sim);
-    p = k / (k + 1);
-    p = Sim.clamp(0.12 + p * 0.76, 0.05, 0.95);
-
-    // gangguan konsentrasi
-    p += sim.get('tambahKiri') * 0.16;
-    p -= sim.get('tambahKanan') * 0.16;
-
-    // gangguan tekanan: bergeser ke ruas dengan mol gas lebih sedikit
-    const beda = S.molKiri - S.molKanan;
-    p += (sim.get('tekanan') - 1) * beda * 0.1;
-
-    return Sim.clamp(p, 0.03, 0.97);
-  }
-
-  function siapkan(sim) {
-    sim.data.p = posisi(sim);
-    sim.data.jejak = new Plot.Buffer(700);
-    sim.data.gangguan = '';
-    sim.data.gangguanWaktu = 0;
-  }
-
-  function catatGangguan(sim, teks) {
-    sim.data.gangguan = teks;
-    sim.data.gangguanWaktu = 3.4;
-  }
-
-  Sim.create({
-    title: 'Kesetimbangan Kimia dan Asas Le Châtelier',
-    subtitle: 'Kesetimbangan bersifat dinamis — reaksi maju dan balik tetap berjalan dengan laju sama. Bila diganggu, sistem bergeser untuk mengurangi pengaruh gangguan itu.',
-    fase: 'F', jenjang: 'SMA Kelas 11',
-    topik: ['Kesetimbangan', 'Le Châtelier', 'Kc dan Kp'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Sistem kesetimbangan',
-        items: [
-          { type: 'select', id: 'sistem', value: 'haber', label: 'Pilih sistem',
-            options: SISTEM.map(function (s) { return { value: s.id, label: s.nama }; }) }
-        ]
-      },
-      {
-        title: 'Gangguan',
-        items: [
-          { type: 'slider', id: 'tambahKiri', value: 0, min: -1, max: 2, step: 0.1,
-            label: 'Konsentrasi pereaksi', dec: 1,
-            minLabel: 'dikurangi', maxLabel: 'ditambah',
-            format: function (v) { return v > 0.05 ? '+' + Sim.fmt(v, 1) : v < -0.05 ? Sim.fmt(v, 1) : 'tetap'; } },
-          { type: 'slider', id: 'tambahKanan', value: 0, min: -1, max: 2, step: 0.1,
-            label: 'Konsentrasi hasil', dec: 1,
-            minLabel: 'dikurangi', maxLabel: 'ditambah',
-            format: function (v) { return v > 0.05 ? '+' + Sim.fmt(v, 1) : v < -0.05 ? Sim.fmt(v, 1) : 'tetap'; } },
-          { type: 'slider', id: 'tekanan', value: 1, min: 0.3, max: 3, step: 0.1,
-            label: 'Tekanan', unit: '×', dec: 1,
-            hint: 'Hanya berpengaruh bila jumlah mol gas kedua ruas berbeda.' },
-          { type: 'slider', id: 'suhu', value: 25, min: -50, max: 500, step: 10,
-            label: 'Suhu', unit: '°C', dec: 0,
-            hint: 'Hanya suhu yang dapat mengubah nilai Kc.' }
-        ]
-      },
-      {
-        title: 'Pengaturan',
-        items: [
-          { type: 'toggle', id: 'katalis', value: false, label: 'Tambahkan katalis',
-            hint: 'Perhatikan: katalis mempercepat tercapainya kesetimbangan, tetapi tidak menggesernya.' },
-          { type: 'buttons', label: '', items: [
-            { label: 'Kembalikan semua', onClick: function (sim) {
-              sim.set('tambahKiri', 0); sim.set('tambahKanan', 0);
-              sim.set('tekanan', 1); sim.set('suhu', 25);
-            } }
-          ] }
-        ]
-      }
+    kendali: [
+      { judul: 'Sistem', isi: [
+        { type: 'select', id: 'sis', value: 0, label: 'Reaksi kesetimbangan',
+          options: SISTEM.map(function (z, i) { return { value: i, label: z.n }; }) }
+      ]},
+      { judul: 'Gangguan', isi: [
+        { type: 'slider', id: 'suhu', value: 25, min: -10, max: 300, step: 5,
+          label: 'Suhu', unit: ' °C', dec: 0 },
+        { type: 'slider', id: 'tekanan', value: 1, min: 0.2, max: 6, step: 0.1,
+          label: 'Tekanan (hanya gas)', unit: ' atm', dec: 1 },
+        { type: 'slider', id: 'tambah', value: 0, min: -3, max: 3, step: 0.1,
+          label: 'Tambah pereaksi (+) / hasil (−)', unit: '', dec: 1 },
+        { type: 'buttons', label: '', items: [
+          { label: '↺ Kembali ke keadaan awal', utama: true, klik: function (s) {
+            s.set('suhu', 25); s.set('tekanan', 1); s.set('tambah', 0);
+          }}
+        ]}
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan grafik konsentrasi' },
+        { type: 'toggle', id: 'panah', value: true, label: 'Tampilkan panah pergeseran' },
+        { type: 'slider', id: 'laju', value: 1, min: 0.2, max: 3, step: 0.1,
+          label: 'Kecepatan animasi', unit: '×', dec: 1 }
+      ]}
     ],
 
-    readouts: [
-      { id: 'arah', label: 'Arah pergeseran', tone: 'accent' },
-      { id: 'kc', label: 'Nilai Kc' },
-      { id: 'hasil', label: 'Kadar hasil' },
-      { id: 'dh', label: 'Sifat reaksi' }
+    baca: [
+      { id: 'arah', label: 'Arah pergeseran', tone: 'aksen' },
+      { id: 'ki', label: 'Pereaksi' },
+      { id: 'ka', label: 'Hasil' },
+      { id: 'k', label: 'Tetapan Kc (relatif)' },
+      { id: 'suhu', label: 'Pengaruh suhu' },
+      { id: 'tek', label: 'Pengaruh tekanan' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 9, warna: 0x0b1118 }));
 
-    onChange: function (sim, id) {
-      const S = sistemAktif(sim);
-      if (id === 'tambahKiri') catatGangguan(sim,
-        sim.get('tambahKiri') > 0
-          ? 'Pereaksi ditambah → sistem bergeser ke KANAN untuk menguranginya.'
-          : 'Pereaksi dikurangi → sistem bergeser ke KIRI untuk menggantinya.');
-      else if (id === 'tambahKanan') catatGangguan(sim,
-        sim.get('tambahKanan') > 0
-          ? 'Hasil ditambah → sistem bergeser ke KIRI.'
-          : 'Hasil dikurangi → sistem bergeser ke KANAN untuk menggantinya.');
-      else if (id === 'tekanan') {
-        const beda = S.molKiri - S.molKanan;
-        catatGangguan(sim, beda === 0
-          ? 'Jumlah mol gas kedua ruas sama — tekanan TIDAK menggeser kesetimbangan.'
-          : (sim.get('tekanan') > 1
-              ? 'Tekanan diperbesar → bergeser ke ruas dengan mol gas lebih SEDIKIT.'
-              : 'Tekanan diperkecil → bergeser ke ruas dengan mol gas lebih BANYAK.'));
-      } else if (id === 'suhu') {
-        catatGangguan(sim, S.dH < 0
-          ? 'Reaksi eksoterm: suhu naik menggeser ke KIRI dan memperkecil Kc.'
-          : 'Reaksi endoterm: suhu naik menggeser ke KANAN dan memperbesar Kc.');
-      } else if (id === 'katalis') {
-        catatGangguan(sim, 'Katalis mempercepat tercapainya kesetimbangan, tetapi TIDAK menggeser posisinya.');
-      } else if (id === 'sistem') {
-        sim.data.jejak.clear();
-      }
-    },
+      /* ---------- bejana silinder berpiston ---------- */
+      const R = 1.7;
+      const dinding = new T.Mesh(new T.CylinderGeometry(R, R, 3.4, 48, 1, true),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, transparent: true,
+          opacity: 0.16, side: T.DoubleSide, depthWrite: false }));
+      dinding.position.y = 1.75;
+      s.tambah(dinding);
+      const dasar = new T.Mesh(new T.CylinderGeometry(R + 0.1, R + 0.18, 0.22, 48),
+        S.matLogam(0x6b7784, { roughness: 0.55 }));
+      dasar.position.y = 0.06;
+      dasar.receiveShadow = true;
+      s.tambah(dasar);
 
-    update: function (sim, dt) {
-      const target = posisi(sim);
-      const cepat = sim.get('katalis') ? 2.4 : 0.9;
-      sim.data.p += (target - sim.data.p) * Math.min(1, dt * cepat);
-      sim.data.jejak.push(sim.t, sim.data.p);
-      if (sim.data.gangguanWaktu > 0) sim.data.gangguanWaktu -= dt;
-    },
+      // piston
+      const piston = new T.Mesh(new T.CylinderGeometry(R - 0.02, R - 0.02, 0.2, 48),
+        S.matLogam(0xb0b8c0, { roughness: 0.4 }));
+      s.data.piston = piston;
+      s.tambah(piston);
+      const tangkai = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 1.6, 18), S.matLogam(0x98a0a8));
+      s.data.tangkai = tangkai;
+      s.tambah(tangkai);
+      const pegangan = new T.Mesh(new T.BoxGeometry(1.0, 0.14, 0.3), S.matLogam(0xd0a84a));
+      s.data.pegangan = pegangan;
+      s.tambah(pegangan);
 
-    draw: function (c, sim) {
-      const S = sistemAktif(sim);
-      const p = sim.data.p;
-      const target = posisi(sim);
-      const k = Kc(sim);
-
-      /* ---------- persamaan ---------- */
-      D.text(c, 'SISTEM KESETIMBANGAN', 40, 44,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, S.nama, 40, 72, { size: 23, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      D.text(c, S.catatan, 40, 96, { size: 12, weight: 500, color: P.faint, base: 'middle' });
-
-      /* ---------- neraca kesetimbangan ---------- */
-      const BX = 60, BY = 140, BW = 680;
-      D.text(c, 'POSISI KESETIMBANGAN', BX, BY - 14,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      // batang terbagi
-      D.roundRect(c, BX, BY, BW, 44, 8, 'rgba(255,255,255,.06)');
-      D.roundRect(c, BX, BY, BW * (1 - p), 44, 8, D.alpha(P.blue, 0.5));
-      D.roundRect(c, BX + BW * (1 - p), BY, BW * p, 44, 8, D.alpha(P.accent, 0.5));
-      D.roundRect(c, BX, BY, BW, 44, 8, null, 'rgba(255,255,255,.2)', 1.4);
-
-      D.text(c, 'PEREAKSI ' + Math.round((1 - p) * 100) + '%', BX + 14, BY + 22,
-        { size: 13, weight: 800, color: P.blue, base: 'middle' });
-      D.text(c, Math.round(p * 100) + '% HASIL', BX + BW - 14, BY + 22,
-        { size: 13, weight: 800, color: P.accent, align: 'r', base: 'middle' });
-
-      // penanda posisi
-      const px = BX + BW * (1 - p);
-      c.beginPath();
-      c.moveTo(px, BY - 6); c.lineTo(px - 8, BY - 18); c.lineTo(px + 8, BY - 18);
-      c.closePath(); c.fillStyle = P.text; c.fill();
-
-      // panah arah pergeseran
-      const geser = target - p;
-      if (Math.abs(geser) > 0.004) {
-        const arah = geser > 0 ? 1 : -1;
-        D.arrow(c, px + arah * 10, BY + 62, px + arah * 70, BY + 62,
-          arah > 0 ? P.accent : P.blue, 3, 10);
-        D.text(c, arah > 0 ? 'bergeser ke KANAN' : 'bergeser ke KIRI',
-          px + arah * 80, BY + 62, {
-            size: 12.5, weight: 700, base: 'middle',
-            align: arah > 0 ? 'left' : 'right',
-            color: arah > 0 ? P.accent : P.blue
-          });
-      } else {
-        D.text(c, 'setimbang — laju maju = laju balik', px, BY + 62,
-          { size: 12.5, weight: 650, color: P.dim, align: 'c', base: 'middle' });
-      }
-
-      /* ---------- gambaran partikel ---------- */
-      const WY = 236, WH = 110;
-      D.roundRect(c, BX, WY, BW, WH, 10, 'rgba(255,255,255,.03)', 'rgba(255,255,255,.12)', 1.2);
-
-      // warna isi untuk NO2 (perubahan warna nyata)
-      if (S.id === 'no2') {
-        c.save();
-        c.beginPath(); c.rect(BX + 2, WY + 2, BW - 4, WH - 4); c.clip();
-        c.fillStyle = D.alpha('#c4703a', (1 - p) * 0.45);
-        c.fillRect(BX, WY, BW, WH);
-        c.restore();
-        D.text(c, (1 - p) > 0.5 ? 'warna cokelat pekat' : 'warna memudar',
-          BX + BW - 14, WY + 16,
-          { size: 11, weight: 600, color: P.amber, align: 'r', base: 'middle' });
-      }
-
-      // partikel pereaksi (kiri) dan hasil (kanan), jumlah mengikuti p
-      const nTotal = 46;
-      for (let i = 0; i < nTotal; i++) {
-        const hasil = (i / nTotal) < p;
-        const kel = hasil ? S.kanan : S.kiri;
-        const z = kel[i % kel.length];
-        const seed = i * 97.3;
-        const x = BX + 20 + ((seed * 7.1) % (BW - 40));
-        const y = WY + 18 + ((seed * 3.7) % (WH - 36));
-        const wob = Math.sin(sim.t * 1.4 + i) * 3;
-        D.atom(c, x + wob, y + Math.cos(sim.t * 1.2 + i) * 3, 9, z.w, '', {});
-      }
-      Plot.legenda(c, BX + 14, WY + WH - 14,
-        S.kiri.map(function (z) { return { label: z.z, warna: z.w }; })
-          .concat(S.kanan.map(function (z) { return { label: z.z, warna: z.w }; })));
-
-      /* ---------- Kc & ungkapan ---------- */
-      const KX2 = 60, KW2 = 330;
-      D.roundRect(c, KX2, 368, KW2, 128, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'TETAPAN KESETIMBANGAN', KX2 + 16, 388,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      const ungkapKanan = S.kanan.filter(function (z) { return S.id !== 'kapur' || z.z === 'CO₂'; })
-        .map(function (z) { return '[' + z.z + ']' + (z.k > 1 ? Sim.sup(z.k) : ''); }).join('·') || '1';
-      const ungkapKiri = S.id === 'kapur' ? '1'
-        : S.kiri.map(function (z) { return '[' + z.z + ']' + (z.k > 1 ? Sim.sup(z.k) : ''); }).join('·');
-
-      D.text(c, 'Kc = ' + ungkapKanan + ' / ' + ungkapKiri, KX2 + 16, 414,
-        { size: 14, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      if (S.id === 'kapur') {
-        D.text(c, 'Zat padat tidak dimasukkan — konsentrasinya tetap.', KX2 + 16, 434,
-          { size: 10.5, weight: 500, color: P.amber, base: 'middle' });
-      }
-      D.text(c, 'Pada ' + Math.round(sim.get('suhu')) + ' °C:', KX2 + 16, 456,
-        { size: 11, weight: 500, color: P.faint, base: 'middle' });
-      D.text(c, 'Kc = ' + Sim.sci(k, 2), KX2 + 16, 478,
-        { size: 19, weight: 700, color: P.accent2, base: 'middle', mono: true });
-      D.text(c, k > 1 ? 'Kc > 1 → hasil mendominasi' : 'Kc < 1 → pereaksi mendominasi',
-        KX2 + 170, 478, { size: 11, weight: 600, color: P.dim, base: 'middle' });
-
-      /* ---------- grafik posisi ---------- */
-      const g = { x: 450, y: 390, w: 290, h: 106 };
-      const tMax = Math.max(14, sim.t);
-      const map = Plot.axes(c, {
-        x: g.x, y: g.y, w: g.w, h: g.h,
-        xmin: Math.max(0, tMax - 30), xmax: tMax, ymin: 0, ymax: 1,
-        xlabel: 'waktu', ylabel: 'kadar hasil',
-        judul: 'Pergeseran kesetimbangan', yticks: 3, xticks: 4
+      /* ---------- partikel: pereaksi & hasil ---------- */
+      const pKi = S.partikel(NP, { r: 0.12, warna: 0xdfe8ee, kotak: { x: 1.4, y: 1.3, z: 1.4 } });
+      const pKa = S.partikel(NP, { r: 0.1, warna: 0xc86a28, kotak: { x: 1.4, y: 1.3, z: 1.4 } });
+      [pKi, pKa].forEach(function (p) {
+        p.position.y = 1.6;
+        p.material.transparent = true;
+        p.material.opacity = 0.95;
+        s.tambah(p);
       });
-      Plot.line(c, map, sim.data.jejak.data, { color: P.accent, lw: 2.4, isi: true });
+      s.data.pKi = pKi; s.data.pKa = pKa;
 
-      /* ---------- pesan gangguan ---------- */
-      if (sim.data.gangguanWaktu > 0) {
-        c.save(); c.globalAlpha = Math.min(1, sim.data.gangguanWaktu / 0.7);
-        const tw = D.measure(c, sim.data.gangguan, { size: 13, weight: 650 }) + 36;
-        D.roundRect(c, W / 2 - tw / 2, 512, tw, 34, 17,
-          'rgba(79,209,192,.14)', P.accent, 1.5);
-        D.text(c, sim.data.gangguan, W / 2, 529,
-          { size: 13, weight: 650, color: P.accent2, align: 'c', base: 'middle' });
-        c.restore();
-      } else {
-        D.roundRect(c, 60, 512, BW, 34, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', 1.1);
-        D.text(c, 'Asas Le Châtelier: bila sistem setimbang diganggu, sistem bergeser ke arah yang mengurangi pengaruh gangguan itu.',
-          76, 529, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-      }
+      // kabut warna di dalam bejana (untuk gas berwarna / larutan)
+      const kabut = new T.Mesh(new T.CylinderGeometry(R - 0.06, R - 0.06, 1, 40),
+        new T.MeshStandardMaterial({ color: 0xc86a28, transparent: true, opacity: 0.1,
+          depthWrite: false }));
+      s.data.kabut = kabut;
+      s.tambah(kabut);
+
+      /* ---------- pemanas / pendingin ---------- */
+      const pelat = new T.Mesh(new T.CylinderGeometry(R + 0.4, R + 0.4, 0.14, 48),
+        new T.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.7,
+          emissive: 0xef4a3a, emissiveIntensity: 0 }));
+      pelat.position.y = -0.1;
+      s.data.pelat = pelat;
+      s.tambah(pelat);
+
+      const lblSuhu = S.teks('', { skala: 0.32, lebar: 12, warna: '#f0a94a' });
+      lblSuhu.position.set(-2.9, 0.5, 0);
+      s.data.lblSuhu = lblSuhu;
+      s.tambah(lblSuhu);
+
+      const lblTek = S.teks('', { skala: 0.3, lebar: 12, warna: '#8fd8ff' });
+      lblTek.position.set(2.9, 4.4, 0);
+      s.data.lblTek = lblTek;
+      s.tambah(lblTek);
+
+      /* ---------- panah pergeseran ---------- */
+      const pKanan = S.panah([-0.9, 4.6, 0], [0.9, 4.6, 0], { warna: 0xf0a94a, tebal: 0.06 });
+      const pKiri = S.panah([0.9, 4.6, 0], [-0.9, 4.6, 0], { warna: 0x6fb6ff, tebal: 0.06 });
+      pKanan.visible = false; pKiri.visible = false;
+      s.data.pKanan = pKanan; s.data.pKiri = pKiri;
+      s.tambah(pKanan); s.tambah(pKiri);
+
+      /* ---------- neraca batang (lambang kesetimbangan) ---------- */
+      const tiang = new T.Mesh(new T.CylinderGeometry(0.06, 0.08, 1.1, 16), S.matLogam(0x8d99a4));
+      tiang.position.set(4.6, 1.0, 0);
+      s.tambah(tiang);
+      const batang = new T.Mesh(new T.BoxGeometry(2.4, 0.08, 0.14), S.matLogam(0xc8ced4));
+      batang.position.set(4.6, 1.6, 0);
+      s.data.batang = batang;
+      s.tambah(batang);
+      const piringKi = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.05, 28),
+        new T.MeshStandardMaterial({ color: 0x9ec8f0, roughness: 0.4,
+          emissive: 0x9ec8f0, emissiveIntensity: 0.2 }));
+      const piringKa = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.05, 28),
+        new T.MeshStandardMaterial({ color: 0xf0a94a, roughness: 0.4,
+          emissive: 0xf0a94a, emissiveIntensity: 0.2 }));
+      s.data.piringKi = piringKi; s.data.piringKa = piringKa;
+      s.tambah(piringKi); s.tambah(piringKa);
+
+      /* ---------- panel grafik ---------- */
+      const g1 = S.panelGrafik({ w: 4.2, px: 680, py: 430 });
+      g1.position.set(-3.6, 3.4, -1.4);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      const lbl = S.teks('', { skala: 0.4, lebar: 40, warna: '#d8e4ec' });
+      lbl.position.set(0, 5.5, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      s.data.f = setimbang(s);
+      s.data.fLama = s.data.f;
+      s.data.rekam = [];
+      s.data.jam = 0;
+      pasang(s);
     },
 
-    readoutsUpdate: function (sim) {
-      const S = sistemAktif(sim);
-      const p = sim.data.p;
-      const target = posisi(sim);
-      const geser = target - p;
-      sim.readout('arah', Math.abs(geser) < 0.004 ? 'setimbang'
-        : geser > 0 ? 'ke kanan →' : '← ke kiri');
-      sim.readout('kc', Sim.sci(Kc(sim), 2));
-      sim.readout('hasil', Math.round(p * 100) + '<span class="unit">%</span>');
-      sim.readout('dh', S.dH < 0 ? 'Eksoterm (ΔH ' + S.dH + ')' : 'Endoterm (ΔH +' + S.dH + ')',
-        S.dH < 0 ? 'warn' : 'accent');
+    ubah: function (s, id) {
+      if (id === 'sis') pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'panah' && !s.get('panah')) {
+        s.data.pKanan.visible = false;
+        s.data.pKiri.visible = false;
+      }
+      if (id !== 'laju' && id !== 'grafik' && id !== 'panah') s.data.ganggu = 1;
     },
 
-    notes: `
-      <p>Reaksi bolak-balik tidak pernah benar-benar berhenti. Pada keadaan setimbang,
-      <strong>laju reaksi maju sama dengan laju reaksi balik</strong>, sehingga
-      konsentrasi semua zat tampak tetap meski reaksinya terus berlangsung. Inilah yang
-      disebut <strong>kesetimbangan dinamis</strong>.</p>
+    langkah: function (s, dt) {
+      const z = sistem(s);
+      const target = setimbang(s);
+      const dtl = dt * s.get('laju');
 
-      <h3>Tetapan kesetimbangan</h3>
-      <span class="formula">Untuk  aA + bB ⇌ cC + dD
-Kc = [C]ᶜ[D]ᵈ ÷ [A]ᵃ[B]ᵇ</span>
+      // konsentrasi menuju nilai setimbang dengan relaksasi
+      s.data.fLama = s.data.f;
+      s.data.f = S.lerp(s.data.f, target, S.clamp(dtl * 1.6, 0, 1));
+      const f = s.data.f;
 
-      <p>Aturan penting: <strong>zat padat murni dan zat cair murni tidak dimasukkan</strong>
-      ke dalam ungkapan Kc, karena konsentrasinya tetap. Pada CaCO₃ ⇌ CaO + CO₂, ungkapannya
-      hanya Kc = [CO₂].</p>
+      s.data.jam += dtl * 3;
+      if (s.data.rekam.length > 420) s.data.rekam.shift();
+      s.data.rekam.push([s.data.jam, f]);
 
-      <ul>
-        <li><strong>Kc &gt; 1</strong> → kesetimbangan condong ke kanan, hasil mendominasi.</li>
-        <li><strong>Kc &lt; 1</strong> → condong ke kiri, pereaksi mendominasi.</li>
-      </ul>
+      // jumlah partikel tiap sisi
+      const nKa = Math.round(f * NP);
+      aturJumlah(s.data.pKa, nKa);
+      aturJumlah(s.data.pKi, NP - nKa);
 
-      <h3>Asas Le Châtelier</h3>
-      <p>Bila sistem setimbang diberi gangguan, sistem akan <strong>bergeser ke arah yang
-      mengurangi pengaruh gangguan</strong> tersebut.</p>
+      // piston: tekanan tinggi → volume kecil
+      const vol = z.fase === 'gas' ? S.clamp(1 / s.get('tekanan'), 0.18, 1.2) : 1;
+      const tinggi = 0.9 + vol * 2.2;
+      s.data.piston.position.y = tinggi + 0.1;
+      s.data.tangkai.position.y = tinggi + 1.0;
+      s.data.pegangan.position.y = tinggi + 1.85;
 
-      <table>
-        <thead><tr><th>Gangguan</th><th>Arah pergeseran</th><th>Kc berubah?</th></tr></thead>
-        <tbody>
-          <tr><td>Pereaksi ditambah</td><td>ke kanan</td><td>tidak</td></tr>
-          <tr><td>Hasil ditambah</td><td>ke kiri</td><td>tidak</td></tr>
-          <tr><td>Hasil diambil terus</td><td>ke kanan</td><td>tidak</td></tr>
-          <tr><td>Tekanan diperbesar</td><td>ke ruas dengan mol gas lebih sedikit</td><td>tidak</td></tr>
-          <tr><td>Suhu dinaikkan</td><td>ke arah endoterm</td><td><strong>ya</strong></td></tr>
-          <tr><td>Katalis ditambah</td><td>tidak bergeser</td><td>tidak</td></tr>
-        </tbody>
-      </table>
+      const setengah = Math.max(0.3, (tinggi - 0.25) / 2);
+      [s.data.pKi, s.data.pKa].forEach(function (p) {
+        p.position.y = 0.2 + setengah;
+        p.userData.kotak = { x: 1.45, y: setengah, z: 1.45 };
+      });
 
-      <p>Dua baris terakhir paling sering keliru. <strong>Hanya suhu</strong> yang dapat
-      mengubah nilai Kc. Katalis mempercepat tercapainya kesetimbangan dari kedua arah
-      sekaligus, sehingga posisinya tidak bergeser sama sekali.</p>
+      const laju = 0.5 + (s.get('suhu') + 20) / 90;
+      s.data.pKi.userData.gerak(dtl, laju);
+      s.data.pKa.userData.gerak(dtl, laju);
 
-      <h3>Pengaruh suhu bergantung pada ΔH</h3>
-      <ul>
-        <li>Reaksi <strong>eksoterm</strong> (ΔH negatif): suhu naik → bergeser ke kiri, Kc mengecil.</li>
-        <li>Reaksi <strong>endoterm</strong> (ΔH positif): suhu naik → bergeser ke kanan, Kc membesar.</li>
-      </ul>
-      <p>Cara mengingatnya: anggap kalor sebagai salah satu zat dalam persamaan. Pada reaksi
-      eksoterm, kalor berada di ruas kanan, sehingga menambah kalor menggeser ke kiri.</p>
+      // kabut warna: campuran warna kiri & kanan sesuai fraksi
+      const c = new T.Color(z.ki.w).lerp(new T.Color(z.ka.w), f);
+      s.data.kabut.material.color.copy(c);
+      s.data.kabut.scale.y = tinggi - 0.25;
+      s.data.kabut.position.y = 0.2 + (tinggi - 0.25) / 2;
+      s.data.kabut.material.opacity = z.fase === 'larutan' ? 0.55 : 0.1 + f * 0.14;
 
-      <h3>Penerapan: proses Haber-Bosch</h3>
-      <p>Pembuatan amonia untuk pupuk menghadapi pertentangan. Reaksinya eksoterm dan mol
-      gas berkurang, sehingga hasil terbaik diperoleh pada <strong>suhu rendah dan tekanan
-      tinggi</strong>. Namun pada suhu rendah reaksinya terlalu lambat.</p>
+      // pelat pemanas
+      const panas = S.clamp((s.get('suhu') - 25) / 275, -1, 1);
+      s.data.pelat.material.emissive.setRGB(
+        panas > 0 ? 0.9 : 0.25, panas > 0 ? 0.25 : 0.55, panas > 0 ? 0.15 : 0.95);
+      s.data.pelat.material.emissiveIntensity = Math.abs(panas) * 0.85;
+      s.data.lblSuhu.userData.ganti(Math.round(s.get('suhu')) + ' °C',
+        panas > 0.1 ? '#ef6a52' : panas < -0.1 ? '#6fb6ff' : '#f0a94a');
+      s.data.lblTek.userData.ganti(z.fase === 'gas'
+        ? S.fmt(s.get('tekanan'), 1) + ' atm' : 'larutan — tekanan tak berpengaruh');
 
-      <p>Jalan tengah yang dipakai industri: suhu sedang (sekitar 450 °C), tekanan sangat
-      tinggi (200 atm), dan <strong>katalis besi</strong> untuk mempercepat tercapainya
-      kesetimbangan. Amonia yang terbentuk terus diambil agar kesetimbangan terus bergeser
-      ke kanan.</p>
+      // neraca miring sesuai fraksi
+      const miring = (f - 0.5) * 0.55;
+      s.data.batang.rotation.z = -miring;
+      s.data.piringKi.position.set(4.6 - 1.1 * Math.cos(miring), 1.6 - 1.1 * Math.sin(miring) * -1 - 0.26, 0);
+      s.data.piringKa.position.set(4.6 + 1.1 * Math.cos(miring), 1.6 + 1.1 * Math.sin(miring) * -1 - 0.26, 0);
 
-      <div class="callout" data-tone="tip">
-        <strong>Kompromi antara dua ilmu</strong>
-        Kesetimbangan memberi tahu <em>berapa banyak</em> hasil yang mungkin, kinetika
-        memberi tahu <em>seberapa cepat</em>. Rancangan pabrik selalu merupakan kompromi
-        antara keduanya.
-      </div>
-    `,
-
-    explore: [
-      'Pilih sistem <strong>Haber</strong>. Tambahkan pereaksi dan amati arah pergeserannya. Apakah Kc berubah?',
-      'Naikkan suhu dari 25 °C ke 500 °C. Perhatikan nilai Kc dan arah pergeserannya. Hubungkan dengan ΔH yang negatif.',
-      'Pilih sistem <strong>esterifikasi</strong> dan ubah tekanan. Mengapa tidak terjadi pergeseran?',
-      'Nyalakan <strong>katalis</strong>. Perhatikan grafik mencapai nilai tetap lebih cepat, tetapi nilai akhirnya sama.'
-    ],
-
-    quiz: [
-      {
-        q: 'Pada kesetimbangan N₂ + 3H₂ ⇌ 2NH₃ (ΔH = −92 kJ), bila suhu dinaikkan maka…',
-        options: [
-          'Bergeser ke kanan dan Kc membesar',
-          'Bergeser ke kiri dan Kc mengecil',
-          'Bergeser ke kanan dan Kc tetap',
-          'Tidak terjadi pergeseran'
-        ],
-        answer: 1,
-        explain: 'Reaksi ini eksoterm, jadi kalor berada di ruas kanan. Menambah kalor berarti menambah "zat" di kanan, sehingga sistem bergeser ke kiri. Karena yang diubah adalah suhu, nilai Kc ikut mengecil.'
-      },
-      {
-        q: 'Pada kesetimbangan 2NO₂(g) ⇌ N₂O₄(g), tekanan diperbesar. Sistem akan bergeser ke…',
-        options: [
-          'Kiri, karena mol gas di kiri lebih banyak',
-          'Kanan, karena mol gas di kanan lebih sedikit',
-          'Tidak bergeser',
-          'Bergantung pada suhu'
-        ],
-        answer: 1,
-        explain: 'Memperbesar tekanan membuat sistem bergeser ke ruas dengan jumlah mol gas lebih sedikit untuk mengurangi tekanan. Di sini ruas kanan punya 1 mol gas, ruas kiri 2 mol, sehingga bergeser ke kanan.'
-      },
-      {
-        q: 'Katalis ditambahkan ke sistem yang sudah setimbang. Apa yang terjadi?',
-        options: [
-          'Kesetimbangan bergeser ke kanan',
-          'Nilai Kc membesar',
-          'Posisi kesetimbangan tidak berubah, hanya dicapai lebih cepat',
-          'Reaksi berhenti'
-        ],
-        answer: 2,
-        explain: 'Katalis menurunkan energi aktivasi reaksi maju dan reaksi balik dengan besar yang sama. Kedua laju meningkat seimbang, sehingga posisi kesetimbangan dan nilai Kc tidak berubah sama sekali.'
-      },
-      {
-        q: 'Dalam ungkapan Kc untuk CaCO₃(s) ⇌ CaO(s) + CO₂(g), yang ditulis adalah…',
-        options: [
-          'Kc = [CaO][CO₂] / [CaCO₃]',
-          'Kc = [CO₂]',
-          'Kc = [CaCO₃] / [CO₂]',
-          'Kc = [CaO] / [CaCO₃]'
-        ],
-        answer: 1,
-        explain: 'Zat padat murni memiliki konsentrasi tetap sehingga tidak dimasukkan ke dalam ungkapan tetapan kesetimbangan. Hanya CO₂ yang berwujud gas yang ditulis.'
+      // panah pergeseran
+      const d = target - f;
+      if (s.get('panah')) {
+        s.data.pKanan.visible = d > 0.004;
+        s.data.pKiri.visible = d < -0.004;
+        const kuat = S.clamp(Math.abs(d) * 9, 0.2, 1);
+        [s.data.pKanan, s.data.pKiri].forEach(function (p) {
+          p.children.forEach(function (m) { m.material.emissiveIntensity = kuat; });
+          p.scale.setScalar(0.8 + kuat * 0.4);
+        });
       }
-    ]
-  });
-})();
+
+      if (s.get('grafik')) gambar(s);
+    },
+
+    bacaUbah: function (s) {
+      const z = sistem(s);
+      const f = s.data.f === undefined ? setimbang(s) : s.data.f;
+      const target = setimbang(s);
+      const d = target - f;
+      s.baca('arah', Math.abs(d) < 0.004 ? 'Sudah setimbang — laju maju = laju balik'
+        : d > 0 ? 'Bergeser ke kanan (menambah hasil)' : 'Bergeser ke kiri (menambah pereaksi)',
+        Math.abs(d) < 0.004 ? 'aksen' : d > 0 ? 'warn' : 'biru');
+      s.baca('ki', z.ki.n + ' : ' + Math.round((1 - f) * 100) + ' %');
+      s.baca('ka', z.ka.n + ' : ' + Math.round(f * 100) + ' %');
+      s.baca('k', S.fmtRapi(f / Math.max(0.001, 1 - f)) + '  (perbandingan hasil/pereaksi)');
+      s.baca('suhu', z.dH > 0
+        ? 'Endoterm (ΔH = +' + z.dH + ' kJ) — dipanaskan bergeser ke kanan'
+        : 'Eksoterm (ΔH = ' + z.dH + ' kJ) — dipanaskan bergeser ke kiri',
+        z.dH > 0 ? 'biru' : 'warn');
+      s.baca('tek', z.fase === 'larutan' ? 'Tidak berpengaruh — bukan sistem gas'
+        : z.molKi === z.molKa ? 'Tidak berpengaruh — jumlah mol gas kedua ruas sama ('
+          + z.molKi + ' = ' + z.molKa + ')'
+          : 'Ditekan bergeser ke ruas ber-mol lebih kecil ('
+            + (z.molKa < z.molKi ? 'kanan, ' + z.molKa + ' mol' : 'kiri, ' + z.molKi + ' mol') + ')',
+        z.fase === 'larutan' || z.molKi === z.molKa ? undefined : 'aksen');
+    }
+  };
+
+  function aturJumlah(p, n) {
+    const d = p.userData.p;
+    for (let i = 0; i < d.length; i++) {
+      if (!d[i].aktif && i < n) {
+        d[i].pos.set(S.acak(-1.2, 1.2), S.acak(-0.8, 0.8), S.acak(-1.2, 1.2));
+      }
+      d[i].aktif = i < n;
+    }
+    p.userData.tulis();
+  }
+
+  function gambar(s) {
+    const z = sistem(s);
+    const rek = s.data.rekam;
+    const kiri = rek.map(function (t) { return [t[0], 1 - t[1]]; });
+    const maksX = Math.max(20, s.data.jam);
+    const minX = Math.max(0, s.data.jam - 60);
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Perbandingan jumlah zat terhadap waktu',
+      xMin: minX, xMax: maksX, yMin: 0, yMax: 1,
+      xLabel: 'waktu', yLabel: 'fraksi zat',
+      seri: [
+        { titik: kiri.length > 1 ? kiri : [[0, 0.5], [0.001, 0.5]],
+          warna: '#6fb6ff', tebal: 3, nama: 'pereaksi' },
+        { titik: rek.length > 1 ? rek : [[0, 0.5], [0.001, 0.5]],
+          warna: '#f0a94a', tebal: 3, nama: 'hasil' }
+      ],
+      garisY: [{ v: setimbang(s), warna: 'rgba(79,209,192,.75)', label: 'nilai setimbang baru' }]
+    });
+  }
+
+  function pasang(s) {
+    const z = sistem(s);
+    s.data.f = setimbang(s);
+    s.data.fLama = s.data.f;
+    s.data.jam = 0;
+    s.data.rekam = [[0, s.data.f]];
+
+    s.data.pKi.material.color.setHex(z.ki.w);
+    s.data.pKi.material.emissive.setHex(z.ki.w);
+    s.data.pKa.material.color.setHex(z.ka.w);
+    s.data.pKa.material.emissive.setHex(z.ka.w);
+    s.data.piringKi.material.color.setHex(z.ki.w);
+    s.data.piringKa.material.color.setHex(z.ka.w);
+    s.data.g1.visible = s.get('grafik');
+    s.data.lbl.userData.ganti(z.n);
+  }
+})());

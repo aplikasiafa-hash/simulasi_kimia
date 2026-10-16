@@ -1,336 +1,219 @@
-/* Partikel Materi: Atom, Molekul, dan Ion — Fase D
-   Bangun partikel dari atom-atom, lalu kenali jenisnya: atom tunggal,
-   molekul unsur, molekul senyawa, atau ion. */
+/* Partikel Materi: Atom, Molekul, dan Ion — Fase D — adegan 3D */
 
-(function () {
+Sim3D.daftar('partikel-materi', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
+  const CONTOH = [
+    { n: 'Atom besi (Fe)', jenis: 'atom',
+      atom: [['Fe', 0, 0, 0]], ikatan: [], ket: 'Satu atom berdiri sendiri' },
+    { n: 'Atom helium (He)', jenis: 'atom',
+      atom: [['He', 0, 0, 0]], ikatan: [], ket: 'Gas mulia, tidak berikatan' },
+    { n: 'Molekul unsur O₂', jenis: 'molekul-unsur',
+      atom: [['O', -0.6, 0, 0], ['O', 0.6, 0, 0]], ikatan: [[0, 1, 2]],
+      ket: 'Dua atom sejenis' },
+    { n: 'Molekul unsur N₂', jenis: 'molekul-unsur',
+      atom: [['N', -0.55, 0, 0], ['N', 0.55, 0, 0]], ikatan: [[0, 1, 3]],
+      ket: 'Ikatan rangkap tiga' },
+    { n: 'Molekul senyawa H₂O', jenis: 'molekul-senyawa',
+      atom: [['O', 0, 0.12, 0], ['H', -0.78, -0.58, 0], ['H', 0.78, -0.58, 0]],
+      ikatan: [[0, 1, 1], [0, 2, 1]], ket: 'Dua jenis atom berbeda' },
+    { n: 'Molekul senyawa CO₂', jenis: 'molekul-senyawa',
+      atom: [['C', 0, 0, 0], ['O', -1.16, 0, 0], ['O', 1.16, 0, 0]],
+      ikatan: [[0, 1, 2], [0, 2, 2]], ket: 'Linear, dua ikatan rangkap' },
+    { n: 'Molekul senyawa CH₄', jenis: 'molekul-senyawa',
+      atom: [['C', 0, 0, 0], ['H', 0.63, 0.63, 0.63], ['H', -0.63, -0.63, 0.63],
+             ['H', -0.63, 0.63, -0.63], ['H', 0.63, -0.63, -0.63]],
+      ikatan: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]], ket: 'Bentuk tetrahedron' },
+    { n: 'Ion natrium Na⁺', jenis: 'ion',
+      atom: [['Na', 0, 0, 0]], ikatan: [], muatan: 1, ket: 'Atom yang melepas 1 elektron' },
+    { n: 'Ion klorida Cl⁻', jenis: 'ion',
+      atom: [['Cl', 0, 0, 0]], ikatan: [], muatan: -1, ket: 'Atom yang menerima 1 elektron' },
+    { n: 'Kisi ion NaCl', jenis: 'kisi', ket: 'Ion tersusun berselang-seling' }
+  ];
 
-  const CONTOH = {
-    'he':   { label: 'He — atom helium',          atom: [['He', 0, 0]], muatan: 0 },
-    'fe':   { label: 'Fe — atom besi',            atom: [['Fe', 0, 0]], muatan: 0 },
-    'h2':   { label: 'H₂ — molekul unsur',        atom: [['H', -22, 0], ['H', 22, 0]], muatan: 0, ikat: [[0, 1]] },
-    'o2':   { label: 'O₂ — molekul unsur',        atom: [['O', -26, 0], ['O', 26, 0]], muatan: 0, ikat: [[0, 1]] },
-    'p4':   { label: 'P₄ — molekul unsur',        atom: [['P', 0, -28], ['P', -28, 18], ['P', 28, 18], ['P', 0, 6]], muatan: 0,
-              ikat: [[0, 1], [0, 2], [1, 2], [0, 3], [1, 3], [2, 3]] },
-    'h2o':  { label: 'H₂O — molekul senyawa',     atom: [['O', 0, -6], ['H', -30, 18], ['H', 30, 18]], muatan: 0, ikat: [[0, 1], [0, 2]] },
-    'co2':  { label: 'CO₂ — molekul senyawa',     atom: [['C', 0, 0], ['O', -40, 0], ['O', 40, 0]], muatan: 0, ikat: [[0, 1], [0, 2]] },
-    'nh3':  { label: 'NH₃ — molekul senyawa',     atom: [['N', 0, -8], ['H', -32, 18], ['H', 0, 30], ['H', 32, 18]], muatan: 0, ikat: [[0, 1], [0, 2], [0, 3]] },
-    'ch4':  { label: 'CH₄ — molekul senyawa',     atom: [['C', 0, 0], ['H', -32, -24], ['H', 32, -24], ['H', -32, 26], ['H', 32, 26]], muatan: 0,
-              ikat: [[0, 1], [0, 2], [0, 3], [0, 4]] },
-    'na+':  { label: 'Na⁺ — ion positif',         atom: [['Na', 0, 0]], muatan: 1 },
-    'cl-':  { label: 'Cl⁻ — ion negatif',         atom: [['Cl', 0, 0]], muatan: -1 },
-    'mg2+': { label: 'Mg²⁺ — ion positif',        atom: [['Mg', 0, 0]], muatan: 2 },
-    'oh-':  { label: 'OH⁻ — ion poliatom',        atom: [['O', -16, 0], ['H', 18, 0]], muatan: -1, ikat: [[0, 1]] },
-    'so42-':{ label: 'SO₄²⁻ — ion poliatom',      atom: [['S', 0, 0], ['O', 0, -36], ['O', 0, 36], ['O', -36, 0], ['O', 36, 0]], muatan: -2,
-              ikat: [[0, 1], [0, 2], [0, 3], [0, 4]] },
-    'nh4+': { label: 'NH₄⁺ — ion poliatom',       atom: [['N', 0, 0], ['H', -30, -24], ['H', 30, -24], ['H', -30, 26], ['H', 30, 26]], muatan: 1,
-              ikat: [[0, 1], [0, 2], [0, 3], [0, 4]] }
+  const JENIS = {
+    'atom': { n: 'Atom', w: 'aksen', ket: 'Bagian terkecil suatu unsur' },
+    'molekul-unsur': { n: 'Molekul unsur', w: 'biru', ket: 'Gabungan atom SEJENIS' },
+    'molekul-senyawa': { n: 'Molekul senyawa', w: 'warn', ket: 'Gabungan atom BERBEDA jenis' },
+    'ion': { n: 'Ion', w: 'danger', ket: 'Atom atau gugus yang bermuatan listrik' },
+    'kisi': { n: 'Senyawa ion', w: 'danger', ket: 'Kisi raksasa ion positif dan negatif' }
   };
 
-  const W = 790, H = 520;
+  function contoh(s) { return CONTOH[parseInt(s.get('c'), 10) || 0]; }
 
-  function jenisPartikel(p) {
-    const unsur = {};
-    p.atom.forEach(function (a) { unsur[a[0]] = true; });
-    const nUnsur = Object.keys(unsur).length;
-    if (p.muatan !== 0) return p.atom.length > 1 ? 'Ion poliatom' : 'Ion monoatom';
-    if (p.atom.length === 1) return 'Atom';
-    return nUnsur === 1 ? 'Molekul unsur' : 'Molekul senyawa';
-  }
+  return {
+    latar: 0x080e14,
+    kamera: { jarak: 6.6, phi: 1.2, theta: 0.6, targetY: 0.1, lajuPutar: 0.26 },
 
-  function penjelasan(jenis) {
-    return {
-      'Atom': 'Partikel terkecil suatu unsur yang masih memiliki sifat unsur itu. Berdiri sendiri, tidak bermuatan.',
-      'Molekul unsur': 'Gabungan dua atau lebih atom dari unsur yang SAMA. Tidak bermuatan.',
-      'Molekul senyawa': 'Gabungan atom dari unsur yang BERBEDA. Tidak bermuatan.',
-      'Ion monoatom': 'Atom tunggal yang melepas atau menerima elektron sehingga bermuatan listrik.',
-      'Ion poliatom': 'Gabungan beberapa atom yang secara keseluruhan bermuatan listrik.'
-    }[jenis];
-  }
-
-  function siapkan(sim) {
-    sim.data.putar = 0;
-    sim.data.sorot = -1;
-  }
-
-  Sim.create({
-    title: 'Partikel Materi: Atom, Molekul, dan Ion',
-    subtitle: 'Semua materi tersusun dari partikel yang sangat kecil. Pilih partikelnya, periksa atom penyusunnya, dan pelajari cara menggolongkannya.',
-    fase: 'D', jenjang: 'SMP Kelas 7–9',
-    topik: ['Partikel Materi', 'Atom'],
-    stage: { w: W, h: H },
-    stageNote: 'Arahkan kursor ke atom untuk melihat lambangnya',
-
-    controls: [
-      {
-        title: 'Partikel yang ditampilkan',
-        items: [
-          { type: 'select', id: 'partikel', value: 'h2o', label: 'Pilih partikel',
-            options: Object.keys(CONTOH).map(function (k) {
-              return { value: k, label: CONTOH[k].label }; }) }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'nama', value: true, label: 'Tampilkan nama unsur' },
-          { type: 'toggle', id: 'ikatan', value: true, label: 'Tampilkan ikatan' },
-          { type: 'toggle', id: 'putar', value: true, label: 'Putar perlahan' },
-          { type: 'slider', id: 'zoom', value: 1.5, min: 0.8, max: 2.4, step: 0.1,
-            label: 'Perbesaran', unit: '×', dec: 1 }
-        ]
-      },
-      {
-        title: 'Pohon penggolongan',
-        items: [
-          { type: 'toggle', id: 'pohon', value: true, label: 'Tampilkan alur penggolongan',
-            hint: 'Tiga pertanyaan berurutan yang menentukan jenis partikel.' }
-        ]
-      }
+    kendali: [
+      { judul: 'Partikel', isi: [
+        { type: 'select', id: 'c', value: 4, label: 'Contoh partikel',
+          options: CONTOH.map(function (c, i) { return { value: i, label: c.n }; }) }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'segment', id: 'gaya', value: 'bola', label: 'Gaya gambar', options: [
+          { value: 'bola', label: 'Bola' },
+          { value: 'tongkat', label: 'Bola-tongkat' },
+          { value: 'kerangka', label: 'Kerangka' }
+        ]},
+        { type: 'toggle', id: 'label', value: true, label: 'Tampilkan lambang atom' },
+        { type: 'toggle', id: 'getar', value: true, label: 'Partikel bergetar' },
+        { type: 'slider', id: 'besar', value: 1, min: 0.5, max: 1.8, step: 0.05,
+          label: 'Ukuran atom', unit: '×', dec: 2 }
+      ]},
+      { judul: 'Kisi NaCl', isi: [
+        { type: 'slider', id: 'kisi', value: 3, min: 2, max: 5, step: 1,
+          label: 'Ukuran kisi', unit: '³ ion', dec: 0 },
+        { type: 'toggle', id: 'potong', value: false, label: 'Belah kisi agar terlihat dalamnya' }
+      ]}
     ],
 
-    readouts: [
-      { id: 'jenis', label: 'Jenis partikel', tone: 'accent' },
+    baca: [
+      { id: 'jenis', label: 'Golongan', tone: 'aksen' },
+      { id: 'arti', label: 'Artinya' },
       { id: 'atom', label: 'Jumlah atom' },
-      { id: 'unsur', label: 'Jenis unsur' },
-      { id: 'muatan', label: 'Muatan' }
+      { id: 'unsur', label: 'Jenis unsur' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
+    bangun: function (s) {
+      s.data.wadah = new T.Group();
+      s.tambah(s.data.wadah);
 
-    onPointerMove: function (sim, x, y) {
-      const p = CONTOH[sim.get('partikel')];
-      const z = sim.get('zoom');
-      const cx = 250, cy = 230;
-      sim.data.sorot = -1;
-      p.atom.forEach(function (a, i) {
-        const r = Math.max(13, C.jariAtom(a[0]) * 0.17) * z;
-        const ang = sim.data.putar;
-        const ax = cx + (a[1] * Math.cos(ang) - a[2] * Math.sin(ang)) * z;
-        const ay = cy + (a[1] * Math.sin(ang) + a[2] * Math.cos(ang)) * z;
-        if (Math.hypot(ax - x, ay - y) < r) sim.data.sorot = i;
-      });
+      const lbl = S.teks('', { skala: 0.42, lebar: 20, warna: '#d8e4ec' });
+      lbl.position.set(0, 2.9, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
     },
 
-    update: function (sim, dt) {
-      if (sim.get('putar')) sim.data.putar += dt * 0.22;
-    },
+    ubah: function (s) { pasang(s); },
 
-    draw: function (c, sim) {
-      const p = CONTOH[sim.get('partikel')];
-      const z = sim.get('zoom');
-      const ang = sim.data.putar;
-      const cx = 250, cy = 230;
-      const jenis = jenisPartikel(p);
-
-      /* ---------- panggung partikel ---------- */
-      D.roundRect(c, 36, 60, 420, 400, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PARTIKEL', 56, 82, { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, p.label, 56, 106, { size: 18, weight: 700, color: P.text, base: 'middle' });
-
-      const pos = p.atom.map(function (a) {
-        return {
-          sym: a[0],
-          x: cx + (a[1] * Math.cos(ang) - a[2] * Math.sin(ang)) * z,
-          y: cy + (a[1] * Math.sin(ang) + a[2] * Math.cos(ang)) * z,
-          r: Math.max(13, C.jariAtom(a[0]) * 0.17) * z
-        };
-      });
-
-      // ikatan
-      if (sim.get('ikatan') && p.ikat) {
-        p.ikat.forEach(function (ik) {
-          const a = pos[ik[0]], b = pos[ik[1]];
-          D.line(c, a.x, a.y, b.x, b.y, 'rgba(255,255,255,.3)', 5.5);
-          D.line(c, a.x, a.y, b.x, b.y, 'rgba(255,255,255,.14)', 2.5);
+    langkah: function (s, dt) {
+      const w = s.data.wadah;
+      if (!s.get('getar')) return;
+      const c = contoh(s);
+      if (c.jenis === 'kisi') {
+        (s.data.ion || []).forEach(function (m, i) {
+          m.position.copy(m.userData.asal).add(new T.Vector3(
+            Math.sin(s.waktu * 7 + i * 1.7) * 0.018,
+            Math.sin(s.waktu * 8 + i * 2.3) * 0.018,
+            Math.cos(s.waktu * 7.5 + i) * 0.018));
+        });
+      } else {
+        (s.data.bola || []).forEach(function (m, i) {
+          m.position.copy(m.userData.asal).add(new T.Vector3(
+            Math.sin(s.waktu * 9 + i * 1.9) * 0.022,
+            Math.sin(s.waktu * 10 + i * 2.6) * 0.022,
+            Math.cos(s.waktu * 9.5 + i * 1.3) * 0.022));
+        });
+        (s.data.ik || []).forEach(function (b) {
+          b.userData.perbarui(b.userData.a.position, b.userData.b.position);
         });
       }
+    },
 
-      // atom
-      pos.forEach(function (a, i) {
-        const warna = C.warnaAtom(a.sym);
-        if (i === sim.data.sorot) {
-          D.circle(c, a.x, a.y, a.r + 7, D.alpha(P.accent, 0.2));
+    bacaUbah: function (s) {
+      const c = contoh(s);
+      const j = JENIS[c.jenis];
+      s.baca('jenis', j.n, j.w);
+      s.baca('arti', j.ket);
+      if (c.jenis === 'kisi') {
+        const n = Math.round(s.get('kisi'));
+        s.baca('atom', n * n * n + ' ion');
+        s.baca('unsur', '2 (Na dan Cl)');
+      } else {
+        s.baca('atom', c.atom.length + ' atom');
+        const u = {};
+        c.atom.forEach(function (a) { u[a[0]] = 1; });
+        const d = Object.keys(u);
+        s.baca('unsur', d.length + ' (' + d.join(', ') + ')');
+      }
+    }
+  };
+
+  function pasang(s) {
+    const c = contoh(s);
+    const w = s.data.wadah;
+    while (w.children.length) { const x = w.children.pop(); S.buangObjek(x); }
+    s.data.bola = []; s.data.ik = []; s.data.ion = [];
+
+    const gaya = s.get('gaya');
+    const besar = s.get('besar');
+    const skalaAtom = gaya === 'bola' ? besar : gaya === 'tongkat' ? besar * 0.42 : besar * 0.16;
+
+    if (c.jenis === 'kisi') {
+      const n = Math.round(s.get('kisi'));
+      const jarak = 1.05 * besar;
+      for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) for (let z = 0; z < n; z++) {
+        if (s.get('potong') && x + y + z > n) continue;
+        const na = (x + y + z) % 2 === 0;
+        const m = S.atom(na ? 'Na' : 'Cl', null, { skala: (na ? 0.62 : 0.95) * besar * 0.85 });
+        m.position.set(
+          (x - (n - 1) / 2) * jarak,
+          (y - (n - 1) / 2) * jarak,
+          (z - (n - 1) / 2) * jarak);
+        m.userData.asal = m.position.clone();
+        w.add(m);
+        s.data.ion.push(m);
+        if (s.get('label')) {
+          const t = S.teks(na ? 'Na⁺' : 'Cl⁻', { skala: 0.2, latar: false,
+            warna: na ? '#c9a8f0' : '#9fe8ad', depthTest: false });
+          t.position.copy(m.position);
+          t.renderOrder = 10;
+          w.add(t);
         }
-        D.atom(c, a.x, a.y, a.r, warna, a.sym, { size: a.r * 0.9 });
-        if (sim.get('nama') && C.bySym[a.sym]) {
-          D.text(c, C.bySym[a.sym].nama, a.x, a.y + a.r + 13,
-            { size: 10.5, weight: 600, color: P.dim, align: 'c', base: 'middle' });
+      }
+      // garis kisi
+      const kisiGeo = new T.BoxGeometry(jarak * (n - 1), jarak * (n - 1), jarak * (n - 1));
+      const rangka = new T.LineSegments(new T.EdgesGeometry(kisiGeo),
+        new T.LineBasicMaterial({ color: 0x4fd1c0, transparent: true, opacity: 0.22 }));
+      w.add(rangka);
+      kisiGeo.dispose();
+      s.orbit.set({ jarak: 3.2 + n * 1.5 });
+    } else {
+      const pos = c.atom.map(function (a) { return new T.Vector3(a[1], a[2], a[3] || 0); });
+      c.atom.forEach(function (a, i) {
+        const m = S.atom(a[0], null, { skala: skalaAtom });
+        m.position.copy(pos[i]);
+        m.userData.asal = pos[i].clone();
+        w.add(m);
+        s.data.bola.push(m);
+        if (s.get('label')) {
+          const u = S.UNSUR[a[0]] || S.UNSUR.X;
+          const warna = new T.Color(u.w);
+          const terang = (0.299 * warna.r + 0.587 * warna.g + 0.114 * warna.b) > 0.55;
+          const t = S.teks(a[0] + (c.muatan ? (c.muatan > 0 ? '⁺' : '⁻') : ''),
+            { skala: 0.26, latar: false, warna: terang ? '#12181d' : '#ffffff', depthTest: false });
+          t.position.copy(pos[i]);
+          t.renderOrder = 10;
+          w.add(t);
         }
       });
-
-      // muatan
-      if (p.muatan !== 0) {
-        const tanda = (Math.abs(p.muatan) > 1 ? Math.abs(p.muatan) : '') + (p.muatan > 0 ? '+' : '−');
-        const bx = 400, by = 150;
-        D.circle(c, bx, by, 22,
-          D.alpha(p.muatan > 0 ? '#ef6a52' : '#5b9bf5', 0.2),
-          p.muatan > 0 ? '#ef6a52' : '#5b9bf5', 2);
-        D.text(c, tanda, bx, by,
-          { size: 18, weight: 800, color: p.muatan > 0 ? '#ef6a52' : '#5b9bf5', align: 'c', base: 'middle' });
-        D.text(c, p.muatan > 0 ? 'melepas ' + Math.abs(p.muatan) + ' elektron'
-          : 'menerima ' + Math.abs(p.muatan) + ' elektron',
-          bx, by + 34, { size: 10.5, weight: 600, color: P.dim, align: 'c', base: 'middle' });
-      }
-
-      // keterangan atom yang disorot
-      if (sim.data.sorot >= 0) {
-        const a = pos[sim.data.sorot];
-        const e = C.bySym[a.sym];
-        if (e) {
-          D.roundRect(c, 56, 396, 240, 48, 8, 'rgba(0,0,0,.4)', 'rgba(255,255,255,.2)', 1.2);
-          D.text(c, e.sym + ' — ' + e.nama, 70, 414,
-            { size: 13.5, weight: 700, color: C.warnaAtom(a.sym), base: 'middle' });
-          D.text(c, 'nomor atom ' + e.Z + ' · massa ' + Sim.fmt(e.massa, 2) + ' g/mol',
-            70, 432, { size: 11, weight: 500, color: P.dim, base: 'middle' });
-        }
-      }
-
-      /* ---------- pohon penggolongan ---------- */
-      if (sim.get('pohon')) {
-        const TX = 476, TW = 282;
-        D.roundRect(c, TX, 60, TW, 400, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'CARA MENGGOLONGKAN', TX + 18, 82,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-        const unsurSet = {};
-        p.atom.forEach(function (a) { unsurSet[a[0]] = true; });
-        const nUnsur = Object.keys(unsurSet).length;
-
-        const langkah = [
-          { tanya: 'Apakah bermuatan listrik?',
-            jawab: p.muatan !== 0 ? 'Ya' : 'Tidak',
-            ya: p.muatan !== 0 },
-          { tanya: 'Terdiri dari berapa atom?',
-            jawab: p.atom.length === 1 ? 'Satu atom' : p.atom.length + ' atom',
-            ya: p.atom.length > 1 },
-          { tanya: 'Berapa jenis unsurnya?',
-            jawab: nUnsur === 1 ? 'Satu jenis' : nUnsur + ' jenis',
-            ya: nUnsur > 1 }
-        ];
-
-        langkah.forEach(function (l, i) {
-          const y = 118 + i * 84;
-          D.roundRect(c, TX + 18, y, TW - 36, 62, 9,
-            'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.2);
-          D.text(c, (i + 1) + '. ' + l.tanya, TX + 32, y + 20,
-            { size: 12, weight: 600, color: P.dim, base: 'middle' });
-          D.roundRect(c, TX + 32, y + 32, D.measure(c, l.jawab, { size: 13, weight: 700 }) + 22, 22, 11,
-            D.alpha(P.accent, 0.18));
-          D.text(c, l.jawab, TX + 43, y + 43,
-            { size: 13, weight: 700, color: P.accent2, base: 'middle' });
-          if (i < 2) {
-            D.arrow(c, TX + TW / 2, y + 62, TX + TW / 2, y + 80, 'rgba(255,255,255,.22)', 2, 7);
-          }
+      (c.ikatan || []).forEach(function (b) {
+        const g = S.ikatan(pos[b[0]], pos[b[1]], {
+          orde: b[2], tebal: gaya === 'kerangka' ? 0.055 : 0.085
         });
+        g.userData.a = s.data.bola[b[0]];
+        g.userData.b = s.data.bola[b[1]];
+        w.add(g);
+        s.data.ik.push(g);
+      });
 
-        // kesimpulan
-        D.roundRect(c, TX + 18, 374, TW - 36, 70, 10,
-          'rgba(79,209,192,.14)', P.accent, 1.6);
-        D.text(c, 'KESIMPULAN', TX + 32, 392,
-          { size: 10, weight: 700, color: P.accent, base: 'middle' });
-        D.text(c, jenis, TX + 32, 414,
-          { size: 16, weight: 700, color: P.accent2, base: 'middle' });
-        D.text(c, p.atom.length + ' atom · ' + nUnsur + ' jenis unsur · muatan ' +
-          (p.muatan === 0 ? 'nol' : (p.muatan > 0 ? '+' : '') + p.muatan),
-          TX + 32, 432, { size: 11, weight: 500, color: P.dim, base: 'middle' });
+      // awan muatan untuk ion
+      if (c.muatan) {
+        const aura = new T.Mesh(new T.SphereGeometry(1, 36, 24),
+          new T.MeshBasicMaterial({
+            color: c.muatan > 0 ? 0xef6a52 : 0x5b9bf5,
+            transparent: true, opacity: 0.12, side: T.BackSide
+          }));
+        aura.scale.setScalar((S.UNSUR[c.atom[0][0]] || S.UNSUR.X).r * skalaAtom * 2.1);
+        w.add(aura);
       }
+      s.orbit.set({ jarak: c.atom.length > 3 ? 6.4 : 5.2 });
+    }
 
-      /* ---------- penjelasan ---------- */
-      D.roundRect(c, 36, 472, W - 72, 34, 8, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', 1.1);
-      D.text(c, penjelasan(jenis), 54, 489,
-        { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-    },
-
-    readoutsUpdate: function (sim) {
-      const p = CONTOH[sim.get('partikel')];
-      const unsurSet = {};
-      p.atom.forEach(function (a) { unsurSet[a[0]] = true; });
-      sim.readout('jenis', jenisPartikel(p));
-      sim.readout('atom', p.atom.length);
-      sim.readout('unsur', Object.keys(unsurSet).length);
-      sim.readout('muatan', p.muatan === 0 ? 'netral'
-        : (p.muatan > 0 ? '+' : '') + p.muatan,
-        p.muatan === 0 ? null : 'warn');
-    },
-
-    notes: `
-      <p>Materi tidak dapat dibagi terus-menerus tanpa batas. Pada suatu titik kita
-      sampai pada <strong>partikel</strong> terkecil yang masih memiliki sifat zat itu.
-      Ada tiga jenis partikel penyusun materi.</p>
-
-      <h3>Atom</h3>
-      <p>Partikel terkecil dari suatu <strong>unsur</strong>. Atom bersifat netral karena
-      jumlah proton (muatan positif) sama dengan jumlah elektron (muatan negatif).
-      Beberapa unsur memang berdiri sebagai atom tunggal, misalnya gas mulia (He, Ne, Ar)
-      dan sebagian besar logam (Fe, Cu, Na).</p>
-
-      <h3>Molekul</h3>
-      <p>Gabungan dua atom atau lebih yang terikat dan bersifat netral. Ada dua macam:</p>
-      <ul>
-        <li><strong>Molekul unsur</strong> — atom penyusunnya sejenis.
-            Contoh: H₂, O₂, N₂, Cl₂, P₄, S₈.</li>
-        <li><strong>Molekul senyawa</strong> — atom penyusunnya berbeda jenis.
-            Contoh: H₂O, CO₂, NH₃, CH₄, C₆H₁₂O₆.</li>
-      </ul>
-
-      <h3>Ion</h3>
-      <p>Atom atau kelompok atom yang <strong>bermuatan listrik</strong> karena melepas
-      atau menerima elektron.</p>
-      <ul>
-        <li><strong>Kation</strong> (ion positif) — melepas elektron. Contoh: Na⁺, Mg²⁺, Al³⁺.</li>
-        <li><strong>Anion</strong> (ion negatif) — menerima elektron. Contoh: Cl⁻, O²⁻, S²⁻.</li>
-        <li><strong>Ion poliatom</strong> — terdiri dari beberapa atom. Contoh: OH⁻, SO₄²⁻, NH₄⁺, NO₃⁻.</li>
-      </ul>
-
-      <div class="callout" data-tone="tip">
-        <strong>Tiga pertanyaan yang selalu berhasil</strong>
-        (1) Bermuatan atau netral? (2) Satu atom atau lebih? (3) Satu jenis unsur atau lebih?
-        Jawab berurutan, dan jenis partikelnya selalu ketemu.
-      </div>
-    `,
-
-    explore: [
-      'Bandingkan <strong>O₂</strong> dan <strong>CO₂</strong>. Keduanya terdiri dari beberapa atom — apa yang membedakannya?',
-      'Lihat <strong>Na⁺</strong> lalu <strong>Cl⁻</strong>. Mengapa yang satu bermuatan positif dan yang lain negatif?',
-      'Bandingkan <strong>NH₃</strong> dan <strong>NH₄⁺</strong>. Hanya beda satu atom H, tetapi golongannya berbeda. Mengapa?',
-      'Cari semua partikel di daftar yang tergolong molekul unsur. Ada berapa?'
-    ],
-
-    quiz: [
-      {
-        q: 'Partikel H₂O tergolong…',
-        options: ['Atom', 'Molekul unsur', 'Molekul senyawa', 'Ion poliatom'],
-        answer: 2,
-        explain: 'H₂O netral, terdiri dari 3 atom, dan tersusun dari dua jenis unsur berbeda (H dan O). Karena itu disebut molekul senyawa.'
-      },
-      {
-        q: 'Manakah yang merupakan molekul unsur?',
-        options: ['CO₂', 'P₄', 'NaCl', 'SO₄²⁻'],
-        answer: 1,
-        explain: 'P₄ terdiri dari empat atom fosforus — semuanya unsur yang sama — dan bersifat netral. Itulah ciri molekul unsur.'
-      },
-      {
-        q: 'Atom natrium melepaskan satu elektron. Partikel yang terbentuk adalah…',
-        options: ['Na⁻', 'Na⁺', 'Na₂', 'Na tetap netral'],
-        answer: 1,
-        explain: 'Melepas elektron berarti kehilangan satu muatan negatif, sehingga muatan positif proton menjadi berlebih satu. Terbentuklah ion Na⁺.'
-      },
-      {
-        q: 'Ion SO₄²⁻ disebut ion poliatom karena…',
-        options: [
-          'Muatannya dua',
-          'Terdiri dari lebih dari satu atom dan bermuatan',
-          'Mengandung oksigen',
-          'Berasal dari asam sulfat'
-        ],
-        answer: 1,
-        explain: 'Awalan "poli" berarti banyak. Ion poliatom adalah kelompok atom yang terikat dan secara keseluruhan membawa muatan listrik.'
-      }
-    ]
-  });
-})();
+    s.data.lbl.userData.ganti(c.n);
+  }
+})());

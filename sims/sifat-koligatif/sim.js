@@ -1,398 +1,449 @@
-/* Sifat Koligatif Larutan — Fase F
-   Larutkan zat elektrolit dan nonelektrolit, amati empat sifat koligatif
-   sekaligus beserta diagram fasenya. */
+/* Sifat Koligatif Larutan — Fase F — adegan 3D */
 
-(function () {
+Sim3D.daftar('sifat-koligatif', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 800, H = 600;
-
+  /* i = faktor van't Hoff ideal (jumlah partikel per rumus) */
   const ZAT = [
-    { n: 'Glukosa', r: 'C6H12O6', Mr: 180.16, i: 1, elek: false, ion: 1 },
-    { n: 'Urea', r: 'CO(NH2)2', Mr: 60.06, i: 1, elek: false, ion: 1 },
-    { n: 'Sukrosa', r: 'C12H22O11', Mr: 342.3, i: 1, elek: false, ion: 1 },
-    { n: 'Natrium klorida', r: 'NaCl', Mr: 58.44, i: 2, elek: true, ion: 2 },
-    { n: 'Kalsium klorida', r: 'CaCl2', Mr: 110.98, i: 3, elek: true, ion: 3 },
-    { n: 'Aluminium sulfat', r: 'Al2(SO4)3', Mr: 342.15, i: 5, elek: true, ion: 5 },
-    { n: 'Asam asetat', r: 'CH3COOH', Mr: 60.05, i: 1.013, elek: true, ion: 2, alfa: 0.013 }
+    { n: 'Glukosa C₆H₁₂O₆ (nonelektrolit)', i: 1, mr: 180.16, warna: 0xf0e8d4, el: false },
+    { n: 'Urea CO(NH₂)₂ (nonelektrolit)', i: 1, mr: 60.06, warna: 0xf2f2ee, el: false },
+    { n: 'Sukrosa C₁₂H₂₂O₁₁ (nonelektrolit)', i: 1, mr: 342.3, warna: 0xf0ecd8, el: false },
+    { n: 'NaCl (elektrolit, 2 ion)', i: 2, mr: 58.44, warna: 0xdfe8ee, el: true },
+    { n: 'KNO₃ (elektrolit, 2 ion)', i: 2, mr: 101.1, warna: 0xe8eef2, el: true },
+    { n: 'CaCl₂ (elektrolit, 3 ion)', i: 3, mr: 110.98, warna: 0xeaf0f4, el: true },
+    { n: 'MgSO₄ (elektrolit, 2 ion)', i: 2, mr: 120.37, warna: 0xe6eef2, el: true },
+    { n: 'Al₂(SO₄)₃ (elektrolit, 5 ion)', i: 5, mr: 342.15, warna: 0xf0f0ea, el: true },
+    { n: 'Na₃PO₄ (elektrolit, 4 ion)', i: 4, mr: 163.94, warna: 0xe4eef0, el: true }
   ];
 
-  function zatAktif(sim) { return ZAT[parseInt(sim.get('zat'), 10) || 0]; }
+  const PELARUT = [
+    { n: 'Air', kf: 1.86, kb: 0.52, tf: 0, tb: 100, mr: 18.02, rho: 1.0, warna: 0x4a9fd8 },
+    { n: 'Benzena', kf: 5.12, kb: 2.53, tf: 5.5, tb: 80.1, mr: 78.11, rho: 0.877, warna: 0xd0b070 },
+    { n: 'Etanol', kf: 1.99, kb: 1.22, tf: -114.6, tb: 78.4, mr: 46.07, rho: 0.789, warna: 0xa8d8c0 },
+    { n: 'Asam asetat', kf: 3.90, kb: 3.07, tf: 16.6, tb: 118.1, mr: 60.05, rho: 1.049, warna: 0xe0d8a0 }
+  ];
 
-  function hitung(sim) {
-    const z = zatAktif(sim);
-    const massa = sim.get('massa');       // gram zat terlarut
-    const air = sim.get('air');           // gram pelarut
-    const n = massa / z.Mr;
-    const kg = air / 1000;
-    const m = n / kg;                     // molalitas
-    const i = z.i;
+  function zat(s) { return ZAT[parseInt(s.get('z'), 10) || 0]; }
+  function pelarut(s) { return PELARUT[parseInt(s.get('pel'), 10) || 0]; }
 
-    const dTb = C.AIR.Kb * m * i;
-    const dTf = C.AIR.Kf * m * i;
-    const Tb = 100 + dTb;
-    const Tf = 0 - dTf;
+  function hitung(s) {
+    const z = zat(s), p = pelarut(s);
+    const gram = s.get('gram');
+    const mPel = s.get('pelarutG');      // gram pelarut
+    const alfa = z.el ? s.get('alfa') : 0;
+    const i = z.el ? 1 + (z.i - 1) * alfa : 1;
 
-    // fraksi mol pelarut untuk tekanan uap
-    const nAir = air / C.AIR.Mr;
-    const Xp = nAir / (nAir + n * i);
-    const P0 = 23.8;                      // mmHg pada 25 °C
-    const Plar = P0 * Xp;
+    const mol = gram / z.mr;
+    const molal = mol / (mPel / 1000);                 // mol/kg
+    const dTf = p.kf * molal * i;
+    const dTb = p.kb * molal * i;
+    const tf = p.tf - dTf;
+    const tb = p.tb + dTb;
 
-    // tekanan osmotik (anggap larutan encer, M ≈ m)
-    const osm = m * i * 0.08206 * 298;
+    // fraksi mol & tekanan uap (hukum Raoult)
+    const molPel = mPel / p.mr;
+    const xPel = molPel / (molPel + mol * i);
+    const p0 = 100;                                     // tekanan uap relatif pelarut murni
+    const pLar = xPel * p0;
 
-    return { z: z, n: n, m: m, i: i, dTb: dTb, dTf: dTf, Tb: Tb, Tf: Tf,
-      Xp: Xp, P0: P0, Plar: Plar, dP: P0 - Plar, osm: osm };
+    // tekanan osmotik pada 27 °C, anggap molaritas ≈ molalitas
+    const M = mol / ((mPel / p.rho) / 1000);
+    const osm = M * 0.0821 * 300.15 * i;
+
+    return { z: z, p: p, mol: mol, molal: molal, i: i, alfa: alfa,
+      dTf: dTf, dTb: dTb, tf: tf, tb: tb, xPel: xPel, pLar: pLar,
+      dP: p0 - pLar, M: M, osm: osm };
   }
 
-  function siapkan(sim) { sim.data.a = 0; }
+  return {
+    latar: 0x070c12,
+    kamera: { jarak: 13, phi: 1.04, theta: 0.62, targetY: 1.3, lajuPutar: 0.1 },
 
-  Sim.create({
-    title: 'Sifat Koligatif Larutan',
-    subtitle: 'Empat sifat ini hanya bergantung pada jumlah partikel terlarut, bukan jenisnya. Karena itu elektrolit yang terurai menjadi banyak ion berpengaruh jauh lebih besar.',
-    fase: 'F', jenjang: 'SMA Kelas 12',
-    topik: ['Koligatif', 'Faktor van \'t Hoff'],
-    stage: { w: W, h: H },
-    showPlay: false,
+    kendali: [
+      { judul: 'Larutan', isi: [
+        { type: 'select', id: 'z', value: 0, label: 'Zat terlarut',
+          options: ZAT.map(function (z, i) { return { value: i, label: z.n }; }) },
+        { type: 'slider', id: 'gram', value: 18, min: 0.5, max: 100, step: 0.5,
+          label: 'Massa zat terlarut', unit: ' g', dec: 1 },
+        { type: 'select', id: 'pel', value: 0, label: 'Pelarut',
+          options: PELARUT.map(function (p, i) { return { value: i, label: p.n }; }) },
+        { type: 'slider', id: 'pelarutG', value: 500, min: 50, max: 1000, step: 10,
+          label: 'Massa pelarut', unit: ' g', dec: 0 },
+        { type: 'slider', id: 'alfa', value: 1, min: 0, max: 1, step: 0.05,
+          label: 'Derajat ionisasi α (elektrolit)', unit: '', dec: 2 }
+      ]},
+      { judul: 'Yang diamati', isi: [
+        { type: 'segment', id: 'sifat', value: 'beku', label: 'Sifat koligatif', options: [
+          { value: 'beku', label: 'Titik beku' },
+          { value: 'didih', label: 'Titik didih' },
+          { value: 'uap', label: 'Tekanan uap' },
+          { value: 'osmosis', label: 'Osmosis' }
+        ]},
+        { type: 'toggle', id: 'banding', value: true, label: 'Bandingkan dengan pelarut murni' }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan diagram fase' },
+        { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan partikel terlarut' }
+      ]}
+    ],
 
-    controls: [
-      {
-        title: 'Larutan',
-        items: [
-          { type: 'select', id: 'zat', value: 0, label: 'Zat terlarut',
-            options: ZAT.map(function (z, i) {
-              return { value: i, label: z.n + ' (' + Sim.formula(z.r) + ')' }; }) },
-          { type: 'slider', id: 'massa', value: 18, min: 1, max: 100, step: 1,
-            label: 'Massa zat terlarut', unit: 'g', dec: 0 },
-          { type: 'slider', id: 'air', value: 1000, min: 100, max: 2000, step: 50,
-            label: 'Massa air', unit: 'g', dec: 0 }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'segment', id: 'panel', value: 'empat', label: 'Panel utama',
-            options: [
-              { value: 'empat', label: 'Empat sifat' },
-              { value: 'fase', label: 'Diagram fase' }
-            ] },
-          { type: 'toggle', id: 'banding', value: true, label: 'Bandingkan dengan nonelektrolit' },
-          { type: 'toggle', id: 'partikel', value: true, label: 'Tampilkan partikel terlarut' }
-        ]
+    baca: [
+      { id: 'molal', label: 'Kemolalan', tone: 'aksen' },
+      { id: 'i', label: 'Faktor van’t Hoff (i)' },
+      { id: 'beku', label: 'Titik beku' },
+      { id: 'didih', label: 'Titik didih' },
+      { id: 'uap', label: 'Tekanan uap relatif' },
+      { id: 'osm', label: 'Tekanan osmotik (27 °C)' }
+    ],
+
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 10, warna: 0x0b1118 }));
+
+      /* ---------- dua gelas: larutan & pelarut murni ---------- */
+      function unit(x, judul, warnaJudul) {
+        const g = new T.Group();
+        const gls = S.gelas({ r: 1.25, h: 2.0, level: 0.66, warna: 0x4a9fd8, opacity: 0.62 });
+        g.add(gls);
+        const t = S.teks(judul, { skala: 0.28, lebar: 18, warna: warnaJudul });
+        t.position.set(0, -0.5, 0);
+        g.add(t);
+        g.position.set(x, 0.05, 0);
+        g.userData.gls = gls;
+        return g;
       }
-    ],
+      const uL = unit(-2.3, 'larutan', '#f0a94a');
+      const uP = unit(2.3, 'pelarut murni', '#6fb6ff');
+      s.data.uL = uL; s.data.uP = uP;
+      s.tambah(uL); s.tambah(uP);
 
-    readouts: [
-      { id: 'm', label: 'Molalitas', tone: 'accent' },
-      { id: 'i', label: 'Faktor van\'t Hoff' },
-      { id: 'tb', label: 'Titik didih' },
-      { id: 'tf', label: 'Titik beku' }
-    ],
+      /* partikel zat terlarut di gelas larutan */
+      const pz = S.partikel(90, { r: 0.095, warna: 0xf0e8d4, kotak: { x: 1, y: 0.5, z: 1 } });
+      pz.position.set(-2.3, 0.75, 0);
+      pz.material.transparent = true;
+      pz.material.opacity = 0.92;
+      s.data.pz = pz;
+      s.tambah(pz);
 
-    setup: siapkan,
-    reset: siapkan,
-
-    draw: function (c, sim) {
-      const h = hitung(sim);
-      const z = h.z;
-
-      /* ---------- gelas + partikel ---------- */
-      const GX = 60, GY = 120, GW = 130, GH = 150;
-      D.beaker(c, GX, GY, GW, GH, 0.74, D.alpha('#4a9fd0', 0.55));
-
-      if (sim.get('partikel')) {
-        const nPartikel = Math.min(26, Math.round(h.m * h.i * 5) + 3);
-        for (let k = 0; k < nPartikel; k++) {
-          const seed = k * 79.7;
-          const x = GX + 16 + ((seed * 5.3) % (GW - 32));
-          const y = GY + 48 + ((seed * 3.7) % (GH - 62));
-          const px = x + Math.sin(sim.t * 0.8 + k) * 3;
-          const py = y + Math.cos(sim.t * 0.9 + k) * 3;
-          if (z.elek) {
-            const pos = k % h.i < 1 || k % 2 === 0;
-            D.circle(c, px, py, 5.5, pos ? '#ef6a52' : '#5b9bf5');
-            D.text(c, pos ? '+' : '−', px, py,
-              { size: 8, weight: 800, color: '#fff', align: 'c', base: 'middle' });
-          } else {
-            D.circle(c, px, py, 6.5, '#b795f0');
-          }
+      /* es yang terbentuk (titik beku) */
+      function esGroup(x) {
+        const g = new T.Group();
+        const butir = [];
+        for (let i = 0; i < 26; i++) {
+          const m = new T.Mesh(new T.OctahedronGeometry(1, 0),
+            new T.MeshPhysicalMaterial({ color: 0xdff0ff, roughness: 0.15, clearcoat: 0.9,
+              transparent: true, opacity: 0.8 }));
+          const sk = S.acak(0.1, 0.2);
+          m.scale.setScalar(sk);
+          m.userData.sk = sk;
+          const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 1.0;
+          m.position.set(Math.cos(a) * rr, 0.3 + Math.random() * 0.9, Math.sin(a) * rr);
+          m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+          m.visible = false;
+          g.add(m);
+          butir.push(m);
         }
+        g.position.set(x, 0.05, 0);
+        g.userData.butir = butir;
+        s.tambah(g);
+        return g;
       }
+      s.data.esL = esGroup(-2.3);
+      s.data.esP = esGroup(2.3);
 
-      D.text(c, z.n, GX + GW / 2, GY - 40,
-        { size: 16, weight: 700, color: P.text, align: 'c', base: 'middle' });
-      D.text(c, z.elek ? 'ELEKTROLIT' : 'NONELEKTROLIT', GX + GW / 2, GY - 20,
-        { size: 10.5, weight: 800, color: z.elek ? P.amber : P.violet, align: 'c', base: 'middle' });
-      D.text(c, Sim.fmt(sim.get('massa'), 0) + ' g dalam ' + Sim.fmt(sim.get('air'), 0) + ' g air',
-        GX + GW / 2, GY + GH + 20,
-        { size: 11, weight: 600, color: P.faint, align: 'c', base: 'middle' });
+      /* gelembung didih */
+      s.data.gelL = S.gelembung({ n: 40, sebar: 0.7, tinggi: 1.3, warna: 0xeaf4fa });
+      s.data.gelL.position.set(-2.3, 0.15, 0);
+      s.tambah(s.data.gelL);
+      s.data.gelP = S.gelembung({ n: 40, sebar: 0.7, tinggi: 1.3, warna: 0xeaf4fa });
+      s.data.gelP.position.set(2.3, 0.15, 0);
+      s.tambah(s.data.gelP);
 
-      // faktor van 't Hoff
-      D.roundRect(c, GX - 6, GY + GH + 36, GW + 12, 56, 10,
-        D.alpha(z.elek ? P.amber : P.violet, 0.12), z.elek ? P.amber : P.violet, 1.4);
-      D.text(c, 'Faktor van \'t Hoff', GX + GW / 2, GY + GH + 52,
-        { size: 10, weight: 600, color: P.faint, align: 'c', base: 'middle' });
-      D.text(c, 'i = ' + Sim.fmt(h.i, h.i % 1 === 0 ? 0 : 3), GX + GW / 2, GY + GH + 74,
-        { size: 20, weight: 700, color: z.elek ? P.amber : P.violet, align: 'c', base: 'middle', mono: true });
-
-      if (z.elek) {
-        const persamaan = z.r === 'NaCl' ? 'NaCl → Na⁺ + Cl⁻'
-          : z.r === 'CaCl2' ? 'CaCl₂ → Ca²⁺ + 2Cl⁻'
-          : z.r === 'Al2(SO4)3' ? 'Al₂(SO₄)₃ → 2Al³⁺ + 3SO₄²⁻'
-          : 'CH₃COOH ⇌ H⁺ + CH₃COO⁻';
-        D.text(c, persamaan, GX + GW / 2, GY + GH + 108,
-          { size: 11, weight: 650, color: P.dim, align: 'c', base: 'middle', mono: true });
-        D.text(c, z.alfa
-          ? 'i = 1 + (n−1)α = 1 + 1×' + Sim.fmt(z.alfa, 3)
-          : 'terurai menjadi ' + z.ion + ' ion',
-          GX + GW / 2, GY + GH + 126,
-          { size: 10, weight: 500, color: P.faint, align: 'c', base: 'middle' });
+      /* uap keluar (tekanan uap) */
+      function uapGroup(x) {
+        const p = S.partikel(60, { r: 0.09, warna: 0xdff0ff, kotak: { x: 0.9, y: 1.1, z: 0.9 } });
+        p.material.transparent = true;
+        p.material.opacity = 0.35;
+        p.position.set(x, 3.0, 0);
+        p.visible = false;
+        s.tambah(p);
+        return p;
       }
+      s.data.uapL = uapGroup(-2.3);
+      s.data.uapP = uapGroup(2.3);
 
-      /* ---------- panel utama ---------- */
-      if (sim.get('panel') === 'empat') {
-        const EX = 232, EW = 540;
-        D.text(c, 'EMPAT SIFAT KOLIGATIF', EX, 100,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
+      /* ---------- tabung osmosis (tabung-U dengan membran) ---------- */
+      const osm = new T.Group();
+      const kiri = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 3.4, 28, 1, true),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.17, side: T.DoubleSide, depthWrite: false }));
+      kiri.position.set(-0.75, 1.7, 0);
+      osm.add(kiri);
+      const kanan = kiri.clone();
+      kanan.position.set(0.75, 1.7, 0);
+      osm.add(kanan);
+      const bawah = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 1.5, 28, 1, true),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+          opacity: 0.17, side: T.DoubleSide, depthWrite: false }));
+      bawah.rotation.z = Math.PI / 2;
+      bawah.position.set(0, 0.2, 0);
+      osm.add(bawah);
 
-        const nonElek = hitung({
-          get: function (k) { return k === 'zat' ? 0 : sim.get(k); },
-          state: sim.state
-        });
-        // bandingkan pada molalitas sama tapi i = 1
-        const mSama = h.m;
-        const banding = {
-          dTb: C.AIR.Kb * mSama, dTf: C.AIR.Kf * mSama,
-          dP: 23.8 * (1 - (sim.get('air') / C.AIR.Mr) / ((sim.get('air') / C.AIR.Mr) + h.n)),
-          osm: mSama * 0.08206 * 298
-        };
+      const cairKi = new T.Mesh(new T.CylinderGeometry(0.39, 0.39, 1, 24),
+        S.matCairan(0xf0a94a, { opacity: 0.85 }));
+      const cairKa = new T.Mesh(new T.CylinderGeometry(0.39, 0.39, 1, 24),
+        S.matCairan(0x4a9fd8, { opacity: 0.85 }));
+      osm.add(cairKi); osm.add(cairKa);
+      s.data.cairKi = cairKi; s.data.cairKa = cairKa;
 
-        const sifat = [
-          { n: 'Penurunan tekanan uap', sim: 'ΔP', v: h.dP, u: 'mmHg', b: banding.dP,
-            rumus: 'ΔP = P° × Xterlarut', w: P.blue },
-          { n: 'Kenaikan titik didih', sim: 'ΔTb', v: h.dTb, u: '°C', b: banding.dTb,
-            rumus: 'ΔTb = Kb × m × i', w: P.amber },
-          { n: 'Penurunan titik beku', sim: 'ΔTf', v: h.dTf, u: '°C', b: banding.dTf,
-            rumus: 'ΔTf = Kf × m × i', w: P.accent },
-          { n: 'Tekanan osmotik', sim: 'π', v: h.osm, u: 'atm', b: banding.osm,
-            rumus: 'π = M × R × T × i', w: P.violet }
-        ];
+      const membran = new T.Mesh(new T.BoxGeometry(0.1, 0.8, 0.8),
+        new T.MeshStandardMaterial({ color: 0xd0d8e0, roughness: 0.6, transparent: true,
+          opacity: 0.6 }));
+      membran.position.set(0, 0.2, 0);
+      osm.add(membran);
+      const lblMem = S.teks('membran semipermeabel', { skala: 0.2, lebar: 26, warna: '#aebbc6' });
+      lblMem.position.set(0, -0.6, 0);
+      osm.add(lblMem);
 
-        sifat.forEach(function (s, idx) {
-          const x = EX + (idx % 2) * (EW / 2);
-          const y = 118 + Math.floor(idx / 2) * 124;
-          const w = EW / 2 - 14;
-          D.roundRect(c, x, y, w, 112, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-          D.text(c, s.n.toUpperCase(), x + 16, y + 20,
-            { size: 9.5, weight: 700, color: P.faint, base: 'middle' });
-          D.text(c, s.rumus, x + 16, y + 40,
-            { size: 11.5, weight: 650, color: s.w, base: 'middle', mono: true });
-          D.text(c, s.sim + ' = ' + Sim.fmt(s.v, 3) + ' ' + s.u, x + 16, y + 68,
-            { size: 17, weight: 700, color: s.w, base: 'middle', mono: true });
+      // panah aliran air melewati membran
+      const panahOsm = S.panah([0.45, 0.2, 0], [-0.45, 0.2, 0], { warna: 0x6fb6ff, tebal: 0.04 });
+      osm.add(panahOsm);
+      s.data.panahOsm = panahOsm;
 
-          if (sim.get('banding') && z.elek) {
-            D.text(c, 'bila nonelektrolit: ' + Sim.fmt(s.b, 3) + ' ' + s.u,
-              x + 16, y + 90, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-            // bilah perbandingan
-            const maks = Math.max(s.v, s.b) * 1.1;
-            D.roundRect(c, x + w - 76, y + 60, 60, 8, 4, 'rgba(255,255,255,.08)');
-            D.roundRect(c, x + w - 76, y + 60, 60 * (s.b / maks), 8, 4, 'rgba(255,255,255,.26)');
-            D.roundRect(c, x + w - 76, y + 72, 60, 8, 4, 'rgba(255,255,255,.08)');
-            D.roundRect(c, x + w - 76, y + 72, 60 * (s.v / maks), 8, 4, s.w);
-          }
-        });
+      osm.position.set(0, 0, 0);
+      osm.visible = false;
+      s.data.osm = osm;
+      s.tambah(osm);
 
+      /* termometer di tiap gelas */
+      function termo(x) {
+        const g = new T.Group();
+        const kaca = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 2.8, 18),
+          new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.06, transparent: true,
+            opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+        kaca.position.y = 1.4;
+        g.add(kaca);
+        const kolom = new T.Mesh(new T.CylinderGeometry(0.038, 0.038, 1, 14),
+          new T.MeshStandardMaterial({ color: 0xef4a3a, emissive: 0xef4a3a, emissiveIntensity: 0.45 }));
+        g.add(kolom);
+        g.userData.kolom = kolom;
+        const lbl = S.teks('', { skala: 0.26, lebar: 12, warna: '#ff8a6a' });
+        lbl.position.set(0, 3.1, 0);
+        g.add(lbl);
+        g.userData.lbl = lbl;
+        g.position.set(x, 0.2, 0.4);
+        s.tambah(g);
+        return g;
+      }
+      s.data.tL = termo(-1.45);
+      s.data.tP = termo(3.15);
+
+      /* panel diagram fase */
+      const g1 = S.panelGrafik({ w: 5.0, px: 720, py: 450 });
+      g1.position.set(0, 5.4, -1.8);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      const lbl = S.teks('', { skala: 0.36, lebar: 40, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.9, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
+    },
+
+    ubah: function (s, id) {
+      pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+    },
+
+    langkah: function (s, dt) {
+      const h = hitung(s);
+      const mode = s.get('sifat');
+      const banding = s.get('banding');
+
+      s.data.pz.userData.gerak(dt, 0.85);
+
+      // ---- titik beku: es muncul lebih dulu di pelarut murni ----
+      if (mode === 'beku') {
+        const siklus = (s.waktu * 0.22) % 1;              // suhu menurun berulang
+        const suhu = S.lerp(h.p.tf + 6, h.p.tf - Math.max(6, h.dTf + 4), siklus);
+        tampilEs(s.data.esP, suhu <= h.p.tf ? S.clamp((h.p.tf - suhu) / 4, 0, 1) : 0, banding);
+        tampilEs(s.data.esL, suhu <= h.tf ? S.clamp((h.tf - suhu) / 4, 0, 1) : 0, true);
+        setTermo(s.data.tL, suhu, h.p);
+        setTermo(s.data.tP, suhu, h.p);
+        s.data.gelL.userData.perbarui(dt, 0);
+        s.data.gelP.userData.perbarui(dt, 0);
+        s.data.uapL.visible = false; s.data.uapP.visible = false;
+      } else if (mode === 'didih') {
+        const siklus = (s.waktu * 0.22) % 1;
+        const suhu = S.lerp(h.p.tb - 8, h.p.tb + Math.max(8, h.dTb + 5), siklus);
+        tampilEs(s.data.esL, 0, false);
+        tampilEs(s.data.esP, 0, false);
+        s.data.gelP.userData.perbarui(dt, suhu >= h.p.tb && banding
+          ? S.clamp((suhu - h.p.tb) / 2, 0, 2) : 0);
+        s.data.gelL.userData.perbarui(dt, suhu >= h.tb
+          ? S.clamp((suhu - h.tb) / 2, 0, 2) : 0);
+        setTermo(s.data.tL, suhu, h.p);
+        setTermo(s.data.tP, suhu, h.p);
+        s.data.uapL.visible = false; s.data.uapP.visible = false;
+      } else if (mode === 'uap') {
+        tampilEs(s.data.esL, 0, false);
+        tampilEs(s.data.esP, 0, false);
+        s.data.gelL.userData.perbarui(dt, 0);
+        s.data.gelP.userData.perbarui(dt, 0);
+        // kerapatan uap sebanding tekanan uap
+        gerakUap(s, s.data.uapL, dt, h.pLar / 100, true);
+        gerakUap(s, s.data.uapP, dt, 1, banding);
+        setTermo(s.data.tL, 25, h.p);
+        setTermo(s.data.tP, 25, h.p);
       } else {
-        /* ---------- diagram fase ---------- */
-        const g = { x: 300, y: 118, w: 420, h: 240 };
-        const map = Plot.axes(c, {
-          x: g.x, y: g.y, w: g.w, h: g.h,
-          xmin: -12, xmax: 112, ymin: 0, ymax: 850,
-          xlabel: 'suhu (°C)', ylabel: 'tekanan (mmHg)',
-          judul: 'Diagram fase air dan larutan', xticks: 6, yticks: 4
+        // osmosis: tinggi kolom larutan naik
+        const naik = S.clamp(h.osm / 60, 0, 1);
+        const hKi = 1.2 + naik * 1.4;
+        const hKa = 1.2 - naik * 0.9;
+        s.data.cairKi.scale.y = hKi;
+        s.data.cairKi.position.set(-0.75, 0.2 + hKi / 2, 0);
+        s.data.cairKa.scale.y = Math.max(0.2, hKa);
+        s.data.cairKa.position.set(0.75, 0.2 + Math.max(0.2, hKa) / 2, 0);
+        s.data.panahOsm.scale.setScalar(0.6 + naik * 0.7);
+        s.data.panahOsm.children.forEach(function (m) {
+          m.material.emissiveIntensity = 0.2 + 0.4 * (0.5 + 0.5 * Math.sin(s.waktu * 4));
         });
-
-        // kurva tekanan uap air murni (perkiraan Antoine sederhana)
-        function Puap(T, faktor) {
-          return faktor * Math.exp(20.386 - 5132 / (T + 273.15));
-        }
-        const murni = [], larutan = [];
-        for (let T = -10; T <= 112; T += 1.2) {
-          murni.push([T, Puap(T, 1)]);
-          larutan.push([T, Puap(T, h.Xp)]);
-        }
-        Plot.line(c, map, murni, { color: '#5b9bf5', lw: 2.2 });
-        Plot.line(c, map, larutan, { color: P.amber, lw: 2.2, dash: [5, 4] });
-
-        // garis 760 mmHg
-        Plot.acuan(c, map, { y: 760, color: 'rgba(255,255,255,.3)', label: '760 mmHg (1 atm)' });
-
-        // titik didih
-        Plot.titik(c, map, 100, 760, { r: 4.5, color: '#5b9bf5', label: '100 °C' });
-        Plot.titik(c, map, h.Tb, 760, { r: 4.5, color: P.amber, label: Sim.fmt(h.Tb, 2) + ' °C' });
-
-        // garis beku
-        Plot.acuan(c, map, { x: 0, color: '#5b9bf5' });
-        Plot.acuan(c, map, { x: h.Tf, color: P.accent, label: 'beku ' + Sim.fmt(h.Tf, 2) + ' °C' });
-
-        Plot.legenda(c, g.x, g.y + g.h + 40, [
-          { label: 'air murni', warna: '#5b9bf5' },
-          { label: 'larutan', warna: P.amber, dash: [5, 4] }
-        ]);
-
-        D.roundRect(c, 300, 388, 420, 72, 10, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.2);
-        D.text(c, 'Zat terlarut menurunkan tekanan uap larutan. Akibatnya kurva bergeser ke bawah,',
-          316, 410, { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-        D.text(c, 'sehingga diperlukan suhu lebih tinggi untuk mencapai 760 mmHg (titik didih naik)',
-          316, 428, { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-        D.text(c, 'dan suhu lebih rendah untuk membeku (titik beku turun).',
-          316, 446, { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
       }
-
-      /* ---------- penerapan ---------- */
-      const PY = 478;
-      D.roundRect(c, 40, PY, W - 80, 96, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'PENERAPAN SEHARI-HARI', 58, PY + 20,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const terap = [
-        ['Garam di jalan bersalju', 'Menurunkan titik beku air sehingga es mencair'],
-        ['Antibeku radiator', 'Etilena glikol mencegah air membeku dan mendidih terlalu cepat'],
-        ['Mengawetkan dengan garam', 'Tekanan osmotik menarik air keluar dari sel bakteri'],
-        ['Cairan infus isotonik', 'Tekanan osmotiknya disamakan dengan darah agar sel tidak rusak']
-      ];
-      terap.forEach(function (t, i) {
-        const x = 58 + i * ((W - 140) / 4);
-        D.text(c, t[0], x, PY + 42, { size: 11.5, weight: 700, color: P.accent2, base: 'middle' });
-        const kata = t[1].split(' ');
-        let baris = [''];
-        kata.forEach(function (w) {
-          const coba = baris[baris.length - 1] ? baris[baris.length - 1] + ' ' + w : w;
-          if (D.measure(c, coba, { size: 10.5 }) > (W - 140) / 4 - 16) baris.push(w);
-          else baris[baris.length - 1] = coba;
-        });
-        baris.slice(0, 3).forEach(function (b, bi) {
-          D.text(c, b, x, PY + 60 + bi * 13,
-            { size: 10.5, weight: 500, color: P.dim, base: 'middle' });
-        });
-      });
     },
 
-    readoutsUpdate: function (sim) {
-      const h = hitung(sim);
-      sim.readout('m', Sim.fmt(h.m, 3) + '<span class="unit"> molal</span>');
-      sim.readout('i', Sim.fmt(h.i, h.i % 1 === 0 ? 0 : 3),
-        h.z.elek ? 'warn' : null);
-      sim.readout('tb', Sim.fmt(h.Tb, 2) + '<span class="unit"> °C</span>');
-      sim.readout('tf', Sim.fmt(h.Tf, 2) + '<span class="unit"> °C</span>');
-    },
+    bacaUbah: function (s) {
+      const h = hitung(s);
+      s.baca('molal', S.fmt(h.molal, 4) + ' mol/kg   (' + S.fmt(h.mol, 4) + ' mol zat)');
+      s.baca('i', h.z.el
+        ? S.fmt(h.i, 2) + '   (dari ' + h.z.i + ' ion, α = ' + S.fmt(h.alfa, 2) + ')'
+        : '1   (nonelektrolit, tidak terionisasi)',
+        h.z.el ? 'warn' : 'aksen');
+      s.baca('beku', S.fmt(h.tf, 3) + ' °C   (turun ' + S.fmt(h.dTf, 3)
+        + ' °C dari ' + S.fmt(h.p.tf, 1) + ' °C)', 'biru');
+      s.baca('didih', S.fmt(h.tb, 3) + ' °C   (naik ' + S.fmt(h.dTb, 3)
+        + ' °C dari ' + S.fmt(h.p.tb, 1) + ' °C)', 'warn');
+      s.baca('uap', S.fmt(h.pLar, 2) + ' %  dari pelarut murni   (turun '
+        + S.fmt(h.dP, 2) + ' %,  X pelarut = ' + S.fmt(h.xPel, 4) + ')');
+      s.baca('osm', S.fmt(h.osm, 3) + ' atm   (M = ' + S.fmt(h.M, 4) + ' mol/L)');
+      gambar(s);
+    }
+  };
 
-    notes: `
-      <p>Sifat koligatif adalah sifat larutan yang hanya bergantung pada
-      <strong>jumlah partikel zat terlarut</strong>, bukan pada jenisnya. Satu mol
-      glukosa dan satu mol urea memberi pengaruh yang persis sama, karena keduanya
-      menghasilkan jumlah partikel yang sama.</p>
+  function setTermo(g, suhu, p) {
+    const sk = S.clamp((suhu - (p.tf - 20)) / ((p.tb + 20) - (p.tf - 20)), 0.02, 1);
+    g.userData.kolom.scale.y = sk * 2.5;
+    g.userData.kolom.position.y = sk * 2.5 / 2;
+    const c = suhu < p.tf ? new T.Color(0x6fb6ff)
+      : suhu > p.tb ? new T.Color(0xef4a3a)
+        : new T.Color(0xf0a94a);
+    g.userData.kolom.material.color.copy(c);
+    g.userData.kolom.material.emissive.copy(c);
+    g.userData.lbl.userData.ganti(S.fmt(suhu, 1) + ' °C', '#' + c.getHexString());
+  }
 
-      <h3>Empat sifat koligatif</h3>
-      <span class="formula">1. Penurunan tekanan uap   ΔP = P° × Xterlarut
-2. Kenaikan titik didih   ΔTb = Kb × m × i
-3. Penurunan titik beku   ΔTf = Kf × m × i
-4. Tekanan osmotik        π = M × R × T × i
+  function tampilEs(g, f, tampil) {
+    const n = Math.round(S.clamp(f, 0, 1) * g.userData.butir.length);
+    g.userData.butir.forEach(function (m, i) {
+      m.visible = tampil && i < n;
+      m.rotation.y += 0.004;
+    });
+  }
 
-Untuk air:  Kb = 0,52 °C/molal   Kf = 1,86 °C/molal</span>
+  function gerakUap(s, p, dt, rapat, tampil) {
+    p.visible = tampil;
+    if (!tampil) return;
+    const d = p.userData.p;
+    const n = Math.round(S.clamp(rapat, 0, 1) * d.length);
+    for (let i = 0; i < d.length; i++) {
+      d[i].aktif = i < n;
+      if (!d[i].aktif) continue;
+      d[i].pos.y += dt * 0.45;
+      d[i].pos.x += Math.sin(s.waktu * 1.3 + i) * dt * 0.25;
+      if (d[i].pos.y > 1.1) d[i].pos.set(S.acak(-0.7, 0.7), -1.0, S.acak(-0.7, 0.7));
+    }
+    p.userData.tulis();
+  }
 
-      <h3>Mengapa keempatnya terjadi?</h3>
-      <p>Partikel zat terlarut <strong>menghalangi molekul air</strong> meninggalkan
-      permukaan dan menghalanginya menyusun diri menjadi kristal es. Akibatnya:</p>
-      <ul>
-        <li>Tekanan uap turun, karena lebih sedikit molekul air yang dapat menguap.</li>
-        <li>Titik didih naik, karena perlu suhu lebih tinggi agar tekanan uap mencapai
-            tekanan udara luar.</li>
-        <li>Titik beku turun, karena molekul air lebih sulit tersusun rapi menjadi es.</li>
-        <li>Timbul tekanan osmotik, karena air cenderung berpindah menuju larutan yang
-            lebih pekat melewati selaput semipermeabel.</li>
-      </ul>
+  function gambar(s) {
+    if (!s.data.g1 || !s.data.g1.visible) return;
+    const h = hitung(s);
+    const p = h.p;
 
-      <h3>Faktor van 't Hoff (i)</h3>
-      <p>Elektrolit terurai menjadi ion, sehingga <strong>jumlah partikelnya berlipat</strong>.
-      Faktor i menyatakan berapa kali lipat pengaruhnya dibanding nonelektrolit pada
-      molalitas sama.</p>
+    // diagram fase sederhana: kurva uap (Clausius-Clapeyron pendekatan) dan garis leleh
+    const uapMurni = [], uapLarutan = [];
+    for (let i = 0; i <= 90; i++) {
+      const Tc = p.tf - 15 + i / 90 * ((p.tb + 25) - (p.tf - 15));
+      // tekanan uap naik eksponensial terhadap suhu, 1 atm pada titik didih
+      const pr = Math.exp((Tc - p.tb) * 0.055);
+      uapMurni.push([Tc, Math.min(2.2, pr)]);
+      uapLarutan.push([Tc, Math.min(2.2, pr * h.xPel)]);
+    }
+    const lelehMurni = [[p.tf, 0], [p.tf - 0.4, 2.2]];
+    const lelehLarutan = [[h.tf, 0], [h.tf - 0.4, 2.2]];
 
-      <table>
-        <thead><tr><th>Zat</th><th>Penguraian</th><th>i</th></tr></thead>
-        <tbody>
-          <tr><td>Glukosa, urea</td><td>tidak terurai</td><td>1</td></tr>
-          <tr><td>NaCl</td><td>Na⁺ + Cl⁻</td><td>2</td></tr>
-          <tr><td>CaCl₂</td><td>Ca²⁺ + 2Cl⁻</td><td>3</td></tr>
-          <tr><td>Al₂(SO₄)₃</td><td>2Al³⁺ + 3SO₄²⁻</td><td>5</td></tr>
-        </tbody>
-      </table>
+    S.gambarGrafik(s.data.g1, {
+      judul: 'Diagram fase — larutan menggeser kedua batas',
+      xMin: p.tf - 15, xMax: p.tb + 25, yMin: 0, yMax: 2.2,
+      xLabel: 'suhu (°C)', yLabel: 'tekanan (atm)',
+      seri: [
+        { titik: uapMurni, warna: '#6fb6ff', tebal: 3, nama: 'pelarut murni' },
+        { titik: uapLarutan, warna: '#f0a94a', tebal: 3, nama: 'larutan' },
+        { titik: lelehMurni, warna: '#6fb6ff', tebal: 2, putus: true },
+        { titik: lelehLarutan, warna: '#f0a94a', tebal: 2, putus: true }
+      ],
+      garisY: [{ v: 1, warna: 'rgba(214,228,240,.5)', label: '1 atm' }],
+      titikTebal: [
+        { x: p.tb, y: 1, warna: '#6fb6ff', r: 6 },
+        { x: h.tb, y: 1, warna: '#f0a94a', r: 6 },
+        { x: p.tf, y: 0.02, warna: '#6fb6ff', r: 6 },
+        { x: h.tf, y: 0.02, warna: '#f0a94a', r: 6 }
+      ]
+    });
+  }
 
-      <p>Untuk elektrolit lemah yang hanya terionisasi sebagian:</p>
-      <span class="formula">i = 1 + (n − 1)α
-<span class="cmt">// n = jumlah ion, α = derajat ionisasi</span></span>
+  function pasang(s) {
+    const h = hitung(s);
+    const mode = s.get('sifat');
+    const banding = s.get('banding');
 
-      <p>Akibatnya, larutan NaCl 1 molal menurunkan titik beku <strong>dua kali lebih
-      banyak</strong> daripada larutan glukosa 1 molal, meski jumlah molnya sama.</p>
+    // warna cairan ikut pelarut
+    s.data.uL.userData.gls.userData.setLevel(0.66, h.p.warna);
+    s.data.uP.userData.gls.userData.setLevel(0.66, h.p.warna);
+    s.data.uL.userData.gls.userData.cair.material.opacity = 0.62;
+    s.data.uP.visible = banding && mode !== 'osmosis';
 
-      <h3>Molalitas, bukan molaritas</h3>
-      <p>Perhitungan koligatif memakai <strong>molalitas</strong> (mol per kilogram
-      pelarut), bukan molaritas. Alasannya: molalitas tidak berubah saat suhu berubah,
-      sedangkan molaritas berubah karena volume larutan memuai.</p>
+    // partikel terlarut
+    const d = s.data.pz.userData.p;
+    const n = Math.round(S.clamp(h.molal / 1.2, 0.12, 1) * d.length);
+    for (let i = 0; i < d.length; i++) {
+      if (!d[i].aktif && i < n) d[i].pos.set(S.acak(-0.9, 0.9), S.acak(-0.4, 0.4), S.acak(-0.9, 0.9));
+      d[i].aktif = i < n;
+    }
+    s.data.pz.material.color.setHex(h.z.warna);
+    s.data.pz.material.emissive.setHex(h.z.warna);
+    s.data.pz.userData.tulis();
+    s.data.pz.visible = s.get('partikel') && mode !== 'osmosis';
 
-      <div class="callout" data-tone="tip">
-        <strong>Mengapa CaCl₂ lebih dipilih daripada NaCl untuk mencairkan salju?</strong>
-        Pada massa yang sama, CaCl₂ menghasilkan tiga partikel per satuan rumus sedangkan
-        NaCl hanya dua. Penurunan titik bekunya lebih besar, sehingga tetap bekerja pada
-        suhu yang lebih rendah.
-      </div>
-    `,
+    // tampilan khusus osmosis
+    const os = mode === 'osmosis';
+    s.data.osm.visible = os;
+    s.data.uL.visible = !os;
+    s.data.tL.visible = !os && (mode === 'beku' || mode === 'didih');
+    s.data.tP.visible = !os && banding && (mode === 'beku' || mode === 'didih');
+    if (os) {
+      s.data.cairKi.material.color.setHex(h.z.warna === 0xf0e8d4 ? 0xf0a94a : 0xf0a94a);
+      s.data.cairKa.material.color.setHex(h.p.warna);
+      tampilEs(s.data.esL, 0, false);
+      tampilEs(s.data.esP, 0, false);
+      s.data.uapL.visible = false; s.data.uapP.visible = false;
+      s.data.gelL.visible = false; s.data.gelP.visible = false;
+    }
 
-    explore: [
-      'Bandingkan <strong>Glukosa</strong> dan <strong>NaCl</strong> dengan massa yang sama. Mengapa pengaruhnya berbeda?',
-      'Pilih <strong>CaCl₂</strong> lalu <strong>Al₂(SO₄)₃</strong>. Perhatikan nilai i dan akibatnya pada titik beku.',
-      'Buka <strong>Diagram fase</strong> dan amati pergeseran kurva tekanan uapnya.',
-      'Pilih <strong>Asam asetat</strong>. Mengapa nilai i-nya hanya 1,013 dan bukan 2?'
-    ],
-
-    quiz: [
-      {
-        q: 'Larutan NaCl 0,5 molal dan larutan glukosa 0,5 molal. Manakah yang titik bekunya lebih rendah?',
-        options: [
-          'Glukosa, karena molekulnya lebih besar',
-          'NaCl, karena terurai menjadi dua ion sehingga jumlah partikelnya dua kali lipat',
-          'Keduanya sama, karena molalitasnya sama',
-          'Tidak dapat ditentukan'
-        ],
-        answer: 1,
-        explain: 'Sifat koligatif bergantung pada jumlah partikel. NaCl terurai menjadi Na⁺ dan Cl⁻ sehingga i = 2, membuat penurunan titik bekunya dua kali lipat dibanding glukosa yang tidak terurai.'
-      },
-      {
-        q: 'Nilai faktor van \'t Hoff untuk Al₂(SO₄)₃ yang terionisasi sempurna adalah…',
-        options: ['2', '3', '5', '7'],
-        answer: 2,
-        explain: 'Al₂(SO₄)₃ → 2Al³⁺ + 3SO₄²⁻ menghasilkan total 2 + 3 = 5 ion per satuan rumus, sehingga i = 5.'
-      },
-      {
-        q: 'Mengapa perhitungan sifat koligatif memakai molalitas, bukan molaritas?',
-        options: [
-          'Karena molalitas lebih mudah dihitung',
-          'Karena molalitas tidak berubah ketika suhu berubah',
-          'Karena molaritas hanya untuk elektrolit',
-          'Karena molalitas selalu lebih besar'
-        ],
-        answer: 1,
-        explain: 'Molalitas dihitung terhadap massa pelarut yang tidak berubah oleh suhu. Molaritas dihitung terhadap volume larutan, yang memuai atau menyusut saat suhu berubah.'
-      },
-      {
-        q: 'Larutan dengan tekanan osmotik sama dengan cairan tubuh disebut…',
-        options: ['Hipertonik', 'Hipotonik', 'Isotonik', 'Jenuh'],
-        answer: 2,
-        explain: 'Larutan isotonik memiliki tekanan osmotik yang sama dengan cairan tubuh, sehingga tidak terjadi perpindahan air bersih ke dalam atau ke luar sel. Inilah prinsip pembuatan cairan infus.'
-      }
-    ]
-  });
-})();
+    s.data.g1.visible = s.get('grafik');
+    s.data.lbl.userData.ganti(h.z.n.split(' (')[0] + ' dalam ' + h.p.n
+      + '   —   ' + S.fmt(h.molal, 3) + ' molal');
+    gambar(s);
+  }
+})());

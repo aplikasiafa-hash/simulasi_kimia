@@ -1,373 +1,211 @@
-/* Unsur, Senyawa, dan Campuran — Fase D
-   Klasifikasikan dua belas materi lewat pohon keputusan sambil melihat
-   gambaran partikelnya pada tingkat mikroskopis. */
+/* Unsur, Senyawa, dan Campuran — Fase D — adegan 3D */
 
-(function () {
+Sim3D.daftar('unsur-senyawa-campuran', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  /* pola: daftar partikel yang digambar.
-     'A' = satu jenis atom, 'AB' = molekul dua unsur, dst. */
-  const MATERI = [
-    { nama: 'Gas oksigen', rumus: 'O2', gol: 'unsur', sub: 'Molekul unsur',
-      pola: [['O', 'O']], warna: ['#e0533d'],
-      cat: 'Hanya tersusun dari atom oksigen. Tidak dapat diuraikan lagi secara kimia.' },
-    { nama: 'Logam tembaga', rumus: 'Cu', gol: 'unsur', sub: 'Unsur logam',
-      pola: [['Cu']], warna: ['#c4703a'],
-      cat: 'Hanya satu jenis atom, tersusun sebagai kisi logam.' },
-    { nama: 'Gas helium', rumus: 'He', gol: 'unsur', sub: 'Unsur gas mulia',
-      pola: [['He']], warna: ['#d67ae0'],
-      cat: 'Atom tunggal yang stabil, tidak berikatan dengan atom lain.' },
-    { nama: 'Serbuk belerang', rumus: 'S8', gol: 'unsur', sub: 'Molekul unsur',
-      pola: [['S', 'S', 'S', 'S']], warna: ['#e8c84a'],
-      cat: 'Delapan atom belerang membentuk cincin. Tetap satu jenis unsur.' },
-    { nama: 'Air murni', rumus: 'H2O', gol: 'senyawa', sub: 'Senyawa molekuler',
-      pola: [['O', 'H', 'H']], warna: ['#e0533d', '#f0f2f4'],
-      cat: 'Hidrogen dan oksigen terikat dengan perbandingan tetap 2 : 1.' },
-    { nama: 'Garam dapur', rumus: 'NaCl', gol: 'senyawa', sub: 'Senyawa ion',
-      pola: [['Na', 'Cl']], warna: ['#8f72d8', '#5fcf5a'],
-      cat: 'Ion Na⁺ dan Cl⁻ tersusun berselang-seling membentuk kristal.' },
-    { nama: 'Gas karbon dioksida', rumus: 'CO2', gol: 'senyawa', sub: 'Senyawa molekuler',
-      pola: [['C', 'O', 'O']], warna: ['#3a4248', '#e0533d'],
-      cat: 'Satu atom karbon mengikat dua atom oksigen, selalu dengan perbandingan tetap.' },
-    { nama: 'Gula pasir', rumus: 'C12H22O11', gol: 'senyawa', sub: 'Senyawa molekuler',
-      pola: [['C', 'H', 'O']], warna: ['#3a4248', '#f0f2f4', '#e0533d'],
-      cat: 'Molekul besar dari karbon, hidrogen, dan oksigen dengan perbandingan tetap.' },
-    { nama: 'Udara', rumus: '—', gol: 'campuran', sub: 'Campuran homogen',
-      pola: [['N', 'N'], ['O', 'O'], ['Ar']], warna: ['#4a7fd8', '#e0533d', '#d67ae0'],
-      cat: 'Nitrogen 78%, oksigen 21%, sisanya gas lain. Perbandingannya bisa berubah.' },
-    { nama: 'Air laut', rumus: '—', gol: 'campuran', sub: 'Campuran homogen',
-      pola: [['O', 'H', 'H'], ['Na'], ['Cl']], warna: ['#e0533d', '#8f72d8', '#5fcf5a'],
-      cat: 'Air, garam, dan zat lain tercampur merata. Kadar garamnya berbeda-beda.' },
-    { nama: 'Air dan pasir', rumus: '—', gol: 'campuran', sub: 'Campuran heterogen',
-      pola: [['O', 'H', 'H'], ['Si']], warna: ['#e0533d', '#c8a070'],
-      cat: 'Batas antarkomponen terlihat jelas. Pasir mengendap di dasar.' },
-    { nama: 'Perunggu', rumus: '—', gol: 'campuran', sub: 'Campuran homogen (paduan)',
-      pola: [['Cu'], ['Sn']], warna: ['#c4703a', '#c3c6c9'],
-      cat: 'Paduan tembaga dan timah. Perbandingannya diatur sesuai kebutuhan.' }
+  const ZAT = [
+    { n: 'Gas oksigen (O₂)', jenis: 'unsur', pola: [{ a: ['O', 'O'], n: 34 }],
+      ket: 'Satu jenis atom saja' },
+    { n: 'Logam tembaga (Cu)', jenis: 'unsur', pola: [{ a: ['Cu'], n: 44 }],
+      ket: 'Atom sejenis tersusun rapat' },
+    { n: 'Gas helium (He)', jenis: 'unsur', pola: [{ a: ['He'], n: 40 }],
+      ket: 'Atom tunggal, tidak berikatan' },
+    { n: 'Air (H₂O)', jenis: 'senyawa', pola: [{ a: ['O', 'H', 'H'], n: 30 }],
+      ket: 'Perbandingan atom selalu tetap 2 : 1' },
+    { n: 'Karbon dioksida (CO₂)', jenis: 'senyawa', pola: [{ a: ['C', 'O', 'O'], n: 28 }],
+      ket: 'Satu karbon mengikat dua oksigen' },
+    { n: 'Garam dapur (NaCl)', jenis: 'senyawa', pola: [{ a: ['Na', 'Cl'], n: 34 }],
+      ket: 'Ion positif dan negatif berpasangan' },
+    { n: 'Udara', jenis: 'campuran', pola: [
+        { a: ['N', 'N'], n: 26 }, { a: ['O', 'O'], n: 8 }, { a: ['Ar'], n: 3 }],
+      ket: 'Beberapa zat bercampur, perbandingan bisa berubah' },
+    { n: 'Air garam', jenis: 'campuran', pola: [
+        { a: ['O', 'H', 'H'], n: 24 }, { a: ['Na'], n: 6 }, { a: ['Cl'], n: 6 }],
+      ket: 'Dua zat berbeda, masih bisa dipisahkan' },
+    { n: 'Kuningan (Cu + Zn)', jenis: 'campuran', pola: [
+        { a: ['Cu'], n: 30 }, { a: ['Zn'], n: 14 }],
+      ket: 'Campuran logam — perbandingan dapat diatur' }
   ];
 
-  const W = 790, H = 530;
+  const JENIS = {
+    unsur: { n: 'Unsur', w: 'aksen', nada: 0x4fd1c0,
+      ciri: ['Hanya satu jenis atom', 'Tidak bisa diuraikan lagi'] },
+    senyawa: { n: 'Senyawa', w: 'warn', nada: 0xf0a94a,
+      ciri: ['Dua jenis atom atau lebih, terikat', 'Perbandingan selalu tetap',
+        'Sifatnya berbeda dari penyusunnya'] },
+    campuran: { n: 'Campuran', w: 'danger', nada: 0xef6a52,
+      ciri: ['Beberapa zat, tidak terikat kimia', 'Perbandingan dapat berubah',
+        'Masih bisa dipisahkan secara fisika'] }
+  };
 
-  function siapkan(sim) {
-    sim.data.idx = 0;
-    sim.data.jawab = MATERI.map(function () { return null; });
-    sim.data.benar = 0; sim.data.dijawab = 0;
-    acakPartikel(sim);
-  }
+  function zat(s) { return ZAT[parseInt(s.get('z'), 10) || 0]; }
 
-  function acakPartikel(sim) {
-    const m = MATERI[parseInt(sim.get('materi'), 10) || 0];
-    const butir = [];
-    const n = 15;
-    for (let i = 0; i < n; i++) {
-      const pola = m.pola[i % m.pola.length];
-      butir.push({
-        x: Sim.rnd(0.1, 0.9), y: Sim.rnd(0.12, 0.88),
-        a: Sim.rnd(0, Math.PI * 2),
-        v: Sim.rnd(0.4, 1), pola: pola
-      });
-    }
-    sim.data.butir = butir;
-  }
+  return {
+    latar: 0x080e14,
+    kamera: { jarak: 8.8, phi: 1.12, theta: 0.58, targetY: 0.3, lajuPutar: 0.14 },
 
-  function jawab(sim, pilihan) {
-    const i = parseInt(sim.get('materi'), 10) || 0;
-    if (sim.data.jawab[i]) return;
-    sim.data.jawab[i] = pilihan;
-    sim.data.dijawab++;
-    if (pilihan === MATERI[i].gol) sim.data.benar++;
-  }
-
-  Sim.create({
-    title: 'Unsur, Senyawa, dan Campuran',
-    subtitle: 'Perbedaan ketiganya paling jelas terlihat pada tingkat partikel. Amati gambaran mikroskopisnya, lalu putuskan golongan materinya.',
-    fase: 'D', jenjang: 'SMP Kelas 7–9',
-    topik: ['Klasifikasi Materi'],
-    stage: { w: W, h: H },
-
-    controls: [
-      {
-        title: 'Materi yang diamati',
-        items: [
-          { type: 'select', id: 'materi', value: 0, label: 'Pilih materi',
-            options: MATERI.map(function (m, i) { return { value: i, label: (i + 1) + '. ' + m.nama }; }) },
-          { type: 'buttons', label: '', items: [
-            { label: '← Sebelumnya', onClick: function (sim) {
-              const i = parseInt(sim.get('materi'), 10) || 0;
-              sim.set('materi', String((i + MATERI.length - 1) % MATERI.length));
-            } },
-            { label: 'Berikutnya →', onClick: function (sim) {
-              const i = parseInt(sim.get('materi'), 10) || 0;
-              sim.set('materi', String((i + 1) % MATERI.length));
-            } }
-          ] }
-        ]
-      },
-      {
-        title: 'Golongkan materi ini',
-        items: [
-          { type: 'buttons', label: '', items: [
-            { label: 'Unsur', onClick: function (sim) { jawab(sim, 'unsur'); } },
-            { label: 'Senyawa', onClick: function (sim) { jawab(sim, 'senyawa'); } },
-            { label: 'Campuran', onClick: function (sim) { jawab(sim, 'campuran'); } }
-          ] },
-          { type: 'toggle', id: 'kunci', value: false, label: 'Tampilkan kunci jawaban' }
-        ]
-      },
-      {
-        title: 'Tampilan',
-        items: [
-          { type: 'toggle', id: 'gerak', value: true, label: 'Partikel bergerak' },
-          { type: 'toggle', id: 'pohon', value: true, label: 'Tampilkan pohon keputusan' },
-          { type: 'buttons', label: '', items: [
-            { label: 'Hapus jawaban', onClick: function (sim) {
-              sim.data.jawab = MATERI.map(function () { return null; });
-              sim.data.benar = 0; sim.data.dijawab = 0;
-            } }
-          ] }
-        ]
-      }
+    kendali: [
+      { judul: 'Zat', isi: [
+        { type: 'select', id: 'z', value: 3, label: 'Zat yang diamati',
+          options: ZAT.map(function (z, i) { return { value: i, label: z.n }; }) }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'toggle', id: 'wadah', value: true, label: 'Tampilkan wadah kaca' },
+        { type: 'toggle', id: 'gerak', value: true, label: 'Partikel bergerak' },
+        { type: 'toggle', id: 'sorot', value: false, label: 'Soroti satu partikel' },
+        { type: 'slider', id: 'laju', value: 1, min: 0.1, max: 3, step: 0.1,
+          label: 'Kecepatan gerak', unit: '×', dec: 1 },
+        { type: 'slider', id: 'besar', value: 1, min: 0.6, max: 1.6, step: 0.05,
+          label: 'Ukuran partikel', unit: '×', dec: 2 }
+      ]},
+      { judul: 'Tebak dulu', isi: [
+        { type: 'segment', id: 'tebak', value: 'belum', label: 'Menurutmu ini…', options: [
+          { value: 'belum', label: 'Belum' }, { value: 'unsur', label: 'Unsur' },
+          { value: 'senyawa', label: 'Senyawa' }, { value: 'campuran', label: 'Campuran' }
+        ]}
+      ]}
     ],
 
-    readouts: [
-      { id: 'gol', label: 'Golongan', tone: 'accent' },
-      { id: 'skor', label: 'Skor' },
-      { id: 'maju', label: 'Terjawab' }
+    baca: [
+      { id: 'jenis', label: 'Golongan', tone: 'aksen' },
+      { id: 'tebak', label: 'Tebakanmu' },
+      { id: 'partikel', label: 'Jenis partikel' },
+      { id: 'unsurN', label: 'Jenis atom' },
+      { id: 'ciri', label: 'Ciri utama' }
     ],
 
-    setup: siapkan,
-    reset: siapkan,
-    onChange: function (sim, id) { if (id === 'materi') acakPartikel(sim); },
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 8, y: -2.6, warna: 0x0e151d }));
 
-    update: function (sim, dt) {
-      if (!sim.get('gerak')) return;
-      sim.data.butir.forEach(function (b) {
-        b.x += Math.cos(b.a) * b.v * dt * 0.07;
-        b.y += Math.sin(b.a) * b.v * dt * 0.07;
-        if (b.x < 0.08 || b.x > 0.92) { b.a = Math.PI - b.a; b.x = Sim.clamp(b.x, 0.08, 0.92); }
-        if (b.y < 0.1 || b.y > 0.9) { b.a = -b.a; b.y = Sim.clamp(b.y, 0.1, 0.9); }
+      const geo = new T.BoxGeometry(4.2, 4.2, 4.2);
+      const kaca = new T.Mesh(geo, S.matKaca({ opacity: 0.08 }));
+      kaca.renderOrder = 3;
+      s.data.kaca = kaca;
+      s.tambah(kaca);
+      const rangka = new T.LineSegments(new T.EdgesGeometry(geo),
+        new T.LineBasicMaterial({ color: 0x4fd1c0, transparent: true, opacity: 0.32 }));
+      s.data.rangka = rangka;
+      s.tambah(rangka);
+
+      s.data.wadahP = new T.Group();
+      s.tambah(s.data.wadahP);
+
+      const lbl = S.teks('', { skala: 0.42, lebar: 20, warna: '#d8e4ec' });
+      lbl.position.set(0, 3.1, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
+    },
+
+    ubah: function (s, id) {
+      if (id === 'z') s.setDiam('tebak', 'belum');
+      if (id === 'wadah') { s.data.kaca.visible = s.get('wadah'); s.data.rangka.visible = s.get('wadah'); }
+      if (id === 'z' || id === 'besar') pasang(s);
+      if (id === 'sorot') sorotkan(s);
+    },
+
+    langkah: function (s, dt) {
+      if (!s.get('gerak')) return;
+      const laju = s.get('laju');
+      const L = 2.1;
+      (s.data.unit || []).forEach(function (u) {
+        u.g.position.addScaledVector(u.v, dt * laju);
+        ['x', 'y', 'z'].forEach(function (a) {
+          const b = L - u.r;
+          if (u.g.position[a] > b) { u.g.position[a] = b; u.v[a] *= -1; }
+          if (u.g.position[a] < -b) { u.g.position[a] = -b; u.v[a] *= -1; }
+        });
+        u.g.rotation.x += u.w.x * dt * laju;
+        u.g.rotation.y += u.w.y * dt * laju;
+        u.g.rotation.z += u.w.z * dt * laju;
       });
     },
 
-    draw: function (c, sim) {
-      const i = parseInt(sim.get('materi'), 10) || 0;
-      const m = MATERI[i];
-      const jawabUser = sim.data.jawab[i];
-      const tampilKunci = sim.get('kunci') || jawabUser;
+    bacaUbah: function (s) {
+      const z = zat(s);
+      const j = JENIS[z.jenis];
+      const tebak = s.get('tebak');
+      const buka = tebak !== 'belum';
+      s.baca('jenis', buka ? j.n : 'tebak dulu di panel', buka ? j.w : null);
+      s.baca('tebak', tebak === 'belum' ? '—'
+        : buka ? (tebak === z.jenis ? JENIS[tebak].n + ' — tepat ✓' : JENIS[tebak].n + ' — belum tepat') : tebak,
+        buka ? (tebak === z.jenis ? 'aksen' : 'danger') : null);
+      const satuan = z.pola.length > 1 ? z.pola.length + ' macam'
+        : z.pola[0].a.length > 1 ? 'molekul ' + z.pola[0].a.length + ' atom' : 'atom tunggal';
+      s.baca('partikel', satuan);
+      const u = {};
+      z.pola.forEach(function (p) { p.a.forEach(function (a) { u[a] = 1; }); });
+      s.baca('unsurN', Object.keys(u).length + ' (' + Object.keys(u).join(', ') + ')');
+      s.baca('ciri', buka ? j.ciri[0] : '—');
+    }
+  };
 
-      /* ---------- panggung mikroskopis ---------- */
-      const VX = 36, VY = 92, VW = 400, VH = 290;
-      D.roundRect(c, VX, VY, VW, VH, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'TAMPAK MIKROSKOPIS', VX + 18, VY - 22,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, m.nama + (m.rumus !== '—' ? '  ·  ' + Sim.formula(m.rumus) : ''),
-        VX, VY - 44, { size: 19, weight: 700, color: P.text, base: 'middle' });
-
-      c.save();
-      c.beginPath(); c.rect(VX + 4, VY + 4, VW - 8, VH - 8); c.clip();
-      sim.data.butir.forEach(function (b) {
-        const px = VX + b.x * VW, py = VY + b.y * VH;
-        if (b.pola.length === 1) {
-          const sym = b.pola[0];
-          D.atom(c, px, py, 13, C.warnaAtom(sym), sym, { size: 11 });
-        } else {
-          // molekul: atom pertama di tengah, sisanya mengelilingi
-          const pusat = b.pola[0];
-          for (let k = 1; k < b.pola.length; k++) {
-            const ang = b.a + (k - 1) / (b.pola.length - 1) * Math.PI * 1.5;
-            const ox = px + Math.cos(ang) * 17, oy = py + Math.sin(ang) * 17;
-            D.line(c, px, py, ox, oy, 'rgba(255,255,255,.3)', 3.4);
-          }
-          for (let k = 1; k < b.pola.length; k++) {
-            const ang = b.a + (k - 1) / (b.pola.length - 1) * Math.PI * 1.5;
-            const ox = px + Math.cos(ang) * 17, oy = py + Math.sin(ang) * 17;
-            D.atom(c, ox, oy, 10, C.warnaAtom(b.pola[k]), b.pola[k], { size: 9 });
-          }
-          D.atom(c, px, py, 13, C.warnaAtom(pusat), pusat, { size: 11 });
+  function sorotkan(s) {
+    const on = s.get('sorot');
+    (s.data.unit || []).forEach(function (u, i) {
+      u.g.traverse(function (m) {
+        if (!m.material || !m.material.opacity === undefined) return;
+        if (m.isMesh && m.material.transparent !== undefined) {
+          m.material.transparent = on && i !== 0;
+          m.material.opacity = on && i !== 0 ? 0.16 : 1;
+          m.material.depthWrite = !(on && i !== 0);
         }
       });
-      c.restore();
+    });
+  }
 
-      // keterangan jumlah jenis partikel
-      const jenisSet = {};
-      m.pola.forEach(function (p) { jenisSet[p.join('')] = true; });
-      D.roundRect(c, VX + 10, VY + VH - 34, 200, 24, 6, 'rgba(0,0,0,.4)');
-      D.text(c, Object.keys(jenisSet).length + ' jenis partikel berbeda terlihat',
-        VX + 22, VY + VH - 22, { size: 11.5, weight: 600, color: P.dim, base: 'middle' });
+  function pasang(s) {
+    const z = zat(s);
+    const w = s.data.wadahP;
+    while (w.children.length) { const c = w.children.pop(); S.buangObjek(c); }
+    s.data.unit = [];
+    const besar = s.get('besar');
 
-      /* ---------- pohon keputusan ---------- */
-      if (sim.get('pohon')) {
-        const TX = 456, TW = 300;
-        D.roundRect(c, TX, VY, TW, VH, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, 'POHON KEPUTUSAN', TX + 18, VY + 20,
-          { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-        const q = [
-          { t: 'Dapatkah dipisahkan secara fisika\n(disaring, diuapkan, didiamkan)?',
-            jawabBenar: m.gol === 'campuran' ? 'Ya → CAMPURAN' : 'Tidak → zat tunggal' },
-          { t: 'Dapatkah diuraikan menjadi\nzat lebih sederhana secara kimia?',
-            jawabBenar: m.gol === 'campuran' ? '—' : (m.gol === 'senyawa' ? 'Ya → SENYAWA' : 'Tidak → UNSUR') },
-          { t: 'Apakah perbandingan penyusunnya tetap?',
-            jawabBenar: m.gol === 'campuran' ? 'Tidak tetap' : 'Tetap' }
-        ];
-
-        q.forEach(function (qq, k) {
-          const y = VY + 48 + k * 78;
-          D.roundRect(c, TX + 18, y, TW - 36, 64, 9, 'rgba(255,255,255,.04)',
-            'rgba(255,255,255,.12)', 1.2);
-          qq.t.split('\n').forEach(function (baris, bi) {
-            D.text(c, baris, TX + 32, y + 18 + bi * 14,
-              { size: 11.5, weight: 600, color: P.dim, base: 'middle' });
+    z.pola.forEach(function (pola) {
+      for (let k = 0; k < pola.n; k++) {
+        const g = new T.Group();
+        const n = pola.a.length;
+        let r = 0.2;
+        if (n === 1) {
+          const m = S.atom(pola.a[0], null, { skala: besar * 0.62, seg: 20 });
+          g.add(m);
+          r = (S.UNSUR[pola.a[0]] || S.UNSUR.X).r * besar * 0.62;
+        } else if (n === 2) {
+          const d = 0.3 * besar;
+          const a = S.atom(pola.a[0], [-d, 0, 0], { skala: besar * 0.5, seg: 18 });
+          const b = S.atom(pola.a[1], [d, 0, 0], { skala: besar * 0.5, seg: 18 });
+          g.add(a, b, S.ikatan([-d, 0, 0], [d, 0, 0], { tebal: 0.05 * besar }));
+          r = d + 0.28 * besar;
+        } else {
+          // tiga atom: bentuk V atau linear
+          const linear = pola.a[0] === 'C';
+          const d = 0.34 * besar;
+          const pusat = S.atom(pola.a[0], [0, 0, 0], { skala: besar * 0.5, seg: 18 });
+          g.add(pusat);
+          [1, 2].forEach(function (i) {
+            const a = linear ? (i === 1 ? Math.PI : 0) : (i === 1 ? Math.PI * 0.72 : Math.PI * 0.28);
+            const pos = [Math.cos(a) * d, Math.sin(a) * d * (linear ? 0 : 1) - (linear ? 0 : 0.1), 0];
+            g.add(S.atom(pola.a[i], pos, { skala: besar * 0.38, seg: 16 }));
+            g.add(S.ikatan([0, 0, 0], pos, { tebal: 0.045 * besar, orde: linear ? 2 : 1 }));
           });
-          if (tampilKunci) {
-            D.text(c, qq.jawabBenar, TX + 32, y + 50,
-              { size: 12.5, weight: 700, color: P.accent2, base: 'middle' });
-          } else {
-            D.text(c, '— jawab sendiri —', TX + 32, y + 50,
-              { size: 12, weight: 500, color: P.faint, base: 'middle' });
-          }
+          r = d + 0.24 * besar;
+        }
+        g.position.set(S.acak(-1.8, 1.8), S.acak(-1.8, 1.8), S.acak(-1.8, 1.8));
+        g.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+        w.add(g);
+        s.data.unit.push({
+          g: g, r: r,
+          v: new T.Vector3(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1)).normalize().multiplyScalar(S.acak(0.3, 0.8)),
+          w: new T.Vector3(S.acak(-1, 1), S.acak(-1, 1), S.acak(-1, 1))
         });
       }
+    });
 
-      /* ---------- hasil & catatan ---------- */
-      D.roundRect(c, 36, 400, W - 72, 72, 12,
-        jawabUser
-          ? (jawabUser === m.gol ? 'rgba(111,207,127,.1)' : 'rgba(239,106,82,.1)')
-          : 'rgba(255,255,255,.04)',
-        jawabUser ? (jawabUser === m.gol ? P.green : P.red) : 'rgba(255,255,255,.12)', 1.4);
-
-      if (jawabUser) {
-        const benar = jawabUser === m.gol;
-        D.text(c, (benar ? '✓ Tepat — ' : '✗ Jawabanmu: ' + jawabUser + ' — ') +
-          m.gol.toUpperCase() + ' (' + m.sub + ')',
-          56, 424, { size: 15, weight: 700, color: benar ? P.green : P.red, base: 'middle' });
-        D.text(c, m.cat, 56, 448, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-      } else if (sim.get('kunci')) {
-        D.text(c, m.gol.toUpperCase() + ' — ' + m.sub, 56, 424,
-          { size: 15, weight: 700, color: P.accent2, base: 'middle' });
-        D.text(c, m.cat, 56, 448, { size: 12.5, weight: 500, color: P.dim, base: 'middle' });
-      } else {
-        D.text(c, 'Golongkan materi ini memakai tombol di panel kanan.', 56, 428,
-          { size: 14, weight: 600, color: P.dim, base: 'middle' });
-        D.text(c, 'Amati berapa jenis partikel yang terlihat dan apakah terikat atau terpisah.',
-          56, 450, { size: 12, weight: 500, color: P.faint, base: 'middle' });
-      }
-
-      /* ---------- deret kemajuan ---------- */
-      MATERI.forEach(function (mm, k) {
-        const x = 46 + k * 31;
-        const j = sim.data.jawab[k];
-        const aktif = k === i;
-        const warna = !j ? 'rgba(255,255,255,.12)' : (j === mm.gol ? P.green : P.red);
-        D.roundRect(c, x, 486, 24, 24, 5,
-          aktif ? D.alpha(P.accent, 0.2) : 'rgba(255,255,255,.04)',
-          aktif ? P.accent : warna, aktif ? 2 : 1.3);
-        D.text(c, String(k + 1), x + 12, 498,
-          { size: 11, weight: 700, align: 'c', base: 'middle',
-            color: aktif ? P.accent2 : (!j ? P.faint : warna) });
-      });
-    },
-
-    readoutsUpdate: function (sim) {
-      const i = parseInt(sim.get('materi'), 10) || 0;
-      const m = MATERI[i];
-      const tampil = sim.get('kunci') || sim.data.jawab[i];
-      sim.readout('gol', tampil ? m.gol : 'tersembunyi');
-      sim.readout('skor', sim.data.benar + ' / ' + MATERI.length);
-      sim.readout('maju', sim.data.dijawab + ' / ' + MATERI.length);
-    },
-
-    notes: `
-      <p>Semua materi dapat digolongkan dengan dua pertanyaan berurutan. Pertanyaan
-      pertama memisahkan <strong>zat tunggal</strong> dari <strong>campuran</strong>;
-      pertanyaan kedua memisahkan <strong>unsur</strong> dari <strong>senyawa</strong>.</p>
-
-      <h3>Unsur</h3>
-      <p>Zat tunggal yang <strong>tidak dapat diuraikan lagi</strong> menjadi zat yang
-      lebih sederhana dengan cara kimia biasa. Hanya tersusun dari satu jenis atom.
-      Sampai saat ini dikenal 118 unsur. Contoh: besi (Fe), oksigen (O₂), helium (He),
-      belerang (S₈).</p>
-
-      <p>Perhatikan: O₂ tetap unsur walaupun terdiri dari dua atom, karena kedua atomnya
-      sejenis.</p>
-
-      <h3>Senyawa</h3>
-      <p>Zat tunggal yang terbentuk dari <strong>dua unsur atau lebih</strong> melalui
-      reaksi kimia, dengan <strong>perbandingan massa yang tetap</strong>. Sifat senyawa
-      sangat berbeda dari unsur penyusunnya.</p>
-
-      <p>Contoh yang paling terkenal: natrium adalah logam yang meledak di air, klorin
-      adalah gas beracun. Tetapi gabungannya, NaCl, adalah garam dapur yang kita makan
-      setiap hari.</p>
-
-      <h3>Campuran</h3>
-      <p>Gabungan dua zat atau lebih yang <strong>tidak bereaksi</strong> dan
-      perbandingannya <strong>dapat berubah-ubah</strong>. Setiap komponen tetap
-      mempertahankan sifatnya dan dapat dipisahkan secara fisika.</p>
-      <ul>
-        <li><strong>Homogen</strong> — tercampur merata, batasnya tidak terlihat.
-            Contoh: udara, air garam, perunggu.</li>
-        <li><strong>Heterogen</strong> — batas antarkomponen terlihat.
-            Contoh: air dan pasir, minyak dan air, beton.</li>
-      </ul>
-
-      <div class="callout" data-tone="tip">
-        <strong>Petunjuk dari gambar partikel</strong>
-        Satu jenis bola → unsur. Satu jenis molekul dengan bola berbeda warna yang terikat
-        → senyawa. Beberapa jenis partikel berbeda yang berdampingan tanpa terikat → campuran.
-      </div>
-    `,
-
-    explore: [
-      'Bandingkan gambar partikel <strong>Gas oksigen</strong> dan <strong>Udara</strong>. Keduanya gas — apa bedanya?',
-      'Lihat <strong>Garam dapur</strong> lalu <strong>Air laut</strong>. Satu senyawa, satu campuran. Dari mana kita tahu?',
-      'Perhatikan <strong>Serbuk belerang (S₈)</strong>. Delapan atom, tetapi tetap unsur. Mengapa?',
-      'Kerjakan keduabelas materi tanpa membuka kunci. Berapa skormu?'
-    ],
-
-    quiz: [
-      {
-        q: 'Gas oksigen (O₂) tergolong unsur meskipun terdiri dari dua atom. Alasannya adalah…',
-        options: [
-          'Karena berwujud gas',
-          'Karena kedua atomnya berjenis sama',
-          'Karena jumlahnya hanya dua',
-          'Karena tidak berwarna'
-        ],
-        answer: 1,
-        explain: 'Unsur ditentukan oleh jenis atomnya, bukan jumlahnya. Karena kedua atom penyusun O₂ sama-sama oksigen, zat ini tetap tergolong unsur.'
-      },
-      {
-        q: 'Natrium adalah logam yang bereaksi hebat dengan air, klorin adalah gas beracun. Tetapi NaCl aman dimakan. Hal ini menunjukkan bahwa…',
-        options: [
-          'Sifat senyawa berbeda dari sifat unsur penyusunnya',
-          'Natrium dan klorin sebenarnya tidak berbahaya',
-          'NaCl adalah campuran',
-          'Reaksi kimia tidak mengubah sifat zat'
-        ],
-        answer: 0,
-        explain: 'Dalam senyawa, atom-atom terikat dan membentuk zat baru dengan sifat yang sama sekali berbeda dari unsur asalnya. Inilah ciri pokok senyawa.'
-      },
-      {
-        q: 'Manakah yang merupakan campuran homogen?',
-        options: ['Air dan minyak', 'Air dan pasir', 'Udara', 'Air murni'],
-        answer: 2,
-        explain: 'Udara adalah campuran gas yang tercampur merata sehingga batas antarkomponennya tidak terlihat. Air murni bukan campuran, melainkan senyawa.'
-      },
-      {
-        q: 'Perbedaan utama senyawa dan campuran terletak pada…',
-        options: [
-          'Wujudnya',
-          'Warnanya',
-          'Perbandingan penyusunnya tetap atau tidak',
-          'Jumlah unsurnya'
-        ],
-        answer: 2,
-        explain: 'Senyawa selalu punya perbandingan massa penyusun yang tetap (air selalu 1 : 8 massa H : O). Pada campuran, perbandingannya bebas — air garam bisa dibuat encer atau pekat.'
-      }
-    ]
-  });
-})();
+    s.data.kaca.visible = s.get('wadah');
+    s.data.rangka.visible = s.get('wadah');
+    s.data.lbl.userData.ganti(z.n);
+    sorotkan(s);
+  }
+})());

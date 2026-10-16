@@ -1,391 +1,440 @@
-/* Kimia Hijau dan Jejak Karbon — Fase E
-   Rancang ulang sebuah proses produksi: pilih bahan baku, pelarut, sumber
-   energi, dan katalis; lalu baca ekonomi atom, limbah, dan emisi karbonnya. */
+/* Kimia Hijau dan Proses Produksi — Fase E — adegan 3D */
 
-(function () {
+Sim3D.daftar('kimia-hijau', (function () {
   'use strict';
+  const T = THREE, S = S3;
 
-  const D = Sim.Draw, P = Sim.P;
-  const C = Chem;
-
-  const W = 790, H = 580;
-
-  const PILIHAN = {
-    bahan: [
-      { n: 'Minyak bumi (fosil)',   atom: 0.42, emisi: 2.6, biaya: 1.0, catatan: 'Tak terbarukan, jejak karbon besar.' },
-      { n: 'Biomassa (terbarukan)', atom: 0.68, emisi: 0.7, biaya: 1.3, catatan: 'Terbarukan, tetapi bersaing dengan lahan pangan.' },
-      { n: 'Limbah pertanian',      atom: 0.74, emisi: 0.3, biaya: 0.8, catatan: 'Memanfaatkan sisa yang tadinya dibakar.' }
-    ],
-    pelarut: [
-      { n: 'Benzena',       aman: 0.1, emisi: 1.4, limbah: 1.0, catatan: 'Karsinogenik dan mudah menguap. Dihindari.' },
-      { n: 'Etanol',        aman: 0.7, emisi: 0.5, limbah: 0.4, catatan: 'Jauh lebih aman dan dapat didaur ulang.' },
-      { n: 'Air',           aman: 1.0, emisi: 0.1, limbah: 0.1, catatan: 'Pelarut paling hijau bila reaksinya memungkinkan.' },
-      { n: 'Tanpa pelarut', aman: 1.0, emisi: 0.0, limbah: 0.0, catatan: 'Reaksi fase padat atau lelehan. Paling ideal.' }
-    ],
-    energi: [
-      { n: 'Batu bara',        emisi: 3.2, catatan: 'Emisi CO₂ terbesar per satuan energi.' },
-      { n: 'Gas alam',         emisi: 1.8, catatan: 'Lebih bersih daripada batu bara, tetapi tetap fosil.' },
-      { n: 'Listrik jaringan', emisi: 1.5, catatan: 'Bergantung bauran energi nasional.' },
-      { n: 'Surya & angin',    emisi: 0.15, catatan: 'Hampir tanpa emisi langsung.' }
-    ],
-    katalis: [
-      { n: 'Tanpa katalis',    suhu: 320, hasil: 0.55, catatan: 'Perlu suhu sangat tinggi, boros energi.' },
-      { n: 'Katalis logam berat', suhu: 180, hasil: 0.82, catatan: 'Efektif, tetapi limbahnya beracun.' },
-      { n: 'Katalis enzim',    suhu: 40,  hasil: 0.91, catatan: 'Bekerja di suhu rendah dan dapat terurai alami.' }
-    ]
-  };
-
-  const PRINSIP = [
-    'Mencegah limbah lebih baik daripada mengolahnya',
-    'Memaksimalkan ekonomi atom',
-    'Memakai bahan yang tidak berbahaya',
-    'Merancang bahan kimia yang lebih aman',
-    'Memakai pelarut yang aman',
-    'Merancang proses hemat energi',
-    'Memakai bahan baku terbarukan',
-    'Mengurangi turunan yang tidak perlu',
-    'Memakai katalis daripada pereaksi berlebih',
-    'Merancang produk yang dapat terurai',
-    'Memantau pencemaran secara langsung',
-    'Mencegah kecelakaan kimia'
+  /* ekonomiKlasik/ekonomiHijau = ekonomi atom (%), langkah = jumlah tahap */
+  const PROSES = [
+    { n: 'Sintesis ibuprofen', eK: 40, eH: 77, lK: 6, lH: 3, produk: 0xe8eef2 },
+    { n: 'Asam adipat (nilon)', eK: 48, eH: 86, lK: 4, lH: 2, produk: 0xf0e07a },
+    { n: 'Biodiesel dari minyak jelantah', eK: 62, eH: 93, lK: 3, lH: 2, produk: 0xd8b84a },
+    { n: 'Plastik PLA dari jagung', eK: 55, eH: 90, lK: 5, lH: 3, produk: 0xdfe8ee },
+    { n: 'Indigo pewarna jins', eK: 36, eH: 72, lK: 5, lH: 3, produk: 0x4a6fd0 }
   ];
 
-  function pilih(sim, kunci) {
-    return PILIHAN[kunci][parseInt(sim.get(kunci), 10) || 0];
+  const PELARUT = [
+    { n: 'Benzena', bahaya: 1.0, warna: 0xd04a3a },
+    { n: 'Toluena', bahaya: 0.78, warna: 0xd07a3a },
+    { n: 'Diklorometana', bahaya: 0.9, warna: 0xc85a8a },
+    { n: 'Etanol', bahaya: 0.3, warna: 0x8ad0a0 },
+    { n: 'Air', bahaya: 0.06, warna: 0x4a9fd8 },
+    { n: 'Tanpa pelarut (bebas pelarut)', bahaya: 0.0, warna: 0x9fe8ad }
+  ];
+
+  const ENERGI = [
+    { n: 'Batu bara', f: 1.0, warna: 0x5a4a40 },
+    { n: 'Gas alam', f: 0.55, warna: 0x6f9ab6 },
+    { n: 'Listrik PLN campuran', f: 0.72, warna: 0x8a94a0 },
+    { n: 'Surya + angin', f: 0.06, warna: 0x9fe8ad }
+  ];
+
+  function proses(s) { return PROSES[parseInt(s.get('p'), 10) || 0]; }
+  function pelarut(s) { return PELARUT[parseInt(s.get('pel'), 10) || 0]; }
+  function energi(s) { return ENERGI[parseInt(s.get('en'), 10) || 0]; }
+
+  function hitung(s) {
+    const p = proses(s);
+    const hijau = s.get('rute') === 'hijau';
+    const kat = s.get('katalis');
+    const suhu = s.get('suhu');
+    const daur = s.get('daur') / 100;
+    const pel = pelarut(s);
+    const en = energi(s);
+
+    // ekonomi atom: rute + bantuan katalis
+    const ekonomi = S.clamp((hijau ? p.eH : p.eK) + kat * 9, 5, 99.5);
+    const langkah = hijau ? p.lH : p.lK;
+
+    // massa limbah per 1 kg produk (faktor E)
+    const limbahDasar = (100 - ekonomi) / ekonomi * langkah * 0.55;
+    const eFaktor = Math.max(0.02, limbahDasar * (1 - daur * 0.8) * (0.55 + pel.bahaya * 0.9));
+
+    // energi: makin panas & makin banyak tahap, makin besar; katalis menurunkan
+    const tenaga = (0.5 + (suhu - 25) / 220) * langkah * (1 - kat * 0.42);
+
+    // emisi karbon kg CO2 per kg produk
+    const emisi = tenaga * en.f * 2.6 * (1 - daur * 0.35);
+
+    // skor hijau gabungan
+    const skor = S.clamp(
+      ekonomi * 0.34
+      + (1 - S.clamp(eFaktor / 14, 0, 1)) * 100 * 0.24
+      + (1 - S.clamp(emisi / 10, 0, 1)) * 100 * 0.24
+      + (1 - pel.bahaya) * 100 * 0.12
+      + daur * 100 * 0.06, 0, 100);
+
+    return { ekonomi: ekonomi, langkah: langkah, eFaktor: eFaktor,
+      tenaga: tenaga, emisi: emisi, skor: skor, pel: pel, en: en, hijau: hijau };
   }
 
-  function nilai(sim) {
-    const b = pilih(sim, 'bahan'), p = pilih(sim, 'pelarut');
-    const e = pilih(sim, 'energi'), k = pilih(sim, 'katalis');
-    const skala = sim.get('skala');
+  return {
+    latar: 0x070d12,
+    kamera: { jarak: 13.5, phi: 1.04, theta: 0.62, targetY: 1.2, lajuPutar: 0.1 },
 
-    const ekonomiAtom = Sim.clamp(b.atom * (0.6 + k.hasil * 0.5), 0, 1);
-    const limbah = skala * (1 - ekonomiAtom) * (0.6 + p.limbah) * 10;
-    const energiPakai = skala * (k.suhu / 100) * 0.9;
-    const emisi = skala * (b.emisi * 0.4 + p.emisi * 0.2 + e.emisi * (k.suhu / 180) * 0.8);
-    const keamanan = (p.aman * 0.6 + (k.n === 'Katalis logam berat' ? 0.2 : 0.8) * 0.4);
+    kendali: [
+      { judul: 'Proses', isi: [
+        { type: 'select', id: 'p', value: 0, label: 'Produk yang dibuat',
+          options: PROSES.map(function (p, i) { return { value: i, label: p.n }; }) },
+        { type: 'segment', id: 'rute', value: 'klasik', label: 'Rute sintesis', options: [
+          { value: 'klasik', label: 'Rute lama' },
+          { value: 'hijau', label: 'Rute hijau' }
+        ]}
+      ]},
+      { judul: 'Rancangan', isi: [
+        { type: 'slider', id: 'katalis', value: 0, min: 0, max: 1, step: 0.05,
+          label: 'Pemakaian katalis', unit: '', dec: 2 },
+        { type: 'slider', id: 'suhu', value: 160, min: 25, max: 300, step: 5,
+          label: 'Suhu reaktor', unit: ' °C', dec: 0 },
+        { type: 'select', id: 'pel', value: 0, label: 'Pelarut',
+          options: PELARUT.map(function (p, i) { return { value: i, label: p.n }; }) },
+        { type: 'slider', id: 'daur', value: 0, min: 0, max: 95, step: 5,
+          label: 'Daur ulang bahan', unit: ' %', dec: 0 },
+        { type: 'select', id: 'en', value: 0, label: 'Sumber energi',
+          options: ENERGI.map(function (e, i) { return { value: i, label: e.n }; }) }
+      ]},
+      { judul: 'Tampilan', isi: [
+        { type: 'buttons', label: '', items: [
+          { label: '♻ Jadikan sehijau mungkin', utama: true, klik: function (s) {
+            s.set('rute', 'hijau');
+            s.set('katalis', 1);
+            s.set('suhu', 40);
+            s.set('pel', 5);
+            s.set('daur', 95);
+            s.set('en', 3);
+          }},
+          { label: '↺ Kembali ke rute lama', klik: function (s) {
+            s.set('rute', 'klasik');
+            s.set('katalis', 0);
+            s.set('suhu', 160);
+            s.set('pel', 0);
+            s.set('daur', 0);
+            s.set('en', 0);
+          }}
+        ]},
+        { type: 'toggle', id: 'grafik', value: true, label: 'Tampilkan panel grafik' },
+        { type: 'toggle', id: 'asap', value: true, label: 'Tampilkan asap & limbah' }
+      ]}
+    ],
 
-    // skor hijau 0..100
-    const skor = Sim.clamp(
-      ekonomiAtom * 30 +
-      (1 - Sim.clamp(emisi / (skala * 3.2), 0, 1)) * 28 +
-      (1 - Sim.clamp(limbah / (skala * 10), 0, 1)) * 22 +
-      keamanan * 20, 0, 100);
+    baca: [
+      { id: 'skor', label: 'Skor hijau', tone: 'aksen' },
+      { id: 'ekonomi', label: 'Ekonomi atom' },
+      { id: 'limbah', label: 'Faktor E (limbah/produk)' },
+      { id: 'energi', label: 'Kebutuhan energi' },
+      { id: 'emisi', label: 'Emisi karbon' },
+      { id: 'pelarut', label: 'Pelarut' }
+    ],
 
-    return {
-      ekonomiAtom: ekonomiAtom, limbah: limbah, energi: energiPakai,
-      emisi: emisi, keamanan: keamanan, skor: skor,
-      hasil: skala * k.hasil * 10, suhu: k.suhu
-    };
+    bangun: function (s) {
+      s.tambah(S.lantai({ r: 10, warna: 0x0c1218 }));
+
+      // lantai pabrik
+      const lantai = new T.Mesh(new T.BoxGeometry(11, 0.22, 7),
+        new T.MeshStandardMaterial({ color: 0x1b242c, roughness: 0.8 }));
+      lantai.position.y = 0.11;
+      lantai.receiveShadow = true;
+      s.tambah(lantai);
+
+      /* ---------- silo bahan baku ---------- */
+      function silo(x, warna) {
+        const g = new T.Group();
+        const b = new T.Mesh(new T.CylinderGeometry(0.52, 0.52, 1.5, 28),
+          S.matLogam(0x8d99a4, { roughness: 0.45 }));
+        b.position.y = 1.0;
+        b.castShadow = true;
+        g.add(b);
+        const kerucut = new T.Mesh(new T.ConeGeometry(0.52, 0.5, 28), S.matLogam(0x75818c));
+        kerucut.position.y = 0.0;
+        kerucut.rotation.x = Math.PI;
+        g.add(kerucut);
+        const isi = new T.Mesh(new T.CylinderGeometry(0.46, 0.46, 1.1, 24),
+          S.matCairan(warna, { opacity: 0.95 }));
+        isi.position.y = 0.95;
+        g.add(isi);
+        g.position.set(x, 0.3, -1.9);
+        return g;
+      }
+      s.tambah(silo(-3.9, 0xc8a070));
+      s.tambah(silo(-2.7, 0x8aa0c8));
+
+      /* ---------- reaktor ---------- */
+      const reaktor = new T.Group();
+      const badan = new T.Mesh(new T.CylinderGeometry(1.05, 1.05, 2.1, 40),
+        new T.MeshPhysicalMaterial({ color: 0xaab6c2, roughness: 0.28, metalness: 0.75,
+          clearcoat: 0.6 }));
+      badan.position.y = 1.4;
+      badan.castShadow = true;
+      reaktor.add(badan);
+      const atas = new T.Mesh(new T.SphereGeometry(1.05, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+        S.matLogam(0x98a4b0, { roughness: 0.32 }));
+      atas.position.y = 2.45;
+      reaktor.add(atas);
+
+      // jendela pengamat
+      const jendela = new T.Mesh(new T.CylinderGeometry(1.06, 1.06, 0.9, 40, 1, true),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.05, transparent: true,
+          opacity: 0.3, side: T.DoubleSide, depthWrite: false }));
+      jendela.position.y = 1.5;
+      reaktor.add(jendela);
+
+      // isi reaktor (warna mengikuti pelarut)
+      const isiR = new T.Mesh(new T.CylinderGeometry(0.98, 0.98, 1.3, 36),
+        S.matCairan(0xd04a3a, { opacity: 0.85 }));
+      isiR.position.y = 1.0;
+      s.data.isiR = isiR;
+      reaktor.add(isiR);
+
+      // pengaduk
+      const batang = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 2.4, 14), S.matLogam(0xc4ccd4));
+      batang.position.y = 1.9;
+      reaktor.add(batang);
+      const bilah = new T.Group();
+      for (let i = 0; i < 3; i++) {
+        const b = new T.Mesh(new T.BoxGeometry(0.72, 0.06, 0.2), S.matLogam(0xc4ccd4));
+        b.rotation.y = i * Math.PI * 2 / 3;
+        b.position.set(Math.cos(i * 2.094) * 0.3, 0, Math.sin(i * 2.094) * 0.3);
+        bilah.add(b);
+      }
+      bilah.position.y = 0.72;
+      s.data.bilah = bilah;
+      reaktor.add(bilah);
+
+      // gelembung di dalam reaktor
+      const gel = S.gelembung({ n: 30, sebar: 0.6, tinggi: 1.2, warna: 0xeaf4fa });
+      gel.position.y = 0.4;
+      s.data.gel = gel;
+      reaktor.add(gel);
+
+      reaktor.position.set(-0.6, 0.22, 0);
+      s.data.reaktor = reaktor;
+      s.tambah(reaktor);
+
+      // cincin suhu di sekeliling reaktor
+      const cincin = new T.Mesh(new T.TorusGeometry(1.2, 0.05, 10, 56),
+        new T.MeshStandardMaterial({ color: 0xef6a52, emissive: 0xef6a52, emissiveIntensity: 0.9 }));
+      cincin.rotation.x = Math.PI / 2;
+      cincin.position.set(-0.6, 0.6, 0);
+      s.data.cincin = cincin;
+      s.tambah(cincin);
+
+      /* ---------- tangki produk ---------- */
+      const tp = new T.Group();
+      const tpB = new T.Mesh(new T.CylinderGeometry(0.78, 0.78, 1.7, 32),
+        new T.MeshPhysicalMaterial({ color: 0xcfe6f2, roughness: 0.08, transparent: true,
+          opacity: 0.24, side: T.DoubleSide, depthWrite: false }));
+      tpB.position.y = 0.95;
+      tp.add(tpB);
+      const tpI = new T.Mesh(new T.CylinderGeometry(0.72, 0.72, 1, 32), S.matCairan(0xe8eef2));
+      tp.add(tpI);
+      s.data.tpI = tpI;
+      const tpD = new T.Mesh(new T.CylinderGeometry(0.86, 0.9, 0.2, 32), S.matLogam(0x6b7784));
+      tpD.position.y = 0.1;
+      tp.add(tpD);
+      tp.position.set(2.4, 0.22, -1.1);
+      s.tambah(tp);
+      const lblP = S.teks('produk', { skala: 0.26, lebar: 12, warna: '#9fe8ad' });
+      lblP.position.set(2.4, 2.4, -1.1);
+      s.tambah(lblP);
+
+      /* ---------- drum limbah ---------- */
+      const drumG = new T.Group();
+      s.data.drum = [];
+      for (let i = 0; i < 8; i++) {
+        const d = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.72, 22),
+          new T.MeshStandardMaterial({ color: 0x6a5a2a, roughness: 0.6, metalness: 0.3 }));
+        const kol = i % 4, bar = Math.floor(i / 4);
+        d.position.set(3.1 + kol * 0.66, 0.58 + bar * 0.74, 1.7);
+        d.castShadow = true;
+        d.visible = false;
+        drumG.add(d);
+        s.data.drum.push(d);
+      }
+      s.tambah(drumG);
+      const lblL = S.teks('limbah', { skala: 0.26, lebar: 12, warna: '#f0a94a' });
+      lblL.position.set(4.0, 2.4, 1.7);
+      s.tambah(lblL);
+
+      /* ---------- cerobong + asap ---------- */
+      const cer = new T.Mesh(new T.CylinderGeometry(0.34, 0.42, 3.4, 26),
+        new T.MeshStandardMaterial({ color: 0x4a5058, roughness: 0.75 }));
+      cer.position.set(-3.4, 1.9, 1.6);
+      cer.castShadow = true;
+      s.tambah(cer);
+      const asap = S.partikel(80, { r: 0.22, warna: 0x8d97a1, kotak: { x: 1.4, y: 2.6, z: 1.4 } });
+      asap.material.transparent = true;
+      asap.material.opacity = 0.3;
+      asap.position.set(-3.4, 5.4, 1.6);
+      s.data.asap = asap;
+      s.tambah(asap);
+
+      /* ---------- sumber energi ---------- */
+      const panel = new T.Group();
+      for (let i = 0; i < 4; i++) {
+        const p = new T.Mesh(new T.BoxGeometry(1.0, 0.05, 0.66),
+          new T.MeshPhysicalMaterial({ color: 0x1b2d4a, roughness: 0.12, metalness: 0.5,
+            clearcoat: 1 }));
+        p.position.set(-4.4 + (i % 2) * 1.1, 0.5, 2.2 + Math.floor(i / 2) * 0.76);
+        p.rotation.x = -0.4;
+        panel.add(p);
+      }
+      s.data.panel = panel;
+      s.tambah(panel);
+
+      const tungku = new T.Group();
+      const kotak = new T.Mesh(new T.BoxGeometry(1.7, 1.0, 1.2),
+        new T.MeshStandardMaterial({ color: 0x322a24, roughness: 0.85 }));
+      kotak.position.set(-4.0, 0.72, 2.5);
+      tungku.add(kotak);
+      const ny = S.nyala({ r: 0.3, h: 0.6 });
+      ny.position.set(-4.0, 1.2, 2.5);
+      s.data.ny = ny;
+      tungku.add(ny);
+      s.data.tungku = tungku;
+      s.tambah(tungku);
+
+      /* ---------- panel grafik ---------- */
+      const g1 = S.panelGrafik({ w: 4.2, px: 640, py: 400 });
+      g1.position.set(0.2, 4.6, -2.6);
+      s.data.g1 = g1;
+      s.tambah(g1);
+
+      // meteran skor hijau
+      const busur = new T.Mesh(new T.TorusGeometry(0.9, 0.09, 12, 64, Math.PI * 1.4),
+        new T.MeshStandardMaterial({ color: 0x9fe8ad, emissive: 0x9fe8ad, emissiveIntensity: 0.8 }));
+      busur.position.set(4.6, 3.6, -1.0);
+      busur.rotation.z = Math.PI * 0.8;
+      s.data.busur = busur;
+      s.tambah(busur);
+      const lblS = S.teks('', { skala: 0.4, lebar: 10, warna: '#9fe8ad' });
+      lblS.position.set(4.6, 3.6, -1.0);
+      s.data.lblS = lblS;
+      s.tambah(lblS);
+
+      const lbl = S.teks('', { skala: 0.4, lebar: 40, warna: '#d8e4ec' });
+      lbl.position.set(0, 6.4, 0);
+      s.data.lbl = lbl;
+      s.tambah(lbl);
+
+      pasang(s);
+    },
+
+    ubah: function (s, id) {
+      pasang(s);
+      if (id === 'grafik') s.data.g1.visible = s.get('grafik');
+      if (id === 'asap') {
+        s.data.asap.visible = s.get('asap');
+        s.data.drum.forEach(function (d, i) {
+          d.visible = s.get('asap') && i < (s.data.nDrum || 0);
+        });
+      }
+    },
+
+    langkah: function (s, dt) {
+      const h = hitung(s);
+      s.data.bilah.rotation.y += dt * (1.5 + h.tenaga * 1.2);
+      s.data.gel.userData.perbarui(dt, S.clamp((s.get('suhu') - 25) / 200, 0.1, 1.4));
+
+      // cincin suhu
+      const panas = S.clamp((s.get('suhu') - 25) / 275, 0, 1);
+      s.data.cincin.material.color.setRGB(0.25 + panas * 0.68, 0.72 - panas * 0.5, 0.78 - panas * 0.6);
+      s.data.cincin.material.emissive.copy(s.data.cincin.material.color);
+      s.data.cincin.material.emissiveIntensity = 0.5 + panas * 0.9;
+
+      // asap naik; kerapatan mengikuti emisi
+      if (s.data.asap.visible) {
+        const d = s.data.asap.userData.p;
+        const n = Math.round(S.clamp(h.emisi / 9, 0, 1) * d.length);
+        for (let i = 0; i < d.length; i++) {
+          d[i].aktif = i < n;
+          if (!d[i].aktif) continue;
+          d[i].pos.y += dt * 0.7;
+          d[i].pos.x += Math.sin(s.waktu * 0.8 + i) * dt * 0.35;
+          d[i].r = 0.16 + d[i].pos.y * 0.07;
+          if (d[i].pos.y > 2.6) d[i].pos.set(S.acak(-0.25, 0.25), -2.5, S.acak(-0.25, 0.25));
+        }
+        s.data.asap.userData.tulis();
+        s.data.asap.material.opacity = 0.1 + S.clamp(h.emisi / 10, 0, 1) * 0.35;
+        s.data.asap.material.color.setHex(h.en.warna);
+      }
+
+      // nyala tungku bila bukan energi terbarukan
+      const fosil = parseInt(s.get('en'), 10) !== 3;
+      s.data.tungku.visible = fosil;
+      s.data.panel.visible = !fosil;
+      if (fosil) s.data.ny.userData.perbarui(s.waktu, 0.4 + h.en.f * 0.6);
+
+      // isi tangki produk naik-turun pelan
+      const isiTinggi = S.clamp(h.ekonomi / 100, 0.08, 1);
+      s.data.tpI.scale.y = isiTinggi * 1.55;
+      s.data.tpI.position.y = isiTinggi * 1.55 / 2 + 0.12;
+      s.data.tpI.material.color.setHex(proses(s).produk);
+
+      // meteran skor
+      s.data.busur.scale.set(1, 1, 1);
+      const c = new T.Color().setHSL(S.lerp(0.02, 0.33, h.skor / 100), 0.65, 0.58);
+      s.data.busur.material.color.copy(c);
+      s.data.busur.material.emissive.copy(c);
+      s.data.busur.material.emissiveIntensity = 0.5 + h.skor / 180;
+      s.data.lblS.userData.ganti(Math.round(h.skor) + '', '#' + c.getHexString());
+
+      s.data.h = h;
+    },
+
+    bacaUbah: function (s) {
+      const h = hitung(s);
+      s.baca('skor', Math.round(h.skor) + ' / 100',
+        h.skor > 70 ? 'aksen' : h.skor > 45 ? 'warn' : 'danger');
+      s.baca('ekonomi', S.fmt(h.ekonomi, 1) + ' %  (' + h.langkah + ' tahap)',
+        h.ekonomi > 75 ? 'aksen' : h.ekonomi > 50 ? 'warn' : 'danger');
+      s.baca('limbah', S.fmt(h.eFaktor, 2) + ' kg limbah per kg produk',
+        h.eFaktor < 1 ? 'aksen' : h.eFaktor < 5 ? 'warn' : 'danger');
+      s.baca('energi', S.fmt(h.tenaga, 2) + ' satuan relatif');
+      s.baca('emisi', S.fmt(h.emisi, 2) + ' kg CO₂ per kg produk',
+        h.emisi < 1.5 ? 'aksen' : h.emisi < 5 ? 'warn' : 'danger');
+      s.baca('pelarut', h.pel.n, h.pel.bahaya < 0.1 ? 'aksen'
+        : h.pel.bahaya < 0.5 ? 'warn' : 'danger');
+      gambar(s, h);
+    }
+  };
+
+  function gambar(s, h) {
+    S.gambarBatang(s.data.g1, {
+      judul: 'Rapor proses (makin tinggi batang hijau, makin baik)',
+      maks: 100,
+      bar: [
+        { nama: 'Ekonomi atom', v: Math.round(h.ekonomi),
+          warna: h.ekonomi > 75 ? 'rgba(159,232,173,.9)' : 'rgba(240,169,74,.9)' },
+        { nama: 'Limbah rendah', v: Math.round((1 - S.clamp(h.eFaktor / 14, 0, 1)) * 100),
+          warna: h.eFaktor < 2 ? 'rgba(159,232,173,.9)' : 'rgba(239,106,82,.9)' },
+        { nama: 'Emisi rendah', v: Math.round((1 - S.clamp(h.emisi / 10, 0, 1)) * 100),
+          warna: h.emisi < 2 ? 'rgba(159,232,173,.9)' : 'rgba(239,106,82,.9)' },
+        { nama: 'Pelarut aman', v: Math.round((1 - h.pel.bahaya) * 100),
+          warna: h.pel.bahaya < 0.2 ? 'rgba(159,232,173,.9)' : 'rgba(240,169,74,.9)' },
+        { nama: 'Daur ulang', v: Math.round(s.get('daur')), warna: 'rgba(111,182,255,.9)' },
+        { nama: 'Skor hijau', v: Math.round(h.skor), warna: 'rgba(79,209,192,.95)' }
+      ]
+    });
   }
 
-  function siapkan(sim) { sim.data.riwayat = []; }
+  function pasang(s) {
+    const h = hitung(s);
+    const p = proses(s);
+    s.data.isiR.material.color.setHex(h.pel.warna);
+    s.data.isiR.material.opacity = 0.7 + h.pel.bahaya * 0.2;
 
-  Sim.create({
-    title: 'Kimia Hijau dan Jejak Karbon',
-    subtitle: 'Kimia hijau bukan sekadar membersihkan limbah, melainkan merancang proses yang sejak awal tidak menghasilkannya. Ubah empat pilihan dan lihat akibatnya.',
-    fase: 'E', jenjang: 'SMA Kelas 10',
-    topik: ['Kimia Hijau', 'Keberlanjutan'],
-    stage: { w: W, h: H },
-    showPlay: false,
+    // jumlah drum limbah terlihat
+    const n = Math.round(S.clamp(h.eFaktor / 14, 0, 1) * 8);
+    s.data.nDrum = n;
+    s.data.drum.forEach(function (d, i) {
+      d.visible = s.get('asap') && i < n;
+      d.material.color.setHex(h.pel.bahaya > 0.5 ? 0x7a4a2a : 0x6a6a3a);
+    });
 
-    controls: [
-      {
-        title: 'Rancangan proses',
-        items: [
-          { type: 'select', id: 'bahan', value: 0, label: 'Bahan baku',
-            options: PILIHAN.bahan.map(function (q, i) { return { value: i, label: q.n }; }) },
-          { type: 'select', id: 'pelarut', value: 0, label: 'Pelarut',
-            options: PILIHAN.pelarut.map(function (q, i) { return { value: i, label: q.n }; }) },
-          { type: 'select', id: 'energi', value: 0, label: 'Sumber energi',
-            options: PILIHAN.energi.map(function (q, i) { return { value: i, label: q.n }; }) },
-          { type: 'select', id: 'katalis', value: 0, label: 'Katalis',
-            options: PILIHAN.katalis.map(function (q, i) { return { value: i, label: q.n }; }) }
-        ]
-      },
-      {
-        title: 'Skala produksi',
-        items: [
-          { type: 'slider', id: 'skala', value: 10, min: 1, max: 50, step: 1,
-            label: 'Produksi', unit: 'ton/hari', dec: 0 }
-        ]
-      },
-      {
-        title: 'Pembanding',
-        items: [
-          { type: 'buttons', label: '', items: [
-            { label: 'Proses lama (1970-an)', onClick: function (sim) {
-              sim.set('bahan', '0'); sim.set('pelarut', '0');
-              sim.set('energi', '0'); sim.set('katalis', '0');
-            } },
-            { label: 'Proses terhijau', primary: true, onClick: function (sim) {
-              sim.set('bahan', '2'); sim.set('pelarut', '3');
-              sim.set('energi', '3'); sim.set('katalis', '2');
-            } }
-          ] },
-          { type: 'toggle', id: 'prinsip', value: true, label: 'Tampilkan 12 prinsip' }
-        ]
-      }
-    ],
-
-    readouts: [
-      { id: 'skor', label: 'Skor hijau', tone: 'accent' },
-      { id: 'atom', label: 'Ekonomi atom' },
-      { id: 'emisi', label: 'Emisi CO₂' },
-      { id: 'limbah', label: 'Limbah' }
-    ],
-
-    setup: siapkan,
-    reset: siapkan,
-
-    draw: function (c, sim) {
-      const v = nilai(sim);
-      const skala = sim.get('skala');
-
-      /* ---------- skor besar ---------- */
-      const warnaSkor = v.skor >= 70 ? P.green : v.skor >= 45 ? P.amber : P.red;
-      D.roundRect(c, 40, 40, 236, 150, 14, D.alpha(warnaSkor, 0.1), warnaSkor, 1.8);
-      D.text(c, 'SKOR KIMIA HIJAU', 58, 62,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, Math.round(v.skor), 58, 110,
-        { size: 52, weight: 700, color: warnaSkor, base: 'middle', mono: true });
-      D.text(c, '/ 100', 58 + D.measure(c, String(Math.round(v.skor)), { size: 52, weight: 700, mono: true }) + 10,
-        118, { size: 17, weight: 600, color: P.faint, base: 'middle' });
-      D.text(c, v.skor >= 70 ? 'Rancangan berkelanjutan'
-        : v.skor >= 45 ? 'Masih bisa diperbaiki' : 'Berdampak besar pada lingkungan',
-        58, 148, { size: 13, weight: 650, color: warnaSkor, base: 'middle' });
-
-      // bilah skor
-      D.roundRect(c, 58, 164, 200, 12, 6, 'rgba(255,255,255,.08)');
-      D.roundRect(c, 58, 164, 200 * v.skor / 100, 12, 6, warnaSkor);
-
-      /* ---------- empat ukuran ---------- */
-      const UX = 296, UW = 462;
-      D.roundRect(c, UX, 40, UW, 150, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'DAMPAK PROSES', UX + 18, 62,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      const ukuran = [
-        { n: 'Ekonomi atom', v: v.ekonomiAtom, maks: 1, teks: Math.round(v.ekonomiAtom * 100) + '%',
-          baik: true, w: P.accent },
-        { n: 'Emisi CO₂', v: v.emisi, maks: skala * 3.2, teks: Sim.fmt(v.emisi, 1) + ' ton/hari',
-          baik: false, w: P.rose },
-        { n: 'Limbah', v: v.limbah, maks: skala * 10, teks: Sim.fmt(v.limbah, 1) + ' ton/hari',
-          baik: false, w: P.amber },
-        { n: 'Keamanan bahan', v: v.keamanan, maks: 1, teks: Math.round(v.keamanan * 100) + '%',
-          baik: true, w: P.blue }
-      ];
-      ukuran.forEach(function (u, i) {
-        const y = 88 + i * 26;
-        D.text(c, u.n, UX + 18, y, { size: 11.5, weight: 600, color: P.dim, base: 'middle' });
-        const bx = UX + 140, bw = 200;
-        D.roundRect(c, bx, y - 7, bw, 14, 7, 'rgba(255,255,255,.07)');
-        const f = Sim.clamp(u.v / u.maks, 0, 1);
-        D.roundRect(c, bx, y - 7, bw * f, 14, 7,
-          u.baik ? D.ramp(['#ef6a52', '#f0a94a', '#6fcf7f'], f)
-                 : D.ramp(['#6fcf7f', '#f0a94a', '#ef6a52'], f));
-        D.text(c, u.teks, UX + UW - 18, y,
-          { size: 11.5, weight: 700, color: u.w, align: 'r', base: 'middle', mono: true });
-      });
-
-      /* ---------- rincian pilihan ---------- */
-      const PY = 206;
-      D.roundRect(c, 40, PY, W - 80, 148, 14, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'EMPAT KEPUTUSAN PERANCANGAN', 58, PY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-
-      const keputusan = [
-        { label: 'Bahan baku', q: pilih(sim, 'bahan') },
-        { label: 'Pelarut', q: pilih(sim, 'pelarut') },
-        { label: 'Sumber energi', q: pilih(sim, 'energi') },
-        { label: 'Katalis', q: pilih(sim, 'katalis') }
-      ];
-      keputusan.forEach(function (k, i) {
-        const x = 58 + i * ((W - 140) / 4);
-        const w = (W - 140) / 4 - 14;
-        D.text(c, k.label.toUpperCase(), x, PY + 46,
-          { size: 9.5, weight: 700, color: P.faint, base: 'middle' });
-        D.text(c, k.q.n, x, PY + 68,
-          { size: 13.5, weight: 700, color: P.accent2, base: 'middle' });
-        // catatan dipenggal
-        const kata = k.q.catatan.split(' ');
-        let baris = [''];
-        kata.forEach(function (wd) {
-          const coba = baris[baris.length - 1] ? baris[baris.length - 1] + ' ' + wd : wd;
-          if (D.measure(c, coba, { size: 11 }) > w) baris.push(wd);
-          else baris[baris.length - 1] = coba;
-        });
-        baris.slice(0, 4).forEach(function (b, bi) {
-          D.text(c, b, x, PY + 90 + bi * 15,
-            { size: 11, weight: 500, color: P.dim, base: 'middle' });
-        });
-      });
-
-      /* ---------- ekonomi atom ---------- */
-      const EY = 370;
-      D.roundRect(c, 40, EY, 364, 112, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'EKONOMI ATOM', 58, EY + 20,
-        { size: 10.5, weight: 700, color: P.faint, base: 'middle' });
-      D.text(c, 'Berapa persen massa pereaksi yang benar-benar masuk ke produk?',
-        58, EY + 40, { size: 11.5, weight: 500, color: P.dim, base: 'middle' });
-
-      // bilah terbagi: produk vs limbah
-      const bw = 306;
-      D.roundRect(c, 58, EY + 54, bw, 26, 5, 'rgba(255,255,255,.07)');
-      D.roundRect(c, 58, EY + 54, bw * v.ekonomiAtom, 26, 5, P.accent);
-      D.text(c, 'produk ' + Math.round(v.ekonomiAtom * 100) + '%',
-        64, EY + 67, { size: 11.5, weight: 700, color: '#06201d', base: 'middle' });
-      if (v.ekonomiAtom < 0.88) {
-        D.text(c, 'limbah ' + Math.round((1 - v.ekonomiAtom) * 100) + '%',
-          58 + bw - 6, EY + 67,
-          { size: 11.5, weight: 700, color: P.amber, align: 'r', base: 'middle' });
-      }
-      D.text(c, 'Hasil produk: ' + Sim.fmt(v.hasil, 1) + ' ton/hari  ·  Suhu reaksi: ' +
-        Math.round(v.suhu) + ' °C', 58, EY + 96,
-        { size: 12, weight: 600, color: P.dim, base: 'middle' });
-
-      /* ---------- 12 prinsip ---------- */
-      if (sim.get('prinsip')) {
-        const KX = 420, KW = 338;
-        D.roundRect(c, KX, EY, KW, 112, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-        D.text(c, '12 PRINSIP KIMIA HIJAU (ANASTAS & WARNER, 1998)', KX + 16, EY + 20,
-          { size: 9.5, weight: 700, color: P.faint, base: 'middle' });
-        PRINSIP.slice(0, 8).forEach(function (p, i) {
-          const x = KX + 16 + (i % 2) * 162;
-          const y = EY + 40 + Math.floor(i / 2) * 17;
-          D.text(c, (i + 1) + '. ' + (p.length > 28 ? p.slice(0, 26) + '…' : p), x, y,
-            { size: 10, weight: 500, color: P.dim, base: 'middle' });
-        });
-        D.text(c, '…dan 4 prinsip lainnya tentang produk terurai, pemantauan, dan keselamatan.',
-          KX + 16, EY + 100, { size: 10, weight: 500, color: P.faint, base: 'middle' });
-      }
-
-      /* ---------- perbandingan ---------- */
-      const BY = 496;
-      D.roundRect(c, 40, BY, W - 80, 66, 12, 'rgba(255,255,255,.04)', 'rgba(255,255,255,.12)', 1.3);
-      D.text(c, 'DALAM SATU TAHUN PRODUKSI', 58, BY + 18,
-        { size: 10, weight: 700, color: P.faint, base: 'middle' });
-      const perTahun = [
-        ['Emisi CO₂', Sim.fmt(v.emisi * 365, 0) + ' ton', P.rose],
-        ['Limbah', Sim.fmt(v.limbah * 365, 0) + ' ton', P.amber],
-        ['Produk', Sim.fmt(v.hasil * 365, 0) + ' ton', P.accent],
-        ['Setara pohon untuk menyerap CO₂', Sim.fmt(v.emisi * 365 / 0.022, 0) + ' pohon', P.green]
-      ];
-      perTahun.forEach(function (q, i) {
-        const x = 58 + i * ((W - 140) / 4);
-        D.text(c, q[0], x, BY + 38, { size: 10.5, weight: 500, color: P.faint, base: 'middle' });
-        D.text(c, q[1], x, BY + 56, { size: 15, weight: 700, color: q[2], base: 'middle', mono: true });
-      });
-    },
-
-    readoutsUpdate: function (sim) {
-      const v = nilai(sim);
-      sim.readout('skor', Math.round(v.skor) + '<span class="unit"> / 100</span>',
-        v.skor >= 70 ? 'accent' : v.skor >= 45 ? 'warn' : 'danger');
-      sim.readout('atom', Math.round(v.ekonomiAtom * 100) + '<span class="unit">%</span>');
-      sim.readout('emisi', Sim.fmt(v.emisi, 1) + '<span class="unit"> t/hari</span>');
-      sim.readout('limbah', Sim.fmt(v.limbah, 1) + '<span class="unit"> t/hari</span>');
-    },
-
-    notes: `
-      <p>Kimia hijau (<em>green chemistry</em>) adalah pendekatan merancang produk dan
-      proses kimia yang <strong>mengurangi atau meniadakan penggunaan dan pembentukan
-      zat berbahaya</strong>. Intinya bukan membersihkan limbah setelah terbentuk,
-      melainkan merancang agar limbah itu tidak pernah ada.</p>
-
-      <h3>Ekonomi atom</h3>
-      <p>Ukuran paling khas dalam kimia hijau. Rendemen tinggi belum tentu hijau, karena
-      rendemen hanya menghitung produk dibanding yang mungkin dihasilkan. Ekonomi atom
-      menghitung berapa persen <strong>massa seluruh pereaksi</strong> yang benar-benar
-      berakhir di produk.</p>
-
-      <span class="formula">Ekonomi atom = (Mr produk yang diinginkan ÷ jumlah Mr seluruh pereaksi) × 100%</span>
-
-      <p>Reaksi adisi memiliki ekonomi atom 100% karena seluruh atom pereaksi masuk ke
-      produk. Reaksi substitusi dan eliminasi selalu menghasilkan produk samping,
-      sehingga ekonomi atomnya lebih rendah.</p>
-
-      <h3>Empat keputusan yang paling berpengaruh</h3>
-      <ul>
-        <li><strong>Bahan baku</strong> — terbarukan atau fosil. Limbah pertanian bahkan
-            mengubah masalah menjadi sumber daya.</li>
-        <li><strong>Pelarut</strong> — penyumbang terbesar volume limbah di industri kimia.
-            Mengganti benzena dengan air atau meniadakan pelarut sama sekali adalah
-            langkah besar.</li>
-        <li><strong>Sumber energi</strong> — menentukan jejak karbon. Batu bara
-            menghasilkan sekitar dua puluh kali emisi tenaga surya per satuan energi.</li>
-        <li><strong>Katalis</strong> — menurunkan energi aktivasi sehingga reaksi dapat
-            berlangsung pada suhu rendah. Katalis enzim bekerja pada suhu tubuh dan dapat
-            terurai alami.</li>
-      </ul>
-
-      <h3>Jejak karbon</h3>
-      <p>Jejak karbon adalah total gas rumah kaca yang dilepaskan suatu kegiatan,
-      dinyatakan setara CO₂. Dalam industri kimia, penyumbang terbesarnya biasanya adalah
-      <strong>energi untuk memanaskan reaktor</strong> — bukan reaksinya sendiri. Karena
-      itu katalis yang menurunkan suhu reaksi punya dampak lingkungan yang besar.</p>
-
-      <h3>Contoh nyata</h3>
-      <p>Pembuatan ibuprofen dahulu memerlukan enam tahap dengan ekonomi atom sekitar 40%.
-      Proses BHC yang lebih baru hanya tiga tahap dengan ekonomi atom 77%, dan hampir
-      seluruh produk sampingnya dapat didaur ulang. Produknya sama, tetapi limbahnya
-      berkurang drastis.</p>
-
-      <div class="callout" data-tone="tip">
-        <strong>Prinsip paling penting</strong>
-        Prinsip pertama kimia hijau berbunyi: mencegah terbentuknya limbah selalu lebih
-        baik daripada mengolah limbah setelah terbentuk. Semua prinsip lain pada dasarnya
-        menjabarkan prinsip ini.
-      </div>
-    `,
-
-    explore: [
-      'Tekan <strong>Proses lama (1970-an)</strong> dan catat skornya. Lalu tekan <strong>Proses terhijau</strong>. Berapa selisihnya?',
-      'Mulai dari proses lama, ganti <strong>hanya pelarutnya</strong> menjadi air. Berapa banyak limbah yang berkurang?',
-      'Ganti <strong>hanya katalisnya</strong> menjadi enzim. Perhatikan suhu reaksi turun dari 320 °C ke 40 °C — bagaimana pengaruhnya pada emisi?',
-      'Naikkan skala produksi menjadi 50 ton/hari. Apakah skor hijaunya berubah? Mengapa emisi tahunannya melonjak?'
-    ],
-
-    quiz: [
-      {
-        q: 'Prinsip pertama kimia hijau menyatakan bahwa…',
-        options: [
-          'Limbah harus diolah dengan teknologi terbaik',
-          'Mencegah terbentuknya limbah lebih baik daripada mengolahnya',
-          'Semua pelarut harus diganti air',
-          'Produksi harus dikurangi'
-        ],
-        answer: 1,
-        explain: 'Prinsip pencegahan menempatkan perancangan di awal: bila proses dirancang agar tidak menghasilkan limbah, biaya dan dampak pengolahan limbah hilang sama sekali.'
-      },
-      {
-        q: 'Suatu reaksi memiliki rendemen 95% tetapi ekonomi atom hanya 35%. Apa artinya?',
-        options: [
-          'Reaksinya sangat hijau',
-          'Hampir semua pereaksi menjadi produk',
-          'Reaksi berhasil, tetapi sebagian besar massa pereaksi berakhir sebagai produk samping',
-          'Perhitungannya pasti salah'
-        ],
-        answer: 2,
-        explain: 'Rendemen mengukur keberhasilan reaksi dibanding hasil teoretis, sedangkan ekonomi atom mengukur berapa massa pereaksi yang masuk ke produk. Reaksi bisa berhasil sempurna namun tetap membuang banyak atom sebagai produk samping.'
-      },
-      {
-        q: 'Mengapa penggunaan katalis termasuk prinsip kimia hijau?',
-        options: [
-          'Karena katalis ikut menjadi produk',
-          'Karena katalis menurunkan energi aktivasi sehingga reaksi dapat berjalan pada suhu lebih rendah',
-          'Karena katalis menambah hasil reaksi menjadi lebih dari 100%',
-          'Karena katalis menggantikan pelarut'
-        ],
-        answer: 1,
-        explain: 'Katalis menurunkan energi aktivasi, sehingga reaksi tidak memerlukan pemanasan setinggi sebelumnya. Energi yang dihemat berarti emisi karbon yang jauh lebih kecil. Katalis juga dipakai berulang, berbeda dengan pereaksi berlebih.'
-      },
-      {
-        q: 'Jenis reaksi manakah yang secara teori memiliki ekonomi atom 100%?',
-        options: ['Substitusi', 'Eliminasi', 'Adisi', 'Pembakaran'],
-        answer: 2,
-        explain: 'Pada reaksi adisi, seluruh atom pereaksi bergabung menjadi satu produk tanpa ada yang terbuang. Substitusi dan eliminasi selalu melepaskan sebagian atom sebagai produk samping.'
-      }
-    ]
-  });
-})();
+    s.data.g1.visible = s.get('grafik');
+    s.data.asap.visible = s.get('asap');
+    s.data.lbl.userData.ganti(p.n + '  —  ' + (h.hijau ? 'rute hijau' : 'rute lama'),
+      h.hijau ? '#9fe8ad' : '#f0a94a');
+    gambar(s, h);
+  }
+})());
