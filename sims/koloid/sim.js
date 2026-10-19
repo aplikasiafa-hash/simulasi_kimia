@@ -41,6 +41,12 @@ Sim3D.daftar('koloid', (function () {
     latar: 0x05090e,
     kamera: { jarak: 11, phi: 1.04, theta: 0.6, targetY: 1.4, lajuPutar: 0.1 },
 
+    legenda: [
+      { warna: '#ff7a5a', label: 'berkas cahaya (uji Tyndall)' },
+      { warna: '#f4f2ec', label: 'partikel terdispersi' },
+      { warna: '#d8cfc0', label: 'endapan / residu' }
+    ],
+
     kendali: [
       { judul: 'Sistem yang diuji', isi: [
         { type: 'segment', id: 'sis', value: 'koloid', label: 'Campuran',

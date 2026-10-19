@@ -82,6 +82,14 @@ Sim3D.daftar('hidrolisis', (function () {
     latar: 0x070c12,
     kamera: { jarak: 12, phi: 1.02, theta: 0.6, targetY: 1.3, lajuPutar: 0.1 },
 
+    legenda: [
+      { warna: '#ef6a52', label: 'kation garam' },
+      { warna: '#6fb6ff', label: 'anion garam' },
+      { warna: '#f0a94a', label: 'H₃O⁺ hasil hidrolisis' },
+      { warna: '#8ad0f0', label: 'OH⁻ hasil hidrolisis' },
+      { warna: '#cfe6f2', label: 'molekul air' }
+    ],
+
     kendali: [
       { judul: 'Garam', isi: [
         { type: 'select', id: 'g', value: 0, label: 'Garam yang dilarutkan',
@@ -323,7 +331,7 @@ Sim3D.daftar('hidrolisis', (function () {
       tb.userData.setLevel(0.6, w.getHex());
       const sorot = kel === 'semua' || kel === g.jenis
         || (kel === 'lk' && g.jenis === 'lk') || (kel === 'kl' && g.jenis === 'kl');
-      tb.userData.cair.material.opacity = sorot ? 0.92 : 0.25;
+      tb.userData.setOpasitas(sorot ? 0.85 : 0.22);
       s.data.lblTab[i].material.opacity = sorot ? 1 : 0.3;
       s.data.lblTab[i].material.transparent = true;
     });

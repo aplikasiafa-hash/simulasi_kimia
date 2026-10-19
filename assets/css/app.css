@@ -301,6 +301,38 @@ body.sembunyi-kendali #kendali {
 }
 body.sembunyi-kendali #kendali-buka { display: grid; }
 
+/* ============================================================= LEGENDA == */
+/* Kunci warna adegan: menjawab "bola merah itu apa?" tanpa perlu membaca
+   teks panjang, sehingga siswa langsung paham apa yang sedang dilihat. */
+
+#legenda {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: calc(var(--tepi-atas) + 86px);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+  max-width: min(760px, 56vw);
+  z-index: 14; pointer-events: none;
+  transition: opacity .28s, transform .28s;
+}
+#legenda:empty { display: none; }
+.leg-sel {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px 5px 8px; border-radius: 999px;
+  background: rgba(12,18,24,.72);
+  border: 1px solid var(--kaca-tepi);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.leg-titik {
+  width: 11px; height: 11px; border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 9px currentColor;
+  background: currentColor; flex: none;
+}
+.leg-titik.kotak { border-radius: 3px; }
+.leg-teks {
+  font-size: 11.5px; font-weight: 600; color: var(--ink-soft, #cfdbe6);
+  letter-spacing: .01em; white-space: nowrap;
+}
+
 /* ======================================================== BACAAN ANGKA = */
 
 #baca {
@@ -482,6 +514,7 @@ body.sembunyi-kendali #kendali-buka { display: grid; }
 body.sembunyi-ui #kepala,
 body.sembunyi-ui #alat,
 body.sembunyi-ui #kendali,
+body.sembunyi-ui #legenda,
 body.sembunyi-ui #baca,
 body.sembunyi-ui #kendali-buka {
   opacity: 0; pointer-events: none;
@@ -508,6 +541,12 @@ body.sembunyi-ui #alat { transform: translateX(-50%) translateY(14px); }
     right: 10px; left: auto; bottom: auto;
     top: calc(var(--tepi-atas) + 70px); max-width: 44vw;
   }
+  #legenda {
+    top: auto; bottom: calc(var(--tepi-bawah) + 56px);
+    max-width: 92vw; gap: 4px;
+  }
+  .leg-sel { padding: 4px 9px 4px 7px; }
+  .leg-teks { font-size: 10.5px; }
   .baca-sel { min-width: 0; padding: 5px 10px; }
   .baca-label { font-size: 9.5px; }
   .baca-nilai { font-size: 11.5px; }

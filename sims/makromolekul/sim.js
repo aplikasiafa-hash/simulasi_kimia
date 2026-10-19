@@ -67,6 +67,12 @@ Sim3D.daftar('makromolekul', (function () {
     latar: 0x070c12,
     kamera: { jarak: 12, phi: 1.08, theta: 0.6, targetY: 0.6, lajuPutar: 0.12 },
 
+    legenda: [
+      { warna: '#2b3238', label: 'atom karbon rantai utama' },
+      { warna: '#f0d040', label: 'ikatan baru antar-monomer' },
+      { warna: '#6fb6ff', label: 'molekul kecil yang dilepas (H₂O)' }
+    ],
+
     kendali: [
       { judul: 'Mode', isi: [
         { type: 'segment', id: 'mode', value: 'polimer', label: 'Yang dikerjakan', options: [

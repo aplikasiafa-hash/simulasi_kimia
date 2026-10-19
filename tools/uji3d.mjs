@@ -81,8 +81,19 @@ page.on('console', m => {
   }
 });
 
-await page.goto('file://' + path.join(AKAR, 'index.html'));
-await page.waitForFunction(() => window.App && window.Sim3D, null, { timeout: 15000 });
+// peluncuran pertama kadang lambat saat peramban masih dingin — coba ulang
+const alamat = 'file://' + path.join(AKAR, 'index.html');
+for (let percobaan = 1; ; percobaan++) {
+  try {
+    await page.goto(alamat, { timeout: 90000, waitUntil: 'domcontentloaded' });
+    break;
+  } catch (e) {
+    if (percobaan >= 3) throw e;
+    console.log('  ·  memuat halaman gagal, mencoba lagi (' + percobaan + ')');
+    await page.waitForTimeout(2000);
+  }
+}
+await page.waitForFunction(() => window.App && window.Sim3D, null, { timeout: 60000 });
 await page.waitForTimeout(600);
 
 /* --------------------------------------------------------------- jalan -- */

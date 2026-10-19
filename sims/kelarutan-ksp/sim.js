@@ -61,7 +61,13 @@ Sim3D.daftar('kelarutan-ksp', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 11, phi: 1.04, theta: 0.6, targetY: 1.4, lajuPutar: 0.1 },
+    kamera: { jarak: 15.84, phi: 1.04, theta: 0.6, targetY: 3.1, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#d8dde2', label: 'ion logam (kation)' },
+      { warna: '#9fe8ad', label: 'ion pasangannya (anion)' },
+      { warna: '#f0d040', label: 'garis jenuh Qc = Ksp' }
+    ],
 
     kendali: [
       { judul: 'Senyawa', isi: [

@@ -139,7 +139,7 @@ Sim3D.daftar('sifat-benda', (function () {
       s.tambah(cahaya);
 
       const lbl = S.teks('Kayu', { skala: 0.5, lebar: 11, warna: '#d8e4ec' });
-      lbl.position.set(0, 3.5, 0);
+      lbl.position.set(0, 2.8, 0);
       s.data.lbl = lbl;
       s.tambah(lbl);
 
@@ -189,7 +189,7 @@ Sim3D.daftar('sifat-benda', (function () {
         o.rotation.y += dt * 0.55;
         o.rotation.x = Math.sin(s.waktu * 0.7) * 0.14;
       }
-      s.data.lbl.position.y = 3.5;
+      s.data.lbl.position.y = 2.8;
     },
 
     bacaUbah: function (s) {

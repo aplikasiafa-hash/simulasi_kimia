@@ -97,13 +97,18 @@
     if (_cacheBola[kunci] && !o.unik) return _cacheBola[kunci];
     const m = new T.MeshPhysicalMaterial({
       color: warna,
-      roughness: o.roughness !== undefined ? o.roughness : 0.34,
-      metalness: o.metalness !== undefined ? o.metalness : 0.06,
-      clearcoat: o.clearcoat !== undefined ? o.clearcoat : 0.55,
-      clearcoatRoughness: 0.22,
+      roughness: o.roughness !== undefined ? o.roughness : 0.24,
+      metalness: o.metalness !== undefined ? o.metalness : 0.05,
+      // clearcoat + pantulan lingkungan kuat = kilau kecil tajam di bola,
+      // seperti model molekul plastik yang dipotret di studio
+      clearcoat: o.clearcoat !== undefined ? o.clearcoat : 0.85,
+      clearcoatRoughness: 0.12,
+      sheen: 0.25,
+      sheenRoughness: 0.6,
+      sheenColor: new T.Color(0xffffff),
       emissive: o.emissive !== undefined ? o.emissive : warna,
-      emissiveIntensity: o.emissiveIntensity !== undefined ? o.emissiveIntensity : 0.06,
-      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 0.85,
+      emissiveIntensity: o.emissiveIntensity !== undefined ? o.emissiveIntensity : 0.035,
+      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.45,
       transparent: o.opacity !== undefined && o.opacity < 1,
       opacity: o.opacity !== undefined ? o.opacity : 1
     });
@@ -112,67 +117,149 @@
   }
 
   /**
-   * Kaca. Dua gaya:
-   *  - baku: transparan sederhana. Isi wadah terlihat jernih, murah, dan
-   *    tidak memantulkan dinding studio — paling cocok untuk alat peraga.
-   *  - { bias: true }: memakai transmission three.js, lebih mewah tetapi
-   *    membuat isi wadah agak terdistorsi.
+   * Kaca alat laboratorium.
+   *
+   * Memakai pantulan lingkungan yang kuat dengan kekasaran sangat rendah,
+   * bukan `transmission`. Hasilnya: tepi wadah menyala seperti kaca sungguhan
+   * (efek Fresnel pada sudut lewat), sementara isinya tetap terlihat jelas —
+   * dan tetap ringan sehingga lancar di komputer sekolah.
+   * `{ bias: true }` memakai transmission three.js bila memang diinginkan
+   * pembiasan sungguhan (lebih berat, isi wadah sedikit terdistorsi).
    */
   function matKaca(o) {
     o = o || {};
     if (o.bias) {
       return new T.MeshPhysicalMaterial({
         color: o.color !== undefined ? o.color : 0xffffff,
-        roughness: o.roughness !== undefined ? o.roughness : 0.06,
+        roughness: o.roughness !== undefined ? o.roughness : 0.04,
         metalness: 0,
         transmission: o.transmission !== undefined ? o.transmission : 1,
-        thickness: o.thickness !== undefined ? o.thickness : 0.14,
-        ior: 1.46,
+        thickness: o.thickness !== undefined ? o.thickness : 0.22,
+        ior: 1.5,
         transparent: true, opacity: 1,
-        clearcoat: 1, clearcoatRoughness: 0.03,
-        envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 0.55,
+        clearcoat: 1, clearcoatRoughness: 0.02,
+        specularIntensity: 1,
+        envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.1,
         side: T.DoubleSide, depthWrite: false
       });
     }
     return new T.MeshPhysicalMaterial({
-      color: o.color !== undefined ? o.color : 0xcfe6f2,
-      roughness: o.roughness !== undefined ? o.roughness : 0.1,
+      color: o.color !== undefined ? o.color : 0xffffff,
+      roughness: o.roughness !== undefined ? o.roughness : 0.02,
       metalness: 0,
+      // pembiasan sungguhan: dinding kaca jadi bening di tengah dan
+      // menyala di tepi, persis perilaku kaca laboratorium
+      transmission: o.transmission !== undefined ? o.transmission : 1,
+      thickness: o.thickness !== undefined ? o.thickness : 0.05,
+      attenuationColor: new T.Color(0xcfeaff),
+      attenuationDistance: 2.4,
+      ior: 1.5,
       transparent: true,
-      opacity: o.opacity !== undefined ? o.opacity : 0.17,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
-      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 0.6,
+      opacity: o.opacity !== undefined ? o.opacity : 1,
+      specularIntensity: 1,
+      // tanpa clearcoat: satu lapis kilau saja, supaya pantulannya berupa
+      // garis terang yang tegas — bukan sapuan abu-abu selebar dinding
+      clearcoat: 0,
+      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.05,
       side: T.DoubleSide,
       depthWrite: false
     });
+  }
+
+  /**
+   * Opasitas zat cair yang menyesuaikan warnanya.
+   * Larutan yang warnanya sangat pucat (mis. 0xeaf2f6 untuk larutan tak
+   * berwarna) dibuat jauh lebih bening, sehingga terlihat seperti air —
+   * bukan seperti susu. Larutan pekat tetap pekat.
+   */
+  const _hsl = { h: 0, s: 0, l: 0 };
+  function opasitasCair(warna, dasar) {
+    dasar = dasar === undefined ? 0.78 : dasar;
+    new T.Color(warna).getHSL(_hsl);
+    // makin terang dan makin pucat → makin bening
+    const dariTerang = clamp(1 - (_hsl.l - 0.72) / 0.26, 0, 1);
+    const dariPekat = clamp(_hsl.s * 1.8, 0, 1);
+    const f = clamp(Math.max(dariTerang, dariPekat * 0.9), 0.3, 1);
+    return dasar * f;
   }
 
   function matCairan(warna, o) {
     o = o || {};
     return new T.MeshPhysicalMaterial({
       color: warna,
-      roughness: o.roughness !== undefined ? o.roughness : 0.16,
+      roughness: o.roughness !== undefined ? o.roughness : 0.08,
       metalness: 0,
-      transmission: o.transmission !== undefined ? o.transmission : 0.45,
+      transmission: o.transmission !== undefined ? o.transmission : 0,
       thickness: 1.2,
-      ior: 1.33,
+      ior: 1.333,
       transparent: true,
-      opacity: o.opacity !== undefined ? o.opacity : 0.9,
-      clearcoat: 0.8,
-      envMapIntensity: 1.1,
+      opacity: o.opacity !== undefined ? o.opacity : opasitasCair(warna),
+      clearcoat: 0.65,
+      clearcoatRoughness: 0.06,
+      specularIntensity: 1,
+      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.35,
       side: T.DoubleSide
     });
   }
 
+  /** Permukaan atas zat cair: lebih mengilap dan sedikit lebih terang. */
+  function matPermukaanCair(warna, o) {
+    o = o || {};
+    return new T.MeshPhysicalMaterial({
+      color: new T.Color(warna).lerp(new T.Color(0xffffff), 0.05),
+      // cukup kasar dan tipis: permukaan hanya memberi kilau lembut,
+      // warna larutan di bawahnya tetap yang dominan terlihat
+      roughness: 0.38,
+      metalness: 0,
+      transparent: true,
+      opacity: o.opacity !== undefined ? o.opacity : 0.26,
+      ior: 1.333,
+      clearcoat: 0,
+      specularIntensity: 0.35,
+      envMapIntensity: 0.22,
+      side: T.DoubleSide
+    });
+  }
+
+  /* Peta kekasaran bergaris halus — memberi kesan logam yang disikat,
+     jauh lebih meyakinkan daripada logam bening sempurna. */
+  let _petaSikat = null;
+  function petaSikat() {
+    if (_petaSikat) return _petaSikat;
+    const n = 256;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    ct.fillStyle = '#808080';
+    ct.fillRect(0, 0, n, n);
+    for (let i = 0; i < 1400; i++) {
+      const y = Math.random() * n;
+      const a = 0.04 + Math.random() * 0.09;
+      ct.strokeStyle = 'rgba(' + (Math.random() < 0.5 ? '255,255,255,' : '0,0,0,') + a + ')';
+      ct.lineWidth = 0.5 + Math.random() * 1.4;
+      ct.beginPath();
+      ct.moveTo(0, y);
+      ct.lineTo(n, y + (Math.random() - 0.5) * 2);
+      ct.stroke();
+    }
+    _petaSikat = new T.CanvasTexture(cv);
+    _petaSikat.wrapS = _petaSikat.wrapT = T.RepeatWrapping;
+    _petaSikat.repeat.set(3, 3);
+    return _petaSikat;
+  }
+
   function matLogam(warna, o) {
     o = o || {};
-    return new T.MeshStandardMaterial({
+    const m = new T.MeshPhysicalMaterial({
       color: warna,
-      roughness: o.roughness !== undefined ? o.roughness : 0.28,
-      metalness: o.metalness !== undefined ? o.metalness : 0.92,
-      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.25
+      roughness: o.roughness !== undefined ? o.roughness : 0.26,
+      metalness: o.metalness !== undefined ? o.metalness : 0.95,
+      clearcoat: o.clearcoat !== undefined ? o.clearcoat : 0.18,
+      clearcoatRoughness: 0.3,
+      envMapIntensity: o.envMapIntensity !== undefined ? o.envMapIntensity : 1.5
     });
+    if (o.sikat !== false) m.roughnessMap = petaSikat();
+    return m;
   }
 
   function matNyala(warna, opacity) {
@@ -222,9 +309,11 @@
     const orde = opt.orde || 1;
     const tebal = opt.tebal || 0.085;
     const pisah = opt.pisah || tebal * 2.4;
-    const mat = opt.mat || new T.MeshStandardMaterial({
-      color: opt.warna !== undefined ? opt.warna : 0xb8c2cc,
-      roughness: 0.4, metalness: 0.15
+    const mat = opt.mat || new T.MeshPhysicalMaterial({
+      color: opt.warna !== undefined ? opt.warna : 0x9fabb8,
+      roughness: 0.3, metalness: 0.3,
+      clearcoat: 0.5, clearcoatRoughness: 0.2,
+      envMapIntensity: 1.3
     });
     // sumbu tegak lurus untuk menyebar ikatan rangkap
     const normal = new T.Vector3(0, 1, 0);
@@ -290,6 +379,7 @@
     opt = opt || {};
     const R = opt.r || 1.1, H = opt.h || 1.8, tebal = 0.045;
     const g = new T.Group();
+    if (opt.bayangan !== false) g.add(bayanganKontak({ r: R * 1.7, y: -0.03, kuat: 0.72 }));
 
     const profil = [];
     profil.push(new T.Vector2(0, 0));
@@ -311,17 +401,89 @@
     cair.renderOrder = 1;
     g.add(cair);
 
+    // permukaan atas + meniskus: dua bagian kecil yang paling menentukan
+    // apakah zat cair terbaca sebagai cairan sungguhan
+    const atas = permukaanCair(R - 0.012,
+      opt.warna !== undefined ? opt.warna : 0x4a8fd0);
+    atas.userData.ikutWarna(cair.material);
+    g.add(atas);
+
     g.userData.R = R; g.userData.H = H;
     g.userData.cair = cair;
+    g.userData.atas = atas;
+    /** Atur kebeningan zat cair; permukaan atasnya ikut menyesuaikan. */
+    g.userData.setOpasitas = function (o) {
+      cair.userData.opasitasTetap = true;
+      cair.material.opacity = o;
+      atas.userData.setOpasitas(o);
+    };
     /** level 0..1 */
     g.userData.setLevel = function (level, warna) {
       const t = clamp(level, 0, 1) * H;
-      cair.visible = t > 0.012;
+      const ada = t > 0.012;
+      cair.visible = ada;
+      atas.visible = ada;
       cair.scale.y = Math.max(0.001, t);
       cair.position.y = t / 2;
-      if (warna !== undefined) cair.material.color.setHex(warna);
+      atas.position.y = t;
+      if (warna !== undefined) {
+        cair.material.color.setHex(warna);
+        if (!cair.userData.opasitasTetap) cair.material.opacity = opasitasCair(warna);
+        atas.userData.setWarna(warna);
+      }
     };
     g.userData.setLevel(opt.level !== undefined ? opt.level : 0.6);
+    return g;
+  }
+
+  /**
+   * Permukaan atas zat cair: cakram mengilap + cincin meniskus yang sedikit
+   * naik di tepi, persis seperti air yang membasahi dinding kaca.
+   */
+  function permukaanCair(r, warna) {
+    const g = new T.Group();
+    const cakram = new T.Mesh(
+      new T.CircleGeometry(r, 48),
+      matPermukaanCair(warna, { opacity: 0.92 })
+    );
+    cakram.rotation.x = -Math.PI / 2;
+    g.add(cakram);
+
+    // meniskus: cincin tipis sedikit lebih terang di tepi
+    const men = new T.Mesh(
+      new T.TorusGeometry(r * 0.99, r * 0.016, 8, 48),
+      new T.MeshPhysicalMaterial({
+        color: new T.Color(warna).lerp(new T.Color(0xffffff), 0.22),
+        roughness: 0.05, metalness: 0,
+        transparent: true, opacity: 0.45,
+        envMapIntensity: 1.1
+      })
+    );
+    men.rotation.x = Math.PI / 2;
+    men.position.y = r * 0.008;
+    g.add(men);
+
+    g.userData.setWarna = function (w) {
+      cakram.material.color.set(w);
+      men.material.color.set(new T.Color(w).lerp(new T.Color(0xffffff), 0.22));
+    };
+    /**
+     * Pakai objek warna milik material cairan secara langsung. Dengan begitu
+     * permukaan ikut berubah walau simulasi mengubah warna cairan sendiri
+     * (mis. `cair.material.color.setHex(...)`), bukan lewat setLevel.
+     */
+    g.userData.setOpasitas = function (o) {
+      // permukaan selalu sedikit lebih kasat daripada badan cairannya,
+      // karena ada pantulan cahaya di permukaan
+      cakram.material.opacity = clamp(o * 0.34 + 0.05, 0.03, 0.55);
+      men.material.opacity = clamp(o * 0.3, 0.02, 0.4);
+    };
+    g.userData.ikutWarna = function (matCair) {
+      cakram.material.color = matCair.color;
+      men.material.color = matCair.color;
+      men.material.opacity = 0.32;
+      g.userData.setWarna = function () {};
+    };
     return g;
   }
 
@@ -330,6 +492,7 @@
     opt = opt || {};
     const R = opt.r || 1.05, H = opt.h || 1.9, leher = opt.leher || 0.34;
     const g = new T.Group();
+    if (opt.bayangan !== false) g.add(bayanganKontak({ r: R * 1.75, y: -0.035, kuat: 0.72 }));
     const p = [
       new T.Vector2(0, 0), new T.Vector2(R, 0),
       new T.Vector2(leher, H * 0.74), new T.Vector2(leher, H),
@@ -346,14 +509,37 @@
     cair.renderOrder = 1;
     g.add(cair);
 
+    // permukaan atas menyempit mengikuti kerucut labu
+    const atas = permukaanCair(R - 0.02, opt.warna !== undefined ? opt.warna : 0x4a8fd0);
+    atas.userData.ikutWarna(cair.material);
+    g.add(atas);
+
     g.userData.setLevel = function (level, warna) {
       const t = clamp(level, 0, 1) * H * 0.72;
-      cair.visible = t > 0.01;
+      const ada = t > 0.01;
+      cair.visible = ada;
+      atas.visible = ada;
       cair.scale.y = Math.max(0.001, t);
       cair.position.y = t / 2;
-      if (warna !== undefined) cair.material.color.setHex(warna);
+      // jari-jari permukaan mengecil ke arah leher
+      const f = clamp(t / (H * 0.72), 0, 1);
+      const rAtas = lerp(R - 0.02, leher, f);
+      atas.scale.setScalar(Math.max(0.02, rAtas / Math.max(0.0001, R - 0.02)));
+      atas.position.y = t;
+      if (warna !== undefined) {
+        cair.material.color.setHex(warna);
+        if (!cair.userData.opasitasTetap) cair.material.opacity = opasitasCair(warna);
+        atas.userData.setWarna(warna);
+      }
     };
     g.userData.cair = cair;
+    g.userData.atas = atas;
+    /** Atur kebeningan zat cair; permukaan atasnya ikut menyesuaikan. */
+    g.userData.setOpasitas = function (o) {
+      cair.userData.opasitasTetap = true;
+      cair.material.opacity = o;
+      atas.userData.setOpasitas(o);
+    };
     g.userData.setLevel(opt.level !== undefined ? opt.level : 0.5);
     return g;
   }
@@ -363,6 +549,7 @@
     opt = opt || {};
     const R = opt.r || 0.3, H = opt.h || 1.5;
     const g = new T.Group();
+    if (opt.bayangan !== false) g.add(bayanganKontak({ r: R * 2.6, y: -0.012, kuat: 0.6 }));
     const p = [];
     for (let i = 0; i <= 10; i++) {
       const a = Math.PI / 2 * (i / 10);
@@ -381,14 +568,32 @@
       matCairan(opt.warna !== undefined ? opt.warna : 0x4a8fd0));
     cair.renderOrder = 1;
     g.add(cair);
+    const atas = permukaanCair(R - 0.012, opt.warna !== undefined ? opt.warna : 0x4a8fd0);
+    atas.userData.ikutWarna(cair.material);
+    g.add(atas);
+
     g.userData.setLevel = function (level, warna) {
       const t = clamp(level, 0, 1) * (H - R);
-      cair.visible = t > 0.01;
+      const ada = t > 0.01;
+      cair.visible = ada;
+      atas.visible = ada;
       cair.scale.y = Math.max(0.001, t);
       cair.position.y = R + t / 2;
-      if (warna !== undefined) cair.material.color.setHex(warna);
+      atas.position.y = R + t;
+      if (warna !== undefined) {
+        cair.material.color.setHex(warna);
+        if (!cair.userData.opasitasTetap) cair.material.opacity = opasitasCair(warna);
+        atas.userData.setWarna(warna);
+      }
     };
     g.userData.cair = cair;
+    g.userData.atas = atas;
+    /** Atur kebeningan zat cair; permukaan atasnya ikut menyesuaikan. */
+    g.userData.setOpasitas = function (o) {
+      cair.userData.opasitasTetap = true;
+      cair.material.opacity = o;
+      atas.userData.setOpasitas(o);
+    };
     g.userData.setLevel(opt.level !== undefined ? opt.level : 0.5);
     return g;
   }
@@ -421,14 +626,32 @@
     peg.position.set(0, 0.37, 0.16);
     g.add(peg);
     g.userData.keranPeg = peg;
+    const atas = permukaanCair(R - 0.012, opt.warna !== undefined ? opt.warna : 0xf0718f);
+    atas.userData.ikutWarna(cair.material);
+    g.add(atas);
+
     g.userData.setLevel = function (level, warna) {
       const t = clamp(level, 0, 1) * (H - 0.6);
-      cair.visible = t > 0.01;
+      const ada = t > 0.01;
+      cair.visible = ada;
+      atas.visible = ada;
       cair.scale.y = Math.max(0.001, t);
       cair.position.y = 0.55 + t / 2;
-      if (warna !== undefined) cair.material.color.setHex(warna);
+      atas.position.y = 0.55 + t;
+      if (warna !== undefined) {
+        cair.material.color.setHex(warna);
+        if (!cair.userData.opasitasTetap) cair.material.opacity = opasitasCair(warna);
+        atas.userData.setWarna(warna);
+      }
     };
     g.userData.cair = cair;
+    g.userData.atas = atas;
+    /** Atur kebeningan zat cair; permukaan atasnya ikut menyesuaikan. */
+    g.userData.setOpasitas = function (o) {
+      cair.userData.opasitasTetap = true;
+      cair.material.opacity = o;
+      atas.userData.setOpasitas(o);
+    };
     g.userData.setLevel(opt.level !== undefined ? opt.level : 0.8);
     return g;
   }
@@ -577,31 +800,56 @@
   function teks(str, opt) {
     opt = opt || {};
     const ukuran = opt.ukuran || 64;
-    const pad = 18;
+    const padX = 26, padY = 16;
+    const DPR = 2;                       // kanvas beresolusi ganda → huruf tajam
     const cv = document.createElement('canvas');
     const ct = cv.getContext('2d');
-    const font = (opt.tebal || 700) + ' ' + ukuran + 'px "Inter", system-ui, sans-serif';
-    ct.font = font;
+    const keluarga = '"Segoe UI", system-ui, -apple-system, Roboto, sans-serif';
+    const fontUtk = function (uk) { return (opt.tebal || 700) + ' ' + uk + 'px ' + keluarga; };
+
+    ct.font = fontUtk(ukuran);
     // sediakan ruang untuk teks pengganti yang lebih panjang
     const ukur = opt.lebar ? 'M'.repeat(opt.lebar) : str;
-    const w = Math.ceil(Math.max(ct.measureText(str).width, ct.measureText(ukur).width)) + pad * 2;
-    const h = ukuran + pad * 2;
-    cv.width = w; cv.height = h;
-    ct.font = font;
-    if (opt.latar !== false) {
-      ct.fillStyle = opt.latar || 'rgba(12,17,22,.72)';
-      const r = 14;
-      ct.beginPath();
-      ct.roundRect ? ct.roundRect(2, 2, w - 4, h - 4, r) : ct.rect(2, 2, w - 4, h - 4);
-      ct.fill();
-      if (opt.garis) { ct.strokeStyle = opt.garis; ct.lineWidth = 3; ct.stroke(); }
+    const wTeks = Math.ceil(Math.max(ct.measureText(str).width, ct.measureText(ukur).width));
+    const w = wTeks + padX * 2;
+    const h = ukuran + padY * 2;
+    cv.width = w * DPR; cv.height = h * DPR;
+
+    /* Latar digambar hanya selebar teks yang sedang tampil, bukan selebar
+       kanvas. Kanvas sengaja dibuat lebih lebar agar teks pengganti yang
+       panjang tetap muat, tetapi pilnya ikut menyusut mengikuti isinya —
+       sehingga label tidak pernah tampak sebagai pita hitam melayang. */
+    function gambar(isi, warnaIsi) {
+      ct.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ct.clearRect(0, 0, w, h);
+      let uk = ukuran;
+      ct.font = fontUtk(uk);
+      while (ct.measureText(isi).width > w - padX * 1.5 && uk > 10) {
+        uk -= 2;
+        ct.font = fontUtk(uk);
+      }
+      const lebarIsi = ct.measureText(isi).width;
+      if (opt.latar !== false) {
+        const pw = Math.min(w - 4, lebarIsi + padX * 1.7);
+        const ph = uk + padY * 1.5;
+        const px = (w - pw) / 2, py = (h - ph) / 2;
+        const r = Math.min(ph / 2, 16);
+        ct.fillStyle = typeof opt.latar === 'string' ? opt.latar : 'rgba(10,15,20,.78)';
+        ct.beginPath();
+        if (ct.roundRect) ct.roundRect(px, py, pw, ph, r); else ct.rect(px, py, pw, ph);
+        ct.fill();
+        ct.strokeStyle = opt.garis || 'rgba(255,255,255,.14)';
+        ct.lineWidth = 2;
+        ct.stroke();
+      }
+      ct.fillStyle = warnaIsi || opt.warna || '#eaf0f4';
+      ct.textAlign = 'center'; ct.textBaseline = 'middle';
+      ct.fillText(isi, w / 2, h / 2 + 1);
     }
-    ct.fillStyle = opt.warna || '#eaf0f4';
-    ct.textAlign = 'center'; ct.textBaseline = 'middle';
-    ct.fillText(str, w / 2, h / 2 + 2);
+    gambar(str);
 
     const tex = new T.CanvasTexture(cv);
-    tex.anisotropy = 4;
+    tex.anisotropy = 8;
     tex.colorSpace = T.SRGBColorSpace;
     const sp = new T.Sprite(new T.SpriteMaterial({
       map: tex, transparent: true, depthTest: opt.depthTest !== false,
@@ -611,30 +859,99 @@
     const maks = opt.maksLebar || 7.5;          // batas lebar di ruang dunia
     if (skala * w / h > maks) skala = maks * h / w;
     sp.scale.set(skala * w / h, skala, 1);
-    sp.userData.ganti = function (baru, warnaBaru) {
-      ct.clearRect(0, 0, w, h);
-      if (opt.latar !== false) {
-        ct.fillStyle = opt.latar || 'rgba(12,17,22,.72)';
-        ct.beginPath();
-        ct.roundRect ? ct.roundRect(2, 2, w - 4, h - 4, 14) : ct.rect(2, 2, w - 4, h - 4);
-        ct.fill();
-      }
-      // kecilkan huruf bila teks baru terlalu panjang
-      let uk = ukuran;
-      ct.font = (opt.tebal || 700) + ' ' + uk + 'px "Inter", system-ui, sans-serif';
-      while (ct.measureText(baru).width > w - pad * 1.4 && uk > 10) {
-        uk -= 2;
-        ct.font = (opt.tebal || 700) + ' ' + uk + 'px "Inter", system-ui, sans-serif';
-      }
-      ct.fillStyle = warnaBaru || opt.warna || '#eaf0f4';
-      ct.textAlign = 'center'; ct.textBaseline = 'middle';
-      ct.fillText(baru, w / 2, h / 2 + 2);
+    sp.userData.ganti = function (isiBaru, warnaBaru) {
+      gambar(isiBaru, warnaBaru);
       tex.needsUpdate = true;
     };
     return sp;
   }
 
   /** Panah 3D. */
+  /**
+   * Label penunjuk: pil teks + garis tipis + titik kecil yang menempel pada
+   * bagian alat. Jauh lebih jelas daripada teks mengambang, karena siswa
+   * langsung tahu bagian mana yang sedang dinamai.
+   *
+   * penunjuk('pengaduk magnet', [0, 0.5, 0], [2.2, 1.6, 0.6], { warna: '#9fe8ad' })
+   *   titik  = letak bagian yang ditunjuk
+   *   label  = letak pil teksnya
+   */
+  function penunjuk(isi, titik, label, opt) {
+    opt = opt || {};
+    const g = new T.Group();
+    const a = new T.Vector3(titik[0], titik[1], titik[2]);
+    const b = new T.Vector3(label[0], label[1], label[2]);
+    const warna = opt.warna || '#cfdbe6';
+
+    // garis penunjuk dengan sedikit lengkungan supaya tidak kaku
+    const tengah = new T.Vector3().lerpVectors(a, b, 0.55);
+    tengah.y += opt.lengkung !== undefined ? opt.lengkung : 0.18;
+    const kurva = new T.QuadraticBezierCurve3(a, tengah, b);
+    const garis = new T.Mesh(
+      new T.TubeGeometry(kurva, 24, opt.tebal || 0.012, 6, false),
+      new T.MeshBasicMaterial({
+        color: new T.Color(warna), transparent: true, opacity: 0.55, depthWrite: false
+      })
+    );
+    g.add(garis);
+
+    // titik penanda di ujung yang ditunjuk
+    const bulat = new T.Mesh(geoBola(14), new T.MeshBasicMaterial({
+      color: new T.Color(warna), transparent: true, opacity: 0.9, depthWrite: false
+    }));
+    bulat.scale.setScalar(opt.titik || 0.045);
+    bulat.position.copy(a);
+    g.add(bulat);
+
+    const t = teks(isi, {
+      skala: opt.skala || 0.3,
+      lebar: opt.lebar,
+      warna: warna,
+      maksLebar: opt.maksLebar || 4.5
+    });
+    t.position.copy(b);
+    g.add(t);
+
+    g.userData.teks = t;
+    g.userData.ganti = function (baru, warnaBaru) { t.userData.ganti(baru, warnaBaru); };
+    return g;
+  }
+
+  /**
+   * Cincin sorotan berdenyut. Dipakai untuk menarik perhatian ke bagian yang
+   * sedang berubah — panggil `userData.perbarui(waktu)` tiap bingkai.
+   */
+  function sorot(opt) {
+    opt = opt || {};
+    const r = opt.r || 0.8;
+    const warna = opt.warna !== undefined ? opt.warna : 0xf0d040;
+    const g = new T.Group();
+    const cincin = [];
+    for (let i = 0; i < 2; i++) {
+      const m = new T.Mesh(
+        new T.TorusGeometry(r, opt.tebal || r * 0.045, 8, 56),
+        new T.MeshBasicMaterial({
+          color: warna, transparent: true, opacity: 0.8, depthWrite: false
+        })
+      );
+      m.rotation.x = opt.tegak ? 0 : Math.PI / 2;
+      g.add(m);
+      cincin.push(m);
+    }
+    g.userData.perbarui = function (waktu, kuat) {
+      kuat = kuat === undefined ? 1 : kuat;
+      g.visible = kuat > 0.02;
+      if (!g.visible) return;
+      for (let i = 0; i < cincin.length; i++) {
+        const u = ((waktu * 0.7 + i * 0.5) % 1);
+        cincin[i].scale.setScalar(1 + u * 0.45);
+        cincin[i].material.opacity = (1 - u) * 0.75 * kuat;
+      }
+    };
+    g.userData.perbarui(0, 1);
+    return g;
+  }
+
   function panah(dari, ke, opt) {
     opt = opt || {};
     const a = dari.isVector3 ? dari : new T.Vector3(dari[0], dari[1], dari[2]);
@@ -858,24 +1175,223 @@
   }
 
   /** Lantai lembut dengan bayangan. */
-  function lantai(opt) {
+  /* Tekstur meja: bintik halus seperti permukaan epoksi meja laboratorium,
+     ditambah pudar gelap ke arah tepi supaya adegan terasa berujung lembut. */
+  let _texMeja = null;
+  function texMeja() {
+    if (_texMeja) return _texMeja;
+    const n = 512;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    ct.fillStyle = '#20282f';
+    ct.fillRect(0, 0, n, n);
+    // bintik halus
+    for (let i = 0; i < 26000; i++) {
+      const x = Math.random() * n, y = Math.random() * n;
+      const t = Math.random();
+      ct.fillStyle = t < 0.55 ? 'rgba(255,255,255,.035)'
+        : t < 0.85 ? 'rgba(0,0,0,.05)' : 'rgba(120,170,200,.03)';
+      ct.fillRect(x, y, 1.4, 1.4);
+    }
+    _texMeja = new T.CanvasTexture(cv);
+    _texMeja.wrapS = _texMeja.wrapT = T.RepeatWrapping;
+    _texMeja.repeat.set(4, 4);
+    _texMeja.colorSpace = T.SRGBColorSpace;
+    return _texMeja;
+  }
+
+  /* Bayangan kontak: cakram gelap membaur di bawah objek. Inilah yang
+     membuat alat terasa benar-benar menempel di meja, bukan melayang. */
+  let _texBayang = null;
+  function texBayang() {
+    if (_texBayang) return _texBayang;
+    const n = 256;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    const g = ct.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+    g.addColorStop(0.00, 'rgba(0,0,0,.72)');
+    g.addColorStop(0.35, 'rgba(0,0,0,.42)');
+    g.addColorStop(0.70, 'rgba(0,0,0,.12)');
+    g.addColorStop(1.00, 'rgba(0,0,0,0)');
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, n, n);
+    _texBayang = new T.CanvasTexture(cv);
+    return _texBayang;
+  }
+
+  /* Cincin pudar: bening di tengah, menggelap halus ke tepi. */
+  let _texPudar = null;
+  function texPudarTepi() {
+    if (_texPudar) return _texPudar;
+    const n = 256;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    const g = ct.createRadialGradient(n / 2, n / 2, n * 0.18, n / 2, n / 2, n * 0.5);
+    g.addColorStop(0.00, 'rgba(0,0,0,0)');
+    g.addColorStop(0.52, 'rgba(0,0,0,.25)');
+    g.addColorStop(0.78, 'rgba(0,0,0,.72)');
+    g.addColorStop(1.00, 'rgba(0,0,0,1)');
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, n, n);
+    _texPudar = new T.CanvasTexture(cv);
+    return _texPudar;
+  }
+
+  /**
+   * Bayangan kontak lembut di bawah sebuah alat.
+   * bayanganKontak({ r: 1.6, x: 0, z: 0, y: 0.01, kuat: 0.8 })
+   */
+  function bayanganKontak(opt) {
     opt = opt || {};
-    const g = new T.Group();
+    const r = opt.r || 1.5;
     const m = new T.Mesh(
-      new T.CircleGeometry(opt.r || 9, 64),
-      new T.MeshStandardMaterial({
-        color: opt.warna !== undefined ? opt.warna : 0x151c23,
-        roughness: 0.92, metalness: 0.0, envMapIntensity: 0.22
+      new T.PlaneGeometry(r * 2, r * 2),
+      new T.MeshBasicMaterial({
+        map: texBayang(), transparent: true, depthWrite: false,
+        opacity: opt.kuat !== undefined ? opt.kuat : 0.8,
+        color: 0x000000
       })
     );
     m.rotation.x = -Math.PI / 2;
-    m.position.y = opt.y !== undefined ? opt.y : 0;
+    m.position.set(opt.x || 0, opt.y !== undefined ? opt.y : 0.012, opt.z || 0);
+    m.renderOrder = -1;
+    return m;
+  }
+
+  /**
+   * Latar bergradasi untuk scene.background. Warna dasar simulasi dipakai di
+   * bagian bawah, lalu menerang sedikit ke atas seperti dinding ruangan.
+   */
+  const _cacheLatar = {};
+  function latarGradasi(warnaDasar) {
+    const kunci = String(warnaDasar);
+    if (_cacheLatar[kunci]) return _cacheLatar[kunci];
+    const c = new T.Color(warnaDasar);
+    // Dinding ruangan dibuat jelas lebih terang daripada lantai. Selain
+    // memberi kesan ruang, inilah yang "ditembus" oleh kaca: tanpa latar
+    // yang punya isi, alat gelas akan tampak hitam pekat.
+    const atas = c.clone().lerp(new T.Color(0x5d7488), 0.72);
+    const tengah = c.clone().lerp(new T.Color(0x35485a), 0.58);
+    const cv = document.createElement('canvas');
+    cv.width = 16; cv.height = 256;
+    const ct = cv.getContext('2d');
+    const g = ct.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.00, '#' + atas.getHexString());
+    g.addColorStop(0.40, '#' + tengah.getHexString());
+    g.addColorStop(0.62, '#' + c.clone().lerp(new T.Color(0x1b2733), 0.5).getHexString());
+    g.addColorStop(1.00, '#' + c.getHexString());
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, 16, 256);
+    const tex = new T.CanvasTexture(cv);
+    tex.colorSpace = T.SRGBColorSpace;
+    tex.mapping = T.EquirectangularReflectionMapping;
+    _cacheLatar[kunci] = tex;
+    return tex;
+  }
+
+  /**
+   * Panggung untuk adegan molekul/atom yang tidak berdiri di atas meja.
+   * Sebuah cahaya lembut di belakang objek plus bayangan samar di bawahnya —
+   * cukup untuk memberi kedalaman, tanpa mengalihkan perhatian dari molekulnya.
+   */
+  function panggungMolekul(opt) {
+    opt = opt || {};
+    const g = new T.Group();
+    const R = opt.r || 6;
+
+    // semburat cahaya di belakang objek
+    const semburat = new T.Mesh(
+      new T.PlaneGeometry(R * 2.4, R * 2.4),
+      new T.MeshBasicMaterial({
+        map: texSemburat(),
+        color: opt.warna !== undefined ? opt.warna : 0x2a4a63,
+        transparent: true, opacity: opt.kuat !== undefined ? opt.kuat : 0.5,
+        depthWrite: false, blending: T.AdditiveBlending
+      })
+    );
+    semburat.position.set(0, opt.y !== undefined ? opt.y : 0, -(opt.z || R * 0.9));
+    semburat.renderOrder = -3;
+    g.add(semburat);
+
+    // bayangan samar di bawah, memberi acuan "bawah"
+    if (opt.bayangan !== false) {
+      const b = bayanganKontak({
+        r: R * 0.42, y: (opt.yBayang !== undefined ? opt.yBayang : -R * 0.42),
+        kuat: 0.45
+      });
+      g.add(b);
+    }
+    return g;
+  }
+
+  /* Semburat lembut: terang di tengah, lenyap ke tepi. */
+  let _texSemburat = null;
+  function texSemburat() {
+    if (_texSemburat) return _texSemburat;
+    const n = 256;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    const g = ct.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+    g.addColorStop(0.00, 'rgba(255,255,255,.85)');
+    g.addColorStop(0.30, 'rgba(255,255,255,.34)');
+    g.addColorStop(0.62, 'rgba(255,255,255,.09)');
+    g.addColorStop(1.00, 'rgba(255,255,255,0)');
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, n, n);
+    _texSemburat = new T.CanvasTexture(cv);
+    return _texSemburat;
+  }
+
+  /** Permukaan meja laboratorium. */
+  function lantai(opt) {
+    opt = opt || {};
+    const g = new T.Group();
+    const R = opt.r || 9;
+    const y = opt.y !== undefined ? opt.y : 0;
+
+    const m = new T.Mesh(
+      new T.CircleGeometry(R, 80),
+      new T.MeshPhysicalMaterial({
+        color: opt.warna !== undefined ? opt.warna : 0x151c23,
+        map: texMeja(),
+        // kasar dan hampir tanpa clearcoat: meja memantulkan cahaya secara
+        // merata, tidak menimbulkan bercak terang besar di tengah adegan
+        roughness: 0.86,
+        metalness: 0.0,
+        clearcoat: 0.06,
+        clearcoatRoughness: 0.6,
+        envMapIntensity: 0.22
+      })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = y;
     m.receiveShadow = true;
     g.add(m);
+
+    // tepi meja memudar halus ke latar, tanpa garis batas yang terlihat
+    const pudar = new T.Mesh(
+      new T.CircleGeometry(R * 1.02, 72),
+      new T.MeshBasicMaterial({
+        map: texPudarTepi(), color: 0x05080b,
+        transparent: true, opacity: 0.95,
+        depthWrite: false, side: T.DoubleSide
+      })
+    );
+    pudar.rotation.x = -Math.PI / 2;
+    pudar.position.y = y + 0.006;
+    pudar.renderOrder = -2;
+    g.add(pudar);
+
     if (opt.kisi !== false) {
-      const kisi = new T.GridHelper(opt.r ? opt.r * 2 : 18, opt.kisiN || 24, 0x2e3a44, 0x24303a);
-      kisi.position.y = (opt.y !== undefined ? opt.y : 0) + 0.004;
-      kisi.material.opacity = 0.28; kisi.material.transparent = true;
+      const kisi = new T.GridHelper(R * 2, opt.kisiN || 24, 0x33414c, 0x27333c);
+      kisi.position.y = y + 0.004;
+      kisi.material.opacity = 0.16;
+      kisi.material.transparent = true;
+      kisi.material.depthWrite = false;
       g.add(kisi);
     }
     return g;
@@ -887,43 +1403,94 @@
      sehingga pantulannya lembut. Dibuat sekali, dipakai seluruh simulasi. */
 
   let _env = null;
+  /* Tekstur softbox: terang di tengah, meredup halus ke tepi.
+     Pantulan dari bidang seperti ini terlihat seperti lampu studio sungguhan,
+     bukan kotak terang bertepi tajam. */
+  let _texSoftbox = null;
+  function texSoftbox() {
+    if (_texSoftbox) return _texSoftbox;
+    const n = 256;
+    const cv = document.createElement('canvas');
+    cv.width = n; cv.height = n;
+    const ct = cv.getContext('2d');
+    const g = ct.createRadialGradient(n / 2, n / 2, n * 0.05, n / 2, n / 2, n * 0.52);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.45, '#e2e2e2');
+    g.addColorStop(0.78, '#6a6a6a');
+    g.addColorStop(1, '#000000');
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, n, n);
+    _texSoftbox = new T.CanvasTexture(cv);
+    return _texSoftbox;
+  }
+
+  /* Tekstur langit studio: gelap di bawah, terang di atas — memberi gradasi
+     Fresnel yang wajar pada kaca dan logam. */
+  let _texLangit = null;
+  function texLangit() {
+    if (_texLangit) return _texLangit;
+    const cv = document.createElement('canvas');
+    cv.width = 8; cv.height = 256;
+    const ct = cv.getContext('2d');
+    const g = ct.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.00, '#9fb4c6');   // langit-langit
+    g.addColorStop(0.42, '#55646f');
+    g.addColorStop(0.56, '#2d363d');   // garis cakrawala
+    g.addColorStop(1.00, '#10161b');   // lantai
+    ct.fillStyle = g;
+    ct.fillRect(0, 0, 8, 256);
+    _texLangit = new T.CanvasTexture(cv);
+    return _texLangit;
+  }
+
   function lingkungan(renderer) {
     if (_env) return _env;
     const st = new T.Scene();
-    const kotak = new T.BoxGeometry(1, 1, 1);
-    kotak.deleteAttribute('uv');
 
-    function bidang(w, h, d, x, y, z, warna, kuat) {
-      const m = new T.Mesh(kotak, new T.MeshBasicMaterial({
-        color: new T.Color(warna).multiplyScalar(kuat), side: T.BackSide
+    /* kubah bergradasi sebagai cahaya dasar */
+    const kubah = new T.Mesh(
+      new T.SphereGeometry(30, 32, 24),
+      new T.MeshBasicMaterial({ map: texLangit(), side: T.BackSide })
+    );
+    st.add(kubah);
+
+    /* softbox: bidang bergradasi lembut, seperti lampu studio */
+    const bidangGeo = new T.PlaneGeometry(1, 1);
+    function softbox(w, h, pos, lihatKe, warna, kuat) {
+      const m = new T.Mesh(bidangGeo, new T.MeshBasicMaterial({
+        map: texSoftbox(),
+        color: new T.Color(warna).multiplyScalar(kuat),
+        transparent: true, side: T.DoubleSide, depthWrite: false
       }));
-      m.scale.set(w, h, d); m.position.set(x, y, z);
+      m.scale.set(w, h, 1);
+      m.position.set(pos[0], pos[1], pos[2]);
+      m.lookAt(lihatKe[0], lihatKe[1], lihatKe[2]);
       st.add(m);
       return m;
     }
-    // ruangan
-    bidang(26, 16, 26, 0, 4, 0, 0x2a363f, 0.22);
-    // langit-langit terang (cahaya utama pantulan)
-    const lampu = new T.Mesh(kotak, new T.MeshBasicMaterial({ color: new T.Color(0xffffff).multiplyScalar(5.5) }));
-    lampu.scale.set(9, 0.4, 9); lampu.position.set(0, 10.6, 0);
-    st.add(lampu);
-    // sisi dingin dan sisi hangat agar pantulan punya arah
-    const kiri = new T.Mesh(kotak, new T.MeshBasicMaterial({ color: new T.Color(0x6fb6ff).multiplyScalar(0.9) }));
-    kiri.scale.set(0.4, 9, 12); kiri.position.set(-11, 4, 0);
-    st.add(kiri);
-    const kanan = new T.Mesh(kotak, new T.MeshBasicMaterial({ color: new T.Color(0xffc98a).multiplyScalar(0.7) }));
-    kanan.scale.set(0.4, 9, 12); kanan.position.set(11, 4, 0);
-    st.add(kanan);
-    const belakang = new T.Mesh(kotak, new T.MeshBasicMaterial({ color: new T.Color(0xffffff).multiplyScalar(0.45) }));
-    belakang.scale.set(14, 7, 0.4); belakang.position.set(0, 4, -9);
-    st.add(belakang);
+
+    // lampu utama dari atas-depan-kanan (kunci)
+    softbox(11, 8, [5.5, 11, 7], [0, 0, 0], 0xffffff, 6.0);
+    // pengisi dingin dari kiri
+    softbox(12, 10, [-12, 4.5, 3], [0, 2, 0], 0x9ac8ff, 1.1);
+    // tepi hangat dari belakang-kanan
+    softbox(8, 9, [9, 4, -9], [0, 2, 0], 0xffc08a, 1.4);
+    // pantulan meja dari bawah
+    softbox(16, 16, [0, -5, 0], [0, 1, 0], 0x8fa4b4, 0.35);
+    // DUA GARIS SEMPIT YANG SANGAT TERANG.
+    // Inilah sumber kilau memanjang khas tabung kaca: sempit supaya
+    // pantulannya berupa garis tegas, terang supaya tetap terlihat.
+    softbox(0.55, 17, [-4.2, 6.5, 6.5], [0, 1.5, 0], 0xffffff, 26);
+    softbox(0.40, 15, [5.2, 5.5, 6.0], [0, 1.5, 0], 0xffffff, 16);
+    softbox(0.35, 13, [-6.5, 5, -3], [0, 1.5, 0], 0xcfe6ff, 10);
 
     const pmrem = new T.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
-    _env = pmrem.fromScene(st, 0.035).texture;
+    _env = pmrem.fromScene(st, 0.02).texture;
     pmrem.dispose();
     st.traverse(function (o) { if (o.material) o.material.dispose(); });
-    kotak.dispose();
+    bidangGeo.dispose();
+    kubah.geometry.dispose();
     return _env;
   }
 
@@ -933,33 +1500,45 @@
     opt = opt || {};
     const g = new T.Group();
 
-    const hemi = new T.HemisphereLight(0x9fc4e8, 0x141b22, opt.hemi !== undefined ? opt.hemi : 0.45);
+    const hemi = new T.HemisphereLight(0xaed0ee, 0x1a222a, opt.hemi !== undefined ? opt.hemi : 0.62);
     g.add(hemi);
 
-    const kunci = new T.DirectionalLight(0xffffff, opt.kunci !== undefined ? opt.kunci : 1.9);
-    kunci.position.set(4.5, 7, 5.5);
+    const kunci = new T.DirectionalLight(0xfff4e8, opt.kunci !== undefined ? opt.kunci : 2.1);
+    kunci.position.set(5, 8.5, 6);
     kunci.castShadow = opt.bayangan !== false;
     if (kunci.castShadow) {
-      kunci.shadow.mapSize.set(1024, 1024);
+      // peta bayangan besar + radius membuat tepi bayangan melembut,
+      // seperti bayangan di bawah lampu ruangan sungguhan
+      kunci.shadow.mapSize.set(2048, 2048);
       kunci.shadow.camera.near = 1;
-      kunci.shadow.camera.far = 28;
-      const s = opt.luasBayangan || 7;
+      kunci.shadow.camera.far = 34;
+      const s = opt.luasBayangan || 8;
       kunci.shadow.camera.left = -s; kunci.shadow.camera.right = s;
       kunci.shadow.camera.top = s; kunci.shadow.camera.bottom = -s;
-      kunci.shadow.bias = -0.0012;
-      kunci.shadow.normalBias = 0.022;
+      kunci.shadow.bias = -0.0008;
+      kunci.shadow.normalBias = 0.02;
+      kunci.shadow.radius = 3.5;
+      kunci.shadow.blurSamples = 12;
     }
     g.add(kunci);
 
-    const isi = new T.DirectionalLight(0x9fd0ff, opt.isi !== undefined ? opt.isi : 0.75);
-    isi.position.set(-6, 2.5, 3);
+    // cahaya pengisi dingin dari kiri — melunakkan sisi gelap
+    const isi = new T.DirectionalLight(0x9fd0ff, opt.isi !== undefined ? opt.isi : 0.74);
+    isi.position.set(-6.5, 3, 3.5);
     g.add(isi);
 
-    const tepi = new T.DirectionalLight(0xffe0bd, opt.tepi !== undefined ? opt.tepi : 0.7);
-    tepi.position.set(-2.5, 3.5, -6.5);
+    // cahaya tepi hangat dari belakang — menghasilkan garis cahaya pada
+    // siluet alat, trik lama fotografi produk
+    const tepi = new T.DirectionalLight(0xffd8a8, opt.tepi !== undefined ? opt.tepi : 1.0);
+    tepi.position.set(-3, 4.5, -7);
     g.add(tepi);
 
-    g.add(new T.AmbientLight(0xffffff, opt.ambien !== undefined ? opt.ambien : 0.18));
+    // kilau kecil dari depan supaya label dan angka tetap terbaca
+    const depan = new T.DirectionalLight(0xffffff, opt.depan !== undefined ? opt.depan : 0.28);
+    depan.position.set(0.5, 2, 9);
+    g.add(depan);
+
+    g.add(new T.AmbientLight(0xffffff, opt.ambien !== undefined ? opt.ambien : 0.2));
 
     scene.add(g);
     g.userData.kunci = kunci;
@@ -1123,7 +1702,11 @@
     gelas: gelas, labu: labu, tabung: tabung, buret: buret,
     nyala: nyala, gelembung: gelembung, partikel: partikel,
     teks: teks, panah: panah, panelGrafik: panelGrafik, lantai: lantai,
+    penunjuk: penunjuk, sorot: sorot, panggungMolekul: panggungMolekul,
     gambarGrafik: gambarGrafik, gambarBatang: gambarBatang,
+    matPermukaanCair: matPermukaanCair, permukaanCair: permukaanCair,
+    opasitasCair: opasitasCair,
+    latarGradasi: latarGradasi, bayanganKontak: bayanganKontak,
     rigCahaya: rigCahaya, lingkungan: lingkungan, Orbit: Orbit, buangObjek: buangObjek,
     V: function (x, y, z) { return new T.Vector3(x, y, z); },
     warna: function (h) { return new T.Color(h); }

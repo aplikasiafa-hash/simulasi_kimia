@@ -48,7 +48,14 @@ Sim3D.daftar('laju-reaksi', (function () {
 
   return {
     latar: 0x070d13,
-    kamera: { jarak: 11, phi: 1.04, theta: 0.58, targetY: 1.6, lajuPutar: 0.1 },
+    kamera: { jarak: 15.84, phi: 1.04, theta: 0.58, targetY: 3.3, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#f0d040', label: 'partikel asam HCl' },
+      { warna: '#b8c2cc', label: 'logam magnesium' },
+      { warna: '#dff2ff', label: 'gas H₂ yang terbentuk' },
+      { warna: '#fff0a0', label: 'tumbukan yang berhasil' }
+    ],
 
     kendali: [
       { judul: 'Pereaksi', isi: [
@@ -184,7 +191,7 @@ Sim3D.daftar('laju-reaksi', (function () {
 
       /* ---------- panel grafik ---------- */
       const g1 = S.panelGrafik({ w: 4.8, px: 700, py: 440 });
-      g1.position.set(0.2, 5.4, -1.8);
+      g1.position.set(0.2, 4.7, -1.8);
       s.data.g1 = g1;
       s.tambah(g1);
 
@@ -194,9 +201,11 @@ Sim3D.daftar('laju-reaksi', (function () {
       s.data.lblS = lblS;
       s.tambah(lblS);
 
+      // persamaan diletakkan di depan-bawah alat: tidak menutupi grafik,
+      // tetap terbaca lebih dulu oleh mata yang menyapu dari bawah ke atas
       const lbl = S.teks('Mg(s) + 2HCl(aq) → MgCl₂(aq) + H₂(g)',
         { skala: 0.36, lebar: 44, warna: '#d8e4ec' });
-      lbl.position.set(0, 7.1, 0);
+      lbl.position.set(0.2, -0.95, 2.0);
       s.tambah(lbl);
 
       s.data.tersimpan = [];
@@ -390,7 +399,9 @@ Sim3D.daftar('laju-reaksi', (function () {
     // warna larutan ikut katalis
     s.data.labu.userData.setLevel(0.5,
       h.k.warna === 0x9aa8b4 ? 0xdfe8ee : h.k.warna);
-    s.data.labu.userData.cair.material.opacity = 0.55 + S.clamp(h.c / 3, 0, 0.3);
+    s.data.labu.userData.setOpasitas(
+      S.opasitasCair(h.k.warna === 0x9aa8b4 ? 0xdfe8ee : h.k.warna, 0.72)
+      * (0.65 + S.clamp(h.c / 3, 0, 0.35)));
 
     // kerapatan partikel asam ikut konsentrasi
     const d = s.data.asam.userData.p;

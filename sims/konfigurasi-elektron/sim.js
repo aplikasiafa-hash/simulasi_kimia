@@ -128,6 +128,7 @@ Sim3D.daftar('konfigurasi-elektron', (function () {
     ],
 
     bangun: function (s) {
+      s.tambah(S.panggungMolekul({ r: 6.0, warna: 0x2e4160, kuat: 0.45, yBayang: -2.8 }));
       s.data.w = new T.Group();
       s.tambah(s.data.w);
 

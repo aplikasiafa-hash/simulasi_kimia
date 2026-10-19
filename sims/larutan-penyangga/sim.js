@@ -67,7 +67,14 @@ Sim3D.daftar('larutan-penyangga', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 11.5, phi: 1.06, theta: 0.5, targetY: 1.5, lajuPutar: 0.1 },
+    kamera: { jarak: 16.56, phi: 1.06, theta: 0.5, targetY: 3.2, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#9fe8ad', label: 'larutan penyangga' },
+      { warna: '#6fb6ff', label: 'air biasa (pembanding)' },
+      { warna: '#f0a94a', label: 'asam lemah' },
+      { warna: '#ef6a52', label: 'asam kuat yang diteteskan' }
+    ],
 
     kendali: [
       { judul: 'Penyangga', isi: [
@@ -211,12 +218,12 @@ Sim3D.daftar('larutan-penyangga', (function () {
 
       /* panel grafik */
       const g1 = S.panelGrafik({ w: 5.2, px: 740, py: 460 });
-      g1.position.set(0, 6.1, -1.4);
+      g1.position.set(0, 5.5, -1.4);
       s.data.g1 = g1;
       s.tambah(g1);
 
       const lbl = S.teks('', { skala: 0.36, lebar: 38, warna: '#d8e4ec' });
-      lbl.position.set(0, 8.6, -1.4);
+      lbl.position.set(0, 7.6, -1.4);
       s.data.lbl = lbl;
       s.tambah(lbl);
 

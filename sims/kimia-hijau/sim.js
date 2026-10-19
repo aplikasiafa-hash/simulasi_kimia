@@ -70,7 +70,7 @@ Sim3D.daftar('kimia-hijau', (function () {
 
   return {
     latar: 0x070d12,
-    kamera: { jarak: 13.5, phi: 1.04, theta: 0.62, targetY: 1.2, lajuPutar: 0.1 },
+    kamera: { jarak: 19.44, phi: 1.04, theta: 0.62, targetY: 2.9, lajuPutar: 0.1 },
 
     kendali: [
       { judul: 'Proses', isi: [

@@ -27,6 +27,32 @@ Kurikulum Merdeka. SimKimia adalah karya mandiri dan tidak berafiliasi dengan Ph
 - Beberapa simulasi menyertakan panel grafik 3D (kurva titrasi, diagram fase,
   tingkat energi, kurva peluruhan, dan lainnya)
 
+### Tampilan yang dibuat semirip aslinya
+
+- **Kaca laboratorium sungguhan** — dinding wadah membiaskan cahaya, bening di
+  tengah dan menyala di tepi, dengan garis kilau memanjang khas tabung kaca
+- **Zat cair punya permukaan** — cakram mengilap dengan cincin meniskus di
+  tepinya, naik-turun mengikuti isi wadah
+- **Larutan tak berwarna terlihat bening seperti air**, larutan pekat tetap
+  pekat: kebeningannya dihitung dari warna larutannya sendiri
+- **Logam tampak disikat**, bukan cermin sempurna
+- **Pencahayaan studio**: lampu utama, pengisi dingin, dan cahaya tepi hangat,
+  dengan bayangan bertepi lembut serta bayangan kontak di bawah tiap alat
+- **Ruangan bergradasi dan meja laboratorium bertekstur** — alat tidak lagi
+  tampak melayang di ruang hampa
+
+### Yang membantu siswa cepat menangkap maksudnya
+
+- **Legenda warna** di atas adegan menjawab "bola merah itu apa?" tanpa perlu
+  membaca teks panjang
+- **Label penunjuk** (`S3.penunjuk`) menamai bagian alat lengkap dengan garis
+  penunjuk ke bendanya
+- **Label tidak pernah tersembunyi**: kerangka aplikasi memeriksa setiap label
+  dan menurunkannya bila tertutup bilah judul
+- **Panel grafik selalu menghadap kamera** sehingga tetap lurus dan terbaca
+  dari sudut pandang mana pun
+- Angka hasil pengukuran membungkus kalimat panjang dan tak tertutup bilah alat
+
 ---
 
 ## Mencoba secara lokal
@@ -128,6 +154,8 @@ assets/
     three.LICENSE
 sims/<slug>/sim.js         satu berkas per simulasi
 tools/uji3d.mjs            pengujian otomatis (Playwright + Chromium)
+tools/periksa-bingkai.mjs  pemeriksa tata letak label di setiap simulasi
+tools/lihat.mjs            penangkap layar satu atau beberapa adegan
 ```
 
 ### Menambah simulasi baru
@@ -138,7 +166,11 @@ tools/uji3d.mjs            pengujian otomatis (Playwright + Chromium)
    dengan kunci: `latar`, `kamera`, `kendali`, `baca`, lalu fungsi
    `bangun(s)`, `ubah(s, id)`, `langkah(s, dt)`, `bacaUbah(s)`, dan `bersih(s)`.
 3. Semua pembantu 3D tersedia lewat `S3` (singkatan `window.S3`), misalnya
-   `S3.gelas()`, `S3.molekul()`, `S3.partikel()`, `S3.gambarGrafik()`.
+   `S3.gelas()`, `S3.molekul()`, `S3.partikel()`, `S3.gambarGrafik()`,
+   `S3.penunjuk()` untuk label berpenunjuk, dan `S3.panggungMolekul()` untuk
+   adegan molekul yang tidak berdiri di atas meja.
+4. Tambahkan `legenda: [{ warna, label }]` pada definisi simulasi bila
+   adegannya memakai kode warna — legendanya muncul otomatis di atas adegan.
 
 > Catatan: seluruh `const`/`let` tingkat modul harus ditulis **di atas**
 > `return { … }` di dalam IIFE simulasi. Yang ditulis setelah `return`
@@ -153,6 +185,8 @@ tools/uji3d.mjs            pengujian otomatis (Playwright + Chromium)
 npm run uji                 # jalankan seluruh 39 simulasi
 node tools/uji3d.mjs titrasi redoks     # hanya beberapa
 npm run foto                # jalankan + simpan tangkapan layar ke tools/foto/
+npm run bingkai             # periksa label yang tertutup bilah judul
+npm run lihat -- titrasi    # tangkap satu adegan saja, untuk memeriksa tampilan
 ```
 
 Pengujian menyapu **setiap** kontrol di setiap simulasi (geser ke nilai minimum,

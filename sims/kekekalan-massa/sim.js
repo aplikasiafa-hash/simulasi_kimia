@@ -231,7 +231,7 @@ Sim3D.daftar('kekekalan-massa', (function () {
     });
     s.data.labu.userData.setLevel(0.46, r.warnaB);
     s.data.labu.userData.cair.material.transmission = 0.45;
-    s.data.labu.userData.cair.material.opacity = 0.9;
+    s.data.labu.userData.setOpasitas(S.opasitasCair(r.warnaB, 0.82));
     s.data.lblP.userData.ganti(r.pers);
     s.data.lblP.visible = s.get('pers');
     s.data.lbl.userData.ganti(r.n + (s.get('wadah') === 'tertutup' ? ' — wadah tertutup' : ' — wadah terbuka'),

@@ -83,6 +83,7 @@ Sim3D.daftar('bentuk-molekul', (function () {
     ],
 
     bangun: function (s) {
+      s.tambah(S.panggungMolekul({ r: 5.5, warna: 0x2a4a63, kuat: 0.5, yBayang: -2.4 }));
       s.data.w = new T.Group();
       s.tambah(s.data.w);
       const lbl = S.teks('', { skala: 0.44, lebar: 16, warna: '#d8e4ec' });

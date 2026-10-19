@@ -45,7 +45,13 @@ Sim3D.daftar('sel-volta', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 13, phi: 1.02, theta: 0.6, targetY: 1.6, lajuPutar: 0.1 },
+    kamera: { jarak: 15.4, phi: 1.04, theta: 0.6, targetY: 2.1, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#8fd8ff', label: 'elektron' },
+      { warna: '#f0a94a', label: 'anode — oksidasi' },
+      { warna: '#6fb6ff', label: 'katode — reduksi' }
+    ],
 
     kendali: [
       { judul: 'Elektrode', isi: [
@@ -378,9 +384,11 @@ Sim3D.daftar('sel-volta', (function () {
 
     s.data.sKi.userData.gls.userData.setLevel(0.68, h.a.ion);
     s.data.sKa.userData.gls.userData.setLevel(0.68, h.b.ion);
-    const op = 0.4 + S.clamp(s.get('c') / 2, 0, 0.35);
-    s.data.sKi.userData.gls.userData.cair.material.opacity = op;
-    s.data.sKa.userData.gls.userData.cair.material.opacity = op;
+    // larutan pucat (ion tak berwarna) tetap bening; larutan pekat
+    // menggelap mengikuti konsentrasi
+    const f = 0.55 + S.clamp(s.get('c') / 2, 0, 0.45);
+    s.data.sKi.userData.gls.userData.setOpasitas(S.opasitasCair(h.a.ion) * f);
+    s.data.sKa.userData.gls.userData.setOpasitas(S.opasitasCair(h.b.ion) * f);
 
     s.data.pKi.material.color.setHex(h.a.ion);
     s.data.pKi.material.emissive.setHex(h.a.ion);

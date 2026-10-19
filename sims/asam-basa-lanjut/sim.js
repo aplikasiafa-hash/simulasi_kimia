@@ -80,6 +80,12 @@ Sim3D.daftar('asam-basa-lanjut', (function () {
     latar: 0x070c12,
     kamera: { jarak: 10.5, phi: 1.06, theta: 0.6, targetY: 1.4, lajuPutar: 0.1 },
 
+    legenda: [
+      { warna: '#ef6a52', label: 'ion H₃O⁺ (asam)' },
+      { warna: '#6fb6ff', label: 'ion OH⁻ (basa)' },
+      { warna: '#dfe8ee', label: 'molekul belum terionisasi' }
+    ],
+
     kendali: [
       { judul: 'Larutan', isi: [
         { type: 'select', id: 'z', value: 0, label: 'Zat',
@@ -365,7 +371,7 @@ Sim3D.daftar('asam-basa-lanjut', (function () {
     // warna larutan mengikuti pH (seperti indikator universal)
     const c = warnaPH(h.pH);
     s.data.gls.userData.setLevel(0.72, c.getHex());
-    s.data.gls.userData.cair.material.opacity = 0.62;
+    s.data.gls.userData.setOpasitas(S.opasitasCair(c.getHex(), 0.74));
 
     // jumlah ion sebanding log konsentrasi ion
     function jumlah(konsen) {

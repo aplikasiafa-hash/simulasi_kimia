@@ -57,6 +57,7 @@ Sim3D.daftar('model-atom', (function () {
     ],
 
     bangun: function (s) {
+      s.tambah(S.panggungMolekul({ r: 6.5, warna: 0x2e4160, kuat: 0.5, yBayang: -3.0 }));
       s.data.w = new T.Group();
       s.tambah(s.data.w);
 

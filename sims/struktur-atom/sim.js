@@ -59,6 +59,7 @@ Sim3D.daftar('struktur-atom', (function () {
     ],
 
     bangun: function (s) {
+      s.tambah(S.panggungMolekul({ r: 6.5, warna: 0x2e4160, kuat: 0.45, yBayang: -3.0 }));
       s.data.inti = new T.Group();
       s.data.kulitG = new T.Group();
       s.tambah(s.data.inti);

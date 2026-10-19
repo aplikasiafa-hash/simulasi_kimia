@@ -37,6 +37,13 @@ Sim3D.daftar('larutan-elektrolit', (function () {
     latar: 0x070d13,
     kamera: { jarak: 9.6, phi: 1.06, theta: 0.62, targetY: 1.6, lajuPutar: 0.1 },
 
+    legenda: [
+      { warna: '#ef6a52', label: 'kation (+)' },
+      { warna: '#6fb6ff', label: 'anion (−)' },
+      { warna: '#f0e8d4', label: 'molekul utuh (tak terionisasi)' },
+      { warna: '#dff2ff', label: 'gelembung gas di elektrode' }
+    ],
+
     kendali: [
       { judul: 'Larutan', isi: [
         { type: 'select', id: 'z', value: 0, label: 'Zat yang dilarutkan',
@@ -320,7 +327,8 @@ Sim3D.daftar('larutan-elektrolit', (function () {
     const z = zat(s);
     const c = s.get('c');
     s.data.gls.userData.setLevel(0.74, z.warna);
-    s.data.gls.userData.cair.material.opacity = 0.42 + S.clamp(c * 0.14, 0, 0.3);
+    s.data.gls.userData.setOpasitas(
+      S.opasitasCair(z.warna, 0.7) * (0.6 + S.clamp(c * 0.2, 0, 0.4)));
 
     // banyaknya ion & molekul utuh mengikuti konsentrasi dan derajat ionisasi
     const total = Math.round(S.clamp(c / 2, 0.06, 1) * NION);

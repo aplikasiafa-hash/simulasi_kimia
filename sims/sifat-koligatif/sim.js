@@ -58,7 +58,13 @@ Sim3D.daftar('sifat-koligatif', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 13, phi: 1.04, theta: 0.62, targetY: 1.3, lajuPutar: 0.1 },
+    kamera: { jarak: 18.72, phi: 1.04, theta: 0.62, targetY: 3, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#f0a94a', label: 'larutan' },
+      { warna: '#6fb6ff', label: 'pelarut murni (pembanding)' },
+      { warna: '#dff0ff', label: 'kristal es yang terbentuk' }
+    ],
 
     kendali: [
       { judul: 'Larutan', isi: [
@@ -411,7 +417,7 @@ Sim3D.daftar('sifat-koligatif', (function () {
     // warna cairan ikut pelarut
     s.data.uL.userData.gls.userData.setLevel(0.66, h.p.warna);
     s.data.uP.userData.gls.userData.setLevel(0.66, h.p.warna);
-    s.data.uL.userData.gls.userData.cair.material.opacity = 0.62;
+    s.data.uL.userData.gls.userData.setOpasitas(S.opasitasCair(h.p.warna, 0.72));
     s.data.uP.visible = banding && mode !== 'osmosis';
 
     // partikel terlarut

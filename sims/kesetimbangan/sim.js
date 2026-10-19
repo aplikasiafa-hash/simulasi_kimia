@@ -55,7 +55,13 @@ Sim3D.daftar('kesetimbangan', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 11.5, phi: 1.06, theta: 0.6, targetY: 1.5, lajuPutar: 0.1 },
+    kamera: { jarak: 13.8, phi: 1.06, theta: 0.6, targetY: 2.35, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#6fb6ff', label: 'pereaksi (ruas kiri)' },
+      { warna: '#f0a94a', label: 'hasil (ruas kanan)' },
+      { warna: '#f0d040', label: 'panah arah pergeseran' }
+    ],
 
     kendali: [
       { judul: 'Sistem', isi: [

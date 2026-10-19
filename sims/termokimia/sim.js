@@ -39,7 +39,13 @@ Sim3D.daftar('termokimia', (function () {
 
   return {
     latar: 0x080d13,
-    kamera: { jarak: 10.5, phi: 1.05, theta: 0.6, targetY: 1.4, lajuPutar: 0.1 },
+    kamera: { jarak: 12.6, phi: 1.05, theta: 0.6, targetY: 2.25, lajuPutar: 0.1 },
+
+    legenda: [
+      { warna: '#ef4a3a', label: 'suhu naik — reaksi eksoterm' },
+      { warna: '#6fb6ff', label: 'suhu turun — reaksi endoterm' },
+      { warna: '#f0d040', label: 'puncak energi aktivasi' }
+    ],
 
     kendali: [
       { judul: 'Reaksi', isi: [

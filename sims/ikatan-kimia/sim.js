@@ -64,6 +64,7 @@ Sim3D.daftar('ikatan-kimia', (function () {
     ],
 
     bangun: function (s) {
+      s.tambah(S.panggungMolekul({ r: 6.0, warna: 0x2a4a63, kuat: 0.45, yBayang: -2.6 }));
       s.data.w = new T.Group();
       s.tambah(s.data.w);
       s.data.kisiG = new T.Group();
@@ -71,7 +72,7 @@ Sim3D.daftar('ikatan-kimia', (function () {
       s.tambah(s.data.kisiG);
 
       const lbl = S.teks('', { skala: 0.42, lebar: 20, warna: '#d8e4ec' });
-      lbl.position.set(0, 3.2, 0);
+      lbl.position.set(0, 2.75, 0);
       s.data.lbl = lbl;
       s.tambah(lbl);
       const ket = S.teks('', { skala: 0.27, lebar: 42, warna: '#9aa8b4' });

@@ -86,6 +86,13 @@ Sim3D.daftar('redoks', (function () {
     latar: 0x070c12,
     kamera: { jarak: 9.2, phi: 1.12, theta: 0.5, targetY: 0.4, lajuPutar: 0.14 },
 
+    legenda: [
+      { warna: '#8fd8ff', label: 'elektron yang berpindah' },
+      { warna: '#ef9a52', label: 'biloks naik (oksidasi)' },
+      { warna: '#6fb6ff', label: 'biloks turun (reduksi)' },
+      { warna: '#9fe8ad', label: 'biloks nol (unsur bebas)' }
+    ],
+
     kendali: [
       { judul: 'Mode', isi: [
         { type: 'segment', id: 'mode', value: 'biloks', label: 'Yang diamati', options: [

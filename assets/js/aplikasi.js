@@ -54,12 +54,25 @@
 
   /* =============================================================== LAYOUT */
 
+  /* Ruang aman di atas adegan.
+     Bilah judul melayang menutupi sekitar 80 piksel teratas. Dengan merender
+     seolah-olah bingkainya lebih tinggi lalu menampilkan bagian atasnya saja,
+     seluruh isi adegan turun sedikit — sehingga label tertinggi tiap simulasi
+     tidak pernah tersembunyi di balik judul, tanpa perlu menyetel ulang
+     kamera satu per satu di 39 simulasi. */
+  const RUANG_ATAS = 76;
+
   function ukur() {
     const w = innerWidth, h = innerHeight;
     renderer.setSize(w, h, false);
-    kamera.aspect = w / h;
+    const t = h > 420 ? RUANG_ATAS : 0;      // layar sangat pendek: tanpa offset
+    const hPenuh = h + t;
+    kamera.aspect = w / hPenuh;
+    if (t > 0) kamera.setViewOffset(w, hPenuh, 0, 0, w, h);
+    else kamera.clearViewOffset();
     kamera.updateProjectionMatrix();
     document.body.classList.toggle('sempit', w < 900);
+    if (scene) rapikanLabel();
   }
   addEventListener('resize', ukur);
 
@@ -196,6 +209,26 @@
     });
   }
 
+  /**
+   * Legenda warna. Diisi dari `legenda: [{ warna, label, bentuk }]` pada
+   * definisi simulasi, atau diubah saat berjalan lewat `s.legenda([...])`.
+   */
+  const barisLegenda = $('#legenda');
+  function bangunLegenda(daftar) {
+    barisLegenda.innerHTML = '';
+    if (!daftar || !daftar.length) return;
+    daftar.forEach(function (g) {
+      if (!g) return;
+      const titik = el('span', { class: 'leg-titik' + (g.bentuk === 'kotak' ? ' kotak' : '') });
+      titik.style.color = typeof g.warna === 'number'
+        ? '#' + ('000000' + g.warna.toString(16)).slice(-6)
+        : g.warna;
+      barisLegenda.appendChild(el('div', { class: 'leg-sel' }, [
+        titik, el('span', { class: 'leg-teks', text: g.label })
+      ]));
+    });
+  }
+
   /* =============================================================== SESI = */
 
   function buatSesi() {
@@ -205,6 +238,7 @@
       kamera: kamera,
       renderer: renderer,
       orbit: orbit,
+      legenda: bangunLegenda,
       data: {},
       waktu: 0,
       get: function (id) { return nilai[id]; },
@@ -239,6 +273,9 @@
     if (!def || !def[nama]) return;
     try { def[nama](sesi, arg); }
     catch (e) { console.error('[' + slugAktif + '.' + nama + ']', e); }
+    // banyak simulasi membangun ulang isinya saat kendali berubah, termasuk
+    // label-labelnya — rapikan lagi agar tak ada yang tersembunyi di balik judul
+    if (nama === 'ubah') rapikanLabel();
   }
 
   /* ====================================================== MUAT SIMULASI = */
@@ -294,9 +331,12 @@
 
     bersihkanScene();
     scene = new T.Scene();
-    scene.background = new T.Color(d.latar !== undefined ? d.latar : 0x0b1016);
+    // latar bergradasi, bukan warna rata: memberi kesan ruangan dan membuat
+    // siluet alat terbaca jelas di bagian bawah yang lebih gelap
+    const warnaLatar = d.latar !== undefined ? d.latar : 0x0b1016;
+    scene.background = S3.latarGradasi(warnaLatar);
     if (d.kabut !== false) {
-      scene.fog = new T.Fog(d.latar !== undefined ? d.latar : 0x0b1016, 16, 54);
+      scene.fog = new T.Fog(warnaLatar, 18, 58);
     }
 
     def = d;
@@ -310,6 +350,7 @@
 
     bangunKendali(d.kendali);
     bangunBaca(d.baca);
+    bangunLegenda(d.legenda);
 
     const k = d.kamera || {};
     orbit.set({
@@ -328,6 +369,11 @@
     sesi.waktu = 0;
     panggil('bangun');
     panggil('bacaUbah');
+    // kamera meluncur halus ke posisinya, jadi perapian diulang beberapa
+    // bingkai pertama sampai sudut pandangnya benar-benar mantap
+    orbit.perbarui(0);
+    rapikanLabel();
+    rapikanSisa = 48;
 
     // kepala
     $('#judul').textContent = entri.judul;
@@ -350,6 +396,55 @@
     tandaiPemilih();
   }
 
+  /**
+   * Rapikan label yang terlanjur terlalu tinggi.
+   *
+   * Tiap simulasi menaruh judul dan keterangannya pada ketinggian sendiri.
+   * Alih-alih menyetel 39 simulasi satu per satu, setelah adegan selesai
+   * dibangun kerangka ini memproyeksikan tiap sprite teks ke layar; yang
+   * tepi atasnya masuk ke daerah bilah judul diturunkan secukupnya.
+   * Dijalankan sekali setelah membangun dan setiap kali ukuran layar berubah.
+   */
+  const AMAN_ATAS = 92;                   // piksel dari tepi atas layar
+  let rapikanSisa = 0;
+  const _v = new T.Vector3();
+
+  function rapikanLabel() {
+    if (!scene) return;
+    const H = innerHeight;
+    kamera.updateMatrixWorld();
+    scene.traverse(function (o) {
+      // hanya sprite teks. Panel grafik sengaja tidak ikut diturunkan:
+      // ukurannya besar, menurunkannya justru menabrak alat di bawahnya.
+      if (!o.isSprite) return;
+      let q = o, tampak = true;
+      while (q) { if (!q.visible) { tampak = false; break; } q = q.parent; }
+      if (!tampak) return;
+
+      for (let ulang = 0; ulang < 6; ulang++) {
+        o.getWorldPosition(_v);
+        _v.y += o.scale.y / 2;             // tepi atas sprite
+        const z = _v.clone().project(kamera).z;
+        if (z >= 1) return;                // di belakang kamera
+        const py = (1 - _v.clone().project(kamera).y) / 2 * H;
+        if (py >= AMAN_ATAS) return;
+
+        // berapa satuan dunia per piksel pada kedalaman sprite ini
+        const a = o.getWorldPosition(new T.Vector3());
+        const b = a.clone(); b.y += 1;
+        const pa = (1 - a.clone().project(kamera).y) / 2 * H;
+        const pb = (1 - b.clone().project(kamera).y) / 2 * H;
+        const pxPerSatuan = Math.abs(pa - pb);
+        if (!(pxPerSatuan > 0.5)) return;
+
+        const turun = (AMAN_ATAS + 6 - py) / pxPerSatuan;
+        o.position.y -= Math.min(turun, 3);
+        if (o.userData.y0 !== undefined) o.userData.y0 = o.position.y;
+        o.updateMatrixWorld(true);
+      }
+    });
+  }
+
   /* ========================================================= GELUNG UTAMA */
 
   function bingkai() {
@@ -363,6 +458,10 @@
         panggil('bacaUbah');
       }
       hadapkanPanel();
+      if (rapikanSisa > 0) {
+        rapikanSisa--;
+        if (rapikanSisa % 6 === 0) rapikanLabel();
+      }
       renderer.render(scene, kamera);
     }
   }
@@ -566,6 +665,12 @@
     if (s && s !== slugAktif && global.KATALOG.some(function (k) { return k.slug === s; })) mulai(s);
   });
 
-  global.App = { mulai: mulai, bukaPemilih: bukaPemilih, geserSim: geserSim };
+  global.App = {
+    mulai: mulai, bukaPemilih: bukaPemilih, geserSim: geserSim,
+    // dibuka untuk perkakas pemeriksaan tata letak di tools/
+    get kamera() { return kamera; },
+    get scene() { return scene; },
+    get sesi() { return sesi; }
+  };
 
 })(window);

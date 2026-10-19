@@ -49,7 +49,14 @@ Sim3D.daftar('kimia-inti', (function () {
 
   return {
     latar: 0x05090e,
-    kamera: { jarak: 12, phi: 1.06, theta: 0.6, targetY: 0.6, lajuPutar: 0.14 },
+    kamera: { jarak: 17.28, phi: 1.06, theta: 0.6, targetY: 2.3, lajuPutar: 0.14 },
+
+    legenda: [
+      { warna: '#f0a94a', label: 'inti induk (belum meluruh)' },
+      { warna: '#6fb6ff', label: 'inti anak (hasil peluruhan)' },
+      { warna: '#ef6a52', label: 'proton' },
+      { warna: '#cfd6dc', label: 'neutron' }
+    ],
 
     kendali: [
       { judul: 'Isotop', isi: [
@@ -221,7 +228,7 @@ Sim3D.daftar('kimia-inti', (function () {
       s.tambah(g1);
 
       const lbl = S.teks('', { skala: 0.38, lebar: 40, warna: '#d8e4ec' });
-      lbl.position.set(0, 2.9, 0);
+      lbl.position.set(0, -2.9, 2.6);   // di depan-bawah, agar tidak menimpa label sampel
       s.data.lbl = lbl;
       s.tambah(lbl);
 

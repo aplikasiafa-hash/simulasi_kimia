@@ -123,7 +123,14 @@ Sim3D.daftar('titrasi', (function () {
 
   return {
     latar: 0x070c12,
-    kamera: { jarak: 11.5, phi: 1.0, theta: 0.58, targetY: 2.2, lajuPutar: 0.08 },
+    kamera: { jarak: 13.6, phi: 1.02, theta: 0.58, targetY: 2.3, lajuPutar: 0.08 },
+
+    legenda: [
+      { warna: '#4fd1c0', label: 'bagian kurva yang sudah dilalui' },
+      { warna: '#8aa0b4', label: 'kurva teoretis' },
+      { warna: '#f0d040', label: 'volume titik ekuivalen' },
+      { warna: '#e0409a', label: 'rentang warna indikator' }
+    ],
 
     kendali: [
       { judul: 'Larutan dalam labu', isi: [
@@ -253,6 +260,16 @@ Sim3D.daftar('titrasi', (function () {
       s.data.g1 = g1;
       s.tambah(g1);
 
+      /* --- label penunjuk: menamai tiap bagian rangkaian titrasi --- */
+      s.tambah(S.penunjuk('buret berisi titran', [-0.78, 3.2, 0.18], [-3.3, 3.9, 0.5],
+        { warna: '#8fd8ff', skala: 0.24, maksLebar: 2.6 }));
+      s.tambah(S.penunjuk('keran', [-1.0, 2.46, 0.18], [-2.9, 2.5, 0.7],
+        { warna: '#f0a94a', skala: 0.24, maksLebar: 1.5 }));
+      s.tambah(S.penunjuk('labu + analit', [-1.75, 0.85, 0.4], [-3.4, 0.5, 0.9],
+        { warna: '#9fe8ad', skala: 0.24, maksLebar: 2.2 }));
+      s.tambah(S.penunjuk('pengaduk magnet', [-1.0, 0.5, 0.55], [0.6, -0.65, 1.3],
+        { warna: '#c58ef0', skala: 0.24, maksLebar: 2.5 }));
+
       const lbl = S.teks('', { skala: 0.38, lebar: 38, warna: '#d8e4ec' });
       lbl.position.set(-1.0, 5.1, 0);
       s.data.lbl = lbl;
@@ -360,7 +377,7 @@ Sim3D.daftar('titrasi', (function () {
     const p = pH(s, s.get('v'));
     const w = warnaLarutan(s, p);
     s.data.labu.userData.cair.material.color.copy(w.warna);
-    s.data.labu.userData.cair.material.opacity = S.lerp(0.9, 0.18, w.jernih);
+    s.data.labu.userData.setOpasitas(S.lerp(0.82, 0.12, w.jernih));
   }
 
   function rekam(s) {
