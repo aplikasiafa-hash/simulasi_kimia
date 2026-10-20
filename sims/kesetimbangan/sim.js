@@ -25,13 +25,46 @@ Sim3D.daftar('kesetimbangan', (function () {
 
   function sistem(s) { return SISTEM[parseInt(s.get('sis'), 10) || 0]; }
 
-  /* Fraksi produk pada kesetimbangan, dipengaruhi suhu, tekanan, dan gangguan */
-  function setimbang(s) {
+  /* ------------------------------------------------------- van 't Hoff --
+     ln K(T) = ln K(298) + (ΔH/R) · (1/298,15 − 1/T)
+
+     ΔH pada tabel di atas ditulis dalam kJ/mol sedangkan R dalam J/(mol·K),
+     jadi ΔH harus dikalikan 1000 lebih dahulu.
+
+     Nilai mentahnya terlalu tajam untuk dipakai mengajar: pada ΔH = −197 kJ,
+     K turun ribuan kali lipat hanya dalam beberapa puluh derajat sehingga
+     slider langsung mentok di ujung. Karena itu besar pergeserannya diredam
+     dengan tanh. Yang dipertahankan:
+       · tandanya  — endoterm dipanaskan selalu bergeser ke kanan, dan
+                     eksoterm selalu ke kiri;
+       · urutannya — makin besar |ΔH| makin besar pergeserannya
+                     (SO₃ bergerak jauh, HI hampir diam);
+       · bentuknya — tetap bergantung pada 1/T, bukan pada T,
+                     sehingga mendinginkan terasa lebih kuat daripada
+                     memanaskan pada selisih derajat yang sama.                */
+  const R_GAS = 8.314;        // J/(mol·K)
+  const T_ACUAN = 298.15;     // 25 °C
+  const REDAM = 6.0;          // skala peredam tanh pada sumbu ln K
+  const KUAT = 2.6;           // lebar pergeseran maksimum pada sumbu ln K
+
+  function lnAcuan(z) { return Math.log(z.K / (1 - z.K)); }
+
+  /** ln K pada suhu sekarang. Hanya suhu yang boleh mengubah K. */
+  function lnTetapan(s) {
     const z = sistem(s);
     const Tk = s.get('suhu') + 273.15;
-    // ln K bergeser menurut van't Hoff: endoterm → K naik saat panas
-    const lnK = Math.log(z.K / (1 - z.K)) + (z.dH / 8.314) * (1 / 298.15 - 1 / Tk) * 1000 / 1000 * 1.0;
-    let f = 1 / (1 + Math.exp(-lnK));
+    const mentah = (z.dH * 1000 / R_GAS) * (1 / T_ACUAN - 1 / Tk);
+    return lnAcuan(z) + KUAT * Math.tanh(mentah / REDAM);
+  }
+
+  /** Kc relatif = perbandingan hasil/pereaksi pada kesetimbangan murni. */
+  function tetapanK(s) { return Math.exp(lnTetapan(s)); }
+
+  /* Fraksi hasil pada kesetimbangan. Suhu menentukan titik dasarnya lewat K;
+     tekanan dan penambahan zat menggeser posisinya TANPA mengubah K. */
+  function setimbang(s) {
+    const z = sistem(s);
+    let f = 1 / (1 + Math.exp(-lnTetapan(s)));
     // tekanan: bergeser ke ruas dengan mol gas lebih kecil
     if (z.fase === 'gas') {
       const p = s.get('tekanan');
@@ -41,16 +74,6 @@ Sim3D.daftar('kesetimbangan', (function () {
     // gangguan konsentrasi: tambah pereaksi (geser kanan) / tambah produk (geser kiri)
     f = S.clamp(f + s.get('tambah') * 0.09, 0.02, 0.98);
     return f;
-  }
-
-  function arah(s) {
-    const f = setimbang(s);
-    const lama = s.data ? (s.data.fLama === undefined ? f : s.data.fLama) : f;
-    const d = f - lama;
-    if (Math.abs(d) < 0.004) return { teks: 'Sudah setimbang — laju maju = laju balik', tone: 'aksen', d: 0 };
-    return d > 0
-      ? { teks: 'Bergeser ke kanan (ke arah hasil)', tone: 'warn', d: 1 }
-      : { teks: 'Bergeser ke kiri (ke arah pereaksi)', tone: 'biru', d: -1 };
   }
 
   return {
@@ -170,30 +193,55 @@ Sim3D.daftar('kesetimbangan', (function () {
       s.tambah(pKanan); s.tambah(pKiri);
 
       /* ---------- neraca batang (lambang kesetimbangan) ---------- */
-      const tiang = new T.Mesh(new T.CylinderGeometry(0.06, 0.08, 1.1, 16), S.matLogam(0x8d99a4));
-      tiang.position.set(4.6, 1.0, 0);
-      s.tambah(tiang);
-      const batang = new T.Mesh(new T.BoxGeometry(2.4, 0.08, 0.14), S.matLogam(0xc8ced4));
-      batang.position.set(4.6, 1.6, 0);
+      /* Neraca dibungkus satu grup. Grup ini diputar mengikuti kamera pada
+         sumbu tegak saja (lihat langkah()), sehingga batangnya selalu
+         melintang terhadap arah pandang. Tanpa itu, pada kemiringan kecil
+         perspektif kamera justru membuat neraca tampak miring ke arah yang
+         berlawanan dengan data — menyesatkan siswa. */
+      const NX = -2.2, NY = 1.45, NZ = 2.9;    // letak neraca di depan-kiri
+      const NL = 0.78;                          // panjang lengan
+      s.data.ny = NY; s.data.nl = NL;
+      const neraca = new T.Group();
+      neraca.position.set(NX, 0, NZ);
+      const alasN = new T.Mesh(new T.CylinderGeometry(0.42, 0.5, 0.1, 28),
+        S.matLogam(0x6b7784, { roughness: 0.5 }));
+      alasN.position.y = 0.05;
+      alasN.receiveShadow = true;
+      neraca.add(alasN);
+      neraca.add(S.bayanganKontak({ r: 0.75, y: 0.012, kuat: 0.7 }));
+      const tiang = new T.Mesh(new T.CylinderGeometry(0.055, 0.075, NY, 16),
+        S.matLogam(0x8d99a4));
+      tiang.position.y = NY / 2 + 0.08;
+      neraca.add(tiang);
+      const batang = new T.Mesh(new T.BoxGeometry(NL * 2.1, 0.07, 0.12),
+        S.matLogam(0xc8ced4));
+      batang.position.y = NY + 0.08;
       s.data.batang = batang;
-      s.tambah(batang);
-      const piringKi = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.05, 28),
+      neraca.add(batang);
+      const piringKi = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.045, 28),
         new T.MeshStandardMaterial({ color: 0x9ec8f0, roughness: 0.4,
           emissive: 0x9ec8f0, emissiveIntensity: 0.2 }));
-      const piringKa = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.05, 28),
+      const piringKa = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.045, 28),
         new T.MeshStandardMaterial({ color: 0xf0a94a, roughness: 0.4,
           emissive: 0xf0a94a, emissiveIntensity: 0.2 }));
       s.data.piringKi = piringKi; s.data.piringKa = piringKa;
-      s.tambah(piringKi); s.tambah(piringKa);
+      neraca.add(piringKi); neraca.add(piringKa);
+      s.data.neraca = neraca;
+      s.tambah(neraca);
+      const lblN = S.teks('neraca kesetimbangan', { skala: 0.19, lebar: 20,
+        warna: '#9fb4c6', maksLebar: 2.4 });
+      lblN.position.set(NX, 0.3, NZ + 0.8);
+      s.tambah(lblN);
 
       /* ---------- panel grafik ---------- */
-      const g1 = S.panelGrafik({ w: 4.2, px: 680, py: 430 });
-      g1.position.set(-3.6, 3.4, -1.4);
+      const g1 = S.panelGrafik({ w: 3.5, px: 620, py: 400 });
+      g1.position.set(-3.95, 3.1, -1.5);
       s.data.g1 = g1;
       s.tambah(g1);
 
-      const lbl = S.teks('', { skala: 0.4, lebar: 40, warna: '#d8e4ec' });
-      lbl.position.set(0, 5.5, 0);
+      const lbl = S.teks('', { skala: 0.46, lebar: 34, warna: '#d8e4ec',
+        maksLebar: 5.4 });
+      lbl.position.set(0.4, 0.28, 3.3);
       s.data.lbl = lbl;
       s.tambah(lbl);
 
@@ -268,10 +316,22 @@ Sim3D.daftar('kesetimbangan', (function () {
         ? S.fmt(s.get('tekanan'), 1) + ' atm' : 'larutan — tekanan tak berpengaruh');
 
       // neraca miring sesuai fraksi
-      const miring = (f - 0.5) * 0.55;
+      /* Hadapkan neraca ke kamera pada sumbu tegak saja supaya batangnya
+         melintang terhadap pandangan dan kemiringannya terbaca jujur. */
+      const kam = s.kamera;
+      if (kam) {
+        const n = s.data.neraca;
+        n.rotation.y = Math.atan2(kam.position.x - n.position.x,
+          kam.position.z - n.position.z);
+      }
+      const miring = (f - 0.5) * 0.9;
+      const NY = s.data.ny + 0.08, NL = s.data.nl;
+      // makin banyak hasil → piring hasil (kanan) makin berat dan turun
       s.data.batang.rotation.z = -miring;
-      s.data.piringKi.position.set(4.6 - 1.1 * Math.cos(miring), 1.6 - 1.1 * Math.sin(miring) * -1 - 0.26, 0);
-      s.data.piringKa.position.set(4.6 + 1.1 * Math.cos(miring), 1.6 + 1.1 * Math.sin(miring) * -1 - 0.26, 0);
+      s.data.piringKi.position.set(-NL * Math.cos(miring),
+        NY + NL * Math.sin(miring) - 0.22, 0);
+      s.data.piringKa.position.set(NL * Math.cos(miring),
+        NY - NL * Math.sin(miring) - 0.22, 0);
 
       // panah pergeseran
       const d = target - f;
@@ -298,11 +358,26 @@ Sim3D.daftar('kesetimbangan', (function () {
         Math.abs(d) < 0.004 ? 'aksen' : d > 0 ? 'warn' : 'biru');
       s.baca('ki', z.ki.n + ' : ' + Math.round((1 - f) * 100) + ' %');
       s.baca('ka', z.ka.n + ' : ' + Math.round(f * 100) + ' %');
-      s.baca('k', S.fmtRapi(f / Math.max(0.001, 1 - f)) + '  (perbandingan hasil/pereaksi)');
-      s.baca('suhu', z.dH > 0
-        ? 'Endoterm (ΔH = +' + z.dH + ' kJ) — dipanaskan bergeser ke kanan'
-        : 'Eksoterm (ΔH = ' + z.dH + ' kJ) — dipanaskan bergeser ke kiri',
-        z.dH > 0 ? 'biru' : 'warn');
+
+      /* Kc hanya berubah oleh suhu. Tekanan dan penambahan zat menggeser
+         posisi setimbang, tetapi angka Kc-nya tetap — itu justru inti
+         pelajarannya, jadi angkanya dibaca dari K, bukan dari f. */
+      const kSekarang = tetapanK(s);
+      const kAcuan = z.K / (1 - z.K);
+      s.baca('k', S.fmtRapi(kSekarang) + '   (pada 25 °C: ' + S.fmtRapi(kAcuan)
+        + ')   — hanya suhu yang mengubahnya');
+
+      const dT = Math.round(s.get('suhu')) - 25;
+      const rasio = kSekarang / kAcuan;
+      const sifat = z.dH > 0
+        ? 'Endoterm (ΔH = +' + z.dH + ' kJ) — panas berlaku sebagai pereaksi'
+        : 'Eksoterm (ΔH = ' + z.dH + ' kJ) — panas berlaku sebagai hasil';
+      s.baca('suhu', Math.abs(dT) < 1
+        ? sifat + '.  Sekarang tepat di suhu acuan 25 °C.'
+        : sifat + '.  ' + (dT > 0 ? 'Dipanaskan ' + dT : 'Didinginkan ' + (-dT))
+          + ' °C → Kc menjadi ' + S.fmtRapi(rasio) + '× dan setimbang bergeser ke '
+          + (rasio > 1.001 ? 'kanan' : rasio < 0.999 ? 'kiri' : 'tempat semula') + '.',
+      z.dH > 0 ? 'biru' : 'warn');
       s.baca('tek', z.fase === 'larutan' ? 'Tidak berpengaruh — bukan sistem gas'
         : z.molKi === z.molKa ? 'Tidak berpengaruh — jumlah mol gas kedua ruas sama ('
           + z.molKi + ' = ' + z.molKa + ')'
